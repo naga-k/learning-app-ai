@@ -1,24 +1,37 @@
 import { cn } from "@/lib/utils";
 import type { Experimental_GeneratedImage } from "ai";
+import NextImage from "next/image";
+import type { ComponentProps } from "react";
 
-export type ImageProps = Experimental_GeneratedImage & {
-  className?: string;
-  alt?: string;
-};
+type NextGeneratedImageProps = Omit<
+  ComponentProps<typeof NextImage>,
+  "src" | "alt" | "className"
+>;
+
+export type ImageProps = Omit<Experimental_GeneratedImage, "uint8Array"> &
+  NextGeneratedImageProps & {
+    className?: string;
+    alt?: string;
+  };
 
 export const Image = ({
   base64,
-  uint8Array,
   mediaType,
-  ...props
-}: ImageProps) => (
-  <img
-    {...props}
-    alt={props.alt}
-    className={cn(
-      "h-auto max-w-full overflow-hidden rounded-md",
-      props.className
-    )}
-    src={`data:${mediaType};base64,${base64}`}
-  />
-);
+  alt,
+  className,
+  ...imageProps
+}: ImageProps) => {
+  const src = `data:${mediaType};base64,${base64}`;
+
+  return (
+    <NextImage
+      {...imageProps}
+      alt={alt ?? ""}
+      className={cn(
+        "h-auto max-w-full overflow-hidden rounded-md",
+        className
+      )}
+      src={src}
+    />
+  );
+};

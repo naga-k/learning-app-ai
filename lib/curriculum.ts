@@ -138,10 +138,22 @@ const ensureCourseIds = (
   plan?: LearningPlanWithIds | null,
 ): CourseWithIds => {
   const planMap = new Map(
-    (plan?.modules ?? []).map((module) => [
-      module.id,
-      new Map(module.subtopics.map((subtopic) => [subtopic.title, subtopic.id])),
-    ]),
+    (plan?.modules ?? []).map((module, moduleIndex) => {
+      const moduleKey =
+        "id" in module && typeof module.id === "string" && module.id.length > 0
+          ? module.id
+          : slugify(`${moduleIndex + 1}-${module.title}`);
+      const subtopicEntries = module.subtopics.map((subtopic, subIndex) => {
+        const subtopicId =
+          "id" in subtopic &&
+          typeof subtopic.id === "string" &&
+          subtopic.id.length > 0
+            ? subtopic.id
+            : slugify(`${moduleKey}-${subIndex + 1}-${subtopic.title}`);
+        return [subtopic.title, subtopicId] as const;
+      });
+      return [moduleKey, new Map(subtopicEntries)] as const;
+    }),
   );
 
   return {

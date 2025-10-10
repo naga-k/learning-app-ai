@@ -61,6 +61,7 @@ import {
   useRef,
   useState,
 } from "react";
+import NextImage from "next/image";
 // ============================================================================
 // Provider Context & Types
 // ============================================================================
@@ -258,6 +259,7 @@ export function PromptInputAttachment({
 
   const mediaType =
     data.mediaType?.startsWith("image/") && data.url ? "image" : "file";
+  const isBlobUrl = data.url?.startsWith("blob:");
 
   return (
     <div
@@ -270,13 +272,28 @@ export function PromptInputAttachment({
       {...props}
     >
       {mediaType === "image" ? (
-        <img
-          alt={data.filename || "attachment"}
-          className="size-full rounded-md object-cover"
-          height={56}
-          src={data.url}
-          width={56}
-        />
+        isBlobUrl ? (
+          <>
+            {/* Next.js Image does not support blob: URLs, fall back to native img */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt={data.filename || "attachment"}
+              className="size-full rounded-md object-cover"
+              height={56}
+              src={data.url!}
+              width={56}
+            />
+          </>
+        ) : (
+          <NextImage
+            alt={data.filename || "attachment"}
+            className="size-full rounded-md object-cover"
+            height={56}
+            src={data.url!}
+            unoptimized
+            width={56}
+          />
+        )
       ) : (
         <div className="flex size-full max-w-full cursor-pointer items-center justify-start gap-2 overflow-hidden px-2 text-muted-foreground">
           <PaperclipIcon className="size-4 shrink-0" />
@@ -540,36 +557,56 @@ export const PromptInput = ({
     [matchesAccept, maxFiles, maxFileSize, onError]
   );
 
-  const add = usingProvider
-    ? (files: File[] | FileList) => controller.attachments.add(files)
-    : addLocal;
+  const add = useCallback(
+    (filesToAdd: File[] | FileList) => {
+      if (usingProvider && controller) {
+        controller.attachments.add(filesToAdd);
+        return;
+      }
+      addLocal(filesToAdd);
+    },
+    [usingProvider, controller, addLocal]
+  );
 
-  const remove = usingProvider
-    ? (id: string) => controller.attachments.remove(id)
-    : (id: string) =>
-        setItems((prev) => {
-          const found = prev.find((file) => file.id === id);
-          if (found?.url) {
-            URL.revokeObjectURL(found.url);
-          }
-          return prev.filter((file) => file.id !== id);
-        });
+  const remove = useCallback(
+    (id: string) => {
+      if (usingProvider && controller) {
+        controller.attachments.remove(id);
+        return;
+      }
+      setItems((prev) => {
+        const found = prev.find((file) => file.id === id);
+        if (found?.url) {
+          URL.revokeObjectURL(found.url);
+        }
+        return prev.filter((file) => file.id !== id);
+      });
+    },
+    [usingProvider, controller]
+  );
 
-  const clear = usingProvider
-    ? () => controller.attachments.clear()
-    : () =>
-        setItems((prev) => {
-          for (const file of prev) {
-            if (file.url) {
-              URL.revokeObjectURL(file.url);
-            }
-          }
-          return [];
-        });
+  const clear = useCallback(() => {
+    if (usingProvider && controller) {
+      controller.attachments.clear();
+      return;
+    }
+    setItems((prev) => {
+      for (const file of prev) {
+        if (file.url) {
+          URL.revokeObjectURL(file.url);
+        }
+      }
+      return [];
+    });
+  }, [usingProvider, controller]);
 
-  const openFileDialog = usingProvider
-    ? () => controller.attachments.openFileDialog()
-    : openFileDialogLocal;
+  const openFileDialog = useCallback(() => {
+    if (usingProvider && controller) {
+      controller.attachments.openFileDialog();
+      return;
+    }
+    openFileDialogLocal();
+  }, [usingProvider, controller, openFileDialogLocal]);
 
   // Let provider know about our hidden file input so external menus can call openFileDialog()
   useEffect(() => {
@@ -693,7 +730,10 @@ export const PromptInput = ({
 
     // Convert blob URLs to data URLs asynchronously
     Promise.all(
-      files.map(async ({ id, ...item }) => {
+      files.map(async (file) => {
+        // Remove client-only identifier before passing to onSubmit
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id, ...item } = file;
         if (item.url && item.url.startsWith("blob:")) {
           return {
             ...item,
@@ -725,7 +765,7 @@ export const PromptInput = ({
             controller.textInput.clear();
           }
         }
-      } catch (error) {
+      } catch {
         // Don't clear on error - user may want to retry
       }
     });
