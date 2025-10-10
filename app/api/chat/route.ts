@@ -1,12 +1,84 @@
 import { openai } from '@ai-sdk/openai';
-import { streamText, generateText, convertToModelMessages } from 'ai';
+import { streamText, generateObject, generateText, convertToModelMessages } from 'ai';
 import { z } from 'zod';
+import {
+  CourseSchema,
+  LearningPlanSchema,
+  formatLearningPlanText,
+  normalizeCourse,
+  normalizeLearningPlan,
+  summarizeCourseForChat,
+  type LearningPlanWithIds,
+} from '@/lib/curriculum';
+
+const learningPlanJsonSchema = `
+{
+  "overview": {
+    "goal": "string",
+    "totalDuration": "string",
+    "outcomes": ["string", "..."]
+  },
+  "modules": [
+    {
+      "title": "string",
+      "duration": "string",
+      "objective": "string",
+      "subtopics": [
+        {
+          "title": "string",
+          "duration": "string",
+          "description": "string"
+        }
+      ],
+      "deliverable": "string"
+    }
+  ],
+  "optionalDeepDive": {
+    "title": "string",
+    "description": "string (optional)",
+    "resources": ["string", "..."] (optional)
+  } (optional)
+}`.trim();
+
+const courseJsonSchema = `
+{
+  "overview": {
+    "focus": "string (optional)",
+    "totalDuration": "string (optional)"
+  },
+  "modules": [
+    {
+      "moduleId": "string (reuse plan slug when available)",
+      "title": "string",
+      "summary": "string (optional)",
+      "submodules": [
+        {
+          "id": "string (reuse plan subtopic slug when available)",
+          "title": "string",
+          "duration": "string (optional)",
+          "keyConcepts": ["string", "..."],
+          "exercises": ["string", "..."],
+          "notes": ["string", "... (optional)"]
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "title": "string",
+      "description": "string (optional)",
+      "url": "string (optional)",
+      "type": "string (optional)"
+    }
+  ] (optional)
+}`.trim();
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
+  let latestStructuredPlan: LearningPlanWithIds | null = null;
 
   // Tool for generating learning plans (corresponds to Agent-HEzeu in your workflow)
   const generatePlanTool = {
@@ -29,8 +101,7 @@ export async function POST(req: Request) {
       modificationRequest?: string;
       currentPlan?: string;
     }) => {
-      // Planning agent using GPT-5 with Responses API
-      const planningPrompt = `You are an expert learning plan creator. Generate a high-level, structured learning plan.
+      const planningPrompt = `You are an expert learning plan creator. Generate a high-level, structured learning plan that conforms to the provided JSON schema.
 
 ${modificationRequest ? `
 **MODIFICATION REQUEST:** ${modificationRequest}
@@ -50,71 +121,62 @@ Experience Level: ${experienceLevel}
 Motivation: ${motivation}
 ${specificFocus ? `Specific Focus: ${specificFocus}` : ''}
 
-Create a practical learning plan that:
-1. Breaks down the topic into digestible modules with clear time estimates
-2. Fits within the available time (distribute it logically across modules)
-3. Matches the user's experience level
-4. Provides a clear roadmap of what will be covered (not how it will be taught)
-5. Is easy to scan and adjust
+JSON schema:
+${learningPlanJsonSchema}
 
-**STRUCTURE:**
+Requirements:
+1. Respect the overall time constraint and distribute time realistically across modules.
+2. Plan modules must align to the user's experience level and motivation.
+3. Provide 2-4 subtopics per module with concise descriptions.
+4. Include a single deliverable per module that describes what the learner will achieve.
+5. Optional deep-dive resources are only included when they add value.`;
 
-**START WITH OVERVIEW:**
-🧭 Overview
-Goal: [Clear one-sentence goal statement]
-Total Duration: [X hours/minutes]
-Outcome: You'll be able to:
-- [Concrete outcome 1]
-- [Concrete outcome 2]
-- [Concrete outcome 3]
+      try {
+        const { object: planObject } = await generateObject({
+          model: openai('gpt-5'),
+          prompt: planningPrompt,
+          schema: LearningPlanSchema,
+        });
 
-**THEN CREATE MODULES:**
-MODULE [NUMBER] — [Module Title] ([Duration])
-Objective: [What the learner will grasp - one sentence]
+        const structuredPlan = normalizeLearningPlan(planObject);
+        latestStructuredPlan = structuredPlan;
+        const planText = formatLearningPlanText(structuredPlan);
 
-([Time]) [Subtopic 1]:
-- [Brief 5-15 word description of what's covered]
+        return {
+          plan: planText,
+          structuredPlan,
+          summary: `Generated a learning plan for ${topic} (${timeAvailable}, ${experienceLevel} level)`,
+        };
+      } catch (error) {
+        console.error('[generate_plan] structured plan failed', error);
+        latestStructuredPlan = null;
 
-([Time]) [Subtopic 2]:
-- [Brief description]
+        const fallbackPrompt = `You are an expert learning plan creator.
 
-([Time]) [Subtopic 3]:
-- [Brief description]
+Topic: ${topic}
+Time Available: ${timeAvailable}
+Experience Level: ${experienceLevel}
+Motivation: ${motivation}
+${specificFocus ? `Specific Focus: ${specificFocus}` : ''}
 
-Deliverable: [One concrete outcome - what they'll understand or be able to do]
+Create a practical learning plan in plain text with:
+- A short overview (goal, total duration, key outcomes)
+- 3-5 numbered modules with durations, objectives, and 2-4 timed subtopics
+- A deliverable for each module
+- Optional deep-dive suggestions if relevant
 
-**KEY FORMATTING RULES:**
-- Use plain text "MODULE 1 — Title (45 min)" format (not markdown headings)
-- Keep objectives to one clear sentence
-- List 2-4 subtopics per module with time estimates in parentheses: (10 min), (15 min)
-- Each subtopic gets ONE brief bullet point (5-15 words) describing what's covered
-- Add one "Deliverable:" per module describing the practical outcome
-- Use emojis sparingly: 🧭 for overview, ✅ for optional sections
+Keep it readable with line breaks so it can be shown directly to the learner.`;
 
-**END WITH OPTIONAL SECTION (if relevant):**
-✅ Optional Deep-Dive (post-course)
-If you want to go further:
-- [2-3 specific resource suggestions: books, papers, or practice ideas]
+        const fallbackPlan = await generateText({
+          model: openai('gpt-5'),
+          prompt: fallbackPrompt,
+        });
 
-**DO NOT:**
-- Use ## or ### markdown headings for modules
-- Include code blocks, formulas, or detailed examples (save for content generation phase)
-- Write detailed step-by-step activities or instructions
-- Add multiple bullet points per subtopic
-- Make it overly detailed—focus on WHAT will be covered, not HOW`;
-
-
-      // Using GPT-5 with Responses API (default API in AI SDK 5)
-      // Note: gpt-5 is a reasoning model and doesn't support temperature setting
-      const planResponse = await generateText({
-        model: openai('gpt-5'),
-        prompt: planningPrompt,
-      });
-
-      return {
-        plan: planResponse.text,
-        summary: `Generated a learning plan for ${topic} (${timeAvailable}, ${experienceLevel} level)`,
-      };
+        return {
+          plan: fallbackPlan.text,
+          summary: `Generated a fallback learning plan for ${topic} (${timeAvailable}, ${experienceLevel} level)`,
+        };
+      }
     },
   };
 
@@ -122,51 +184,75 @@ If you want to go further:
   const generateCourseTool = {
     description: 'Generate detailed course content based on an approved learning plan.',
     inputSchema: z.object({
-      approvedPlan: z.string().describe('The approved learning plan'),
+      approvedPlan: z.string().describe('The approved learning plan in plain text'),
       topic: z.string().describe('The main topic'),
       experienceLevel: z.string().describe('User experience level'),
+      planStructure: z
+        .string()
+        .optional()
+        .describe(
+          'JSON string representing the structured learning plan as returned by generate_plan',
+        ),
     }),
-    execute: async ({ approvedPlan, topic, experienceLevel }: {
+    execute: async ({
+      approvedPlan,
+      topic,
+      experienceLevel,
+      planStructure,
+    }: {
       approvedPlan: string;
       topic: string;
       experienceLevel: string;
+      planStructure?: string;
     }) => {
-      // Course generator using GPT-5
+      let parsedPlan: LearningPlanWithIds | null = null;
+
+      if (planStructure) {
+        try {
+          const json = JSON.parse(planStructure);
+          parsedPlan = normalizeLearningPlan(LearningPlanSchema.parse(json));
+        } catch {
+          parsedPlan = null;
+        }
+      }
+
+      if (!parsedPlan && latestStructuredPlan) {
+        parsedPlan = latestStructuredPlan;
+      }
+
       const coursePrompt = `You are an expert course content creator.
 
-**APPROVED LEARNING PLAN:**
+APPROVED LEARNING PLAN (text):
 ${approvedPlan}
+
+${parsedPlan ? `APPROVED LEARNING PLAN (JSON):\n${JSON.stringify(parsedPlan, null, 2)}\n` : ''}
 
 Topic: ${topic}
 Experience Level: ${experienceLevel}
 
-Generate detailed course content for this plan. For now, create a structured outline with:
+Generate detailed course content that adheres to the learning plan. Requirements:
+1. Maintain the module order and intent from the approved plan.
+2. Provide at least one practical exercise or project idea per submodule.
+3. Surface the most important key concepts as bullet strings.
+4. When possible, include estimated time or pacing notes to help learners stay on track.
+5. Use clear and approachable language tuned to the stated experience level.
+6. Return valid JSON that matches the provided Course schema exactly.
 
-For each MODULE in the plan:
-- Expand each subtopic with key concepts to cover
-- Suggest 1-2 concrete examples or exercises per subtopic
-- Keep it structured and ready for future content expansion
+Course schema:
+${courseJsonSchema}`;
 
-Format as:
-**MODULE X — [Title]**
-
-**Subtopic 1: [Name]**
-  Key concepts: [list]
-  Example/Exercise: [brief description]
-
-**Subtopic 2: [Name]**
-  Key concepts: [list]
-  Example/Exercise: [brief description]
-
-(This is a dummy implementation - full content generation will be added later)`;
-
-      const courseResponse = await generateText({
+      const { object: courseObject } = await generateObject({
         model: openai('gpt-5'),
         prompt: coursePrompt,
+        schema: CourseSchema,
       });
 
+      const structuredCourse = normalizeCourse(courseObject, parsedPlan);
+      const courseSummary = summarizeCourseForChat(structuredCourse);
+
       return {
-        course: courseResponse.text,
+        course: courseSummary,
+        courseStructured: structuredCourse,
         summary: `Generated course structure for ${topic}`,
       };
     },
@@ -215,8 +301,8 @@ Repeat this small adjustment loop until the user is happy with the plan.
 ⚡ When plan is approved
 When the user approves the plan (says "looks good", "approve", "let's go", "ready", "start the course", etc.):
 - Confirm: "Great! Generating your course content now..."
-- Use the generate_course tool with the approved plan
-- Output the course structure directly to the user
+- Use the generate_course tool with the approved plan. Include the original plan text, topic, experience level, and the Structured JSON returned from the plan tool (pass it as planStructure).
+- Once the course is generated, summarize what was created (the UI will handle detailed rendering).
 - Ask if they'd like any adjustments to the course content
 
 🗣️ Tone & style
