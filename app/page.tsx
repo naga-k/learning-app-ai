@@ -10,6 +10,7 @@ import {
 } from '@/components/ai-elements/conversation';
 import { Message, MessageContent } from '@/components/ai-elements/message';
 import { Response } from '@/components/ai-elements/response';
+import { Loader } from '@/components/ai-elements/loader';
 import { MessageSquare } from 'lucide-react';
 
 export default function Chat() {
@@ -56,51 +57,83 @@ export default function Chat() {
                 description="Just say hi or tell me what you&apos;d like to learn!"
               />
             ) : (
-              messages.map((message) => (
-                <Message from={message.role} key={message.id}>
-                  <MessageContent>
-                    {message.parts.map((part: { type?: string; output?: unknown; result?: unknown; state?: string; text?: string }, i: number) => {
-                      if (part.type === 'text') {
-                        return (
-                          <Response key={`${message.id}-${i}`}>
-                            {part.text}
-                          </Response>
-                        );
-                      }
-                      
-                      // Handle tool calls
-                      if (part.type?.startsWith('tool-')) {
-                        const output = part.output || part.result;
-                        if (output && typeof output === 'object' && 'plan' in output) {
-                          const planOutput = output as { plan: string };
+              <>
+                {messages.map((message) => (
+                  <Message from={message.role} key={message.id}>
+                    <MessageContent>
+                      {message.parts.map((part: { type?: string; output?: unknown; result?: unknown; state?: string; text?: string }, i: number) => {
+                        if (part.type === 'text') {
                           return (
-                            <div key={`${message.id}-${i}`} className="mt-4 space-y-3">
-                              <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Learning Plan Generated
-                              </div>
-                              <Response className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
-                                {planOutput.plan}
-                              </Response>
-                            </div>
-                          );
-                        } else if (part.state === 'input-streaming' || !output) {
-                          return (
-                            <div key={`${message.id}-${i}`} className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                              <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
-                              Creating your learning plan...
-                            </div>
+                            <Response key={`${message.id}-${i}`}>
+                              {part.text}
+                            </Response>
                           );
                         }
-                      }
-                      
-                      return null;
-                    })}
-                  </MessageContent>
-                </Message>
-              ))
+                        
+                        // Handle tool calls
+                        if (part.type?.startsWith('tool-')) {
+                          const output = part.output || part.result;
+                          if (output && typeof output === 'object' && 'plan' in output) {
+                            const planOutput = output as { plan: string };
+                            return (
+                              <div key={`${message.id}-${i}`} className="mt-4 space-y-3">
+                                <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Learning Plan Generated
+                                </div>
+                                <Response className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+                                  {planOutput.plan}
+                                </Response>
+                              </div>
+                            );
+                          } else if (part.state === 'input-streaming' || !output) {
+                            return (
+                              <div key={`${message.id}-${i}`} className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                                <Loader size={16} />
+                                Creating your learning plan...
+                              </div>
+                            );
+                          }
+                        }
+                        
+                        return null;
+                      })}
+                    </MessageContent>
+                  </Message>
+                ))}
+                {(() => {
+                  // Show loading indicator when streaming and no assistant response has started yet
+                  const lastMessage = messages[messages.length - 1];
+                  const showLoader = 
+                    status === 'streaming' &&
+                    lastMessage?.role === 'user';
+                  
+                  // Also check if assistant message exists but has no text content yet
+                  const lastAssistantMessage = messages[messages.length - 1]?.role === 'assistant' 
+                    ? messages[messages.length - 1] 
+                    : null;
+                  
+                  const hasTextContent = lastAssistantMessage?.parts?.some(
+                    (part: { type?: string }) => part.type === 'text'
+                  );
+                  
+                  if (showLoader || (status === 'streaming' && lastAssistantMessage && !hasTextContent)) {
+                    return (
+                      <Message from="assistant">
+                        <MessageContent>
+                          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400 py-2">
+                            <Loader size={20} />
+                            <span className="text-sm animate-pulse">Thinking...</span>
+                          </div>
+                        </MessageContent>
+                      </Message>
+                    );
+                  }
+                  return null;
+                })()}
+              </>
             )}
           </ConversationContent>
           <ConversationScrollButton />
