@@ -28,7 +28,7 @@ export default function Chat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() && status !== 'streaming') {
-        handleSubmit(e as any);
+        handleSubmit(e as unknown as React.FormEvent);
       }
     }
   };
@@ -41,7 +41,7 @@ export default function Chat() {
             🎓 AI Learning-Plan Assistant
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Tell me what you want to learn, and I'll create a personalized plan for you
+            Tell me what you want to learn, and I&apos;ll create a personalized plan for you
           </p>
         </div>
       </header>
@@ -53,13 +53,13 @@ export default function Chat() {
               <ConversationEmptyState
                 icon={<MessageSquare className="w-12 h-12" />}
                 title="Ready to start learning?"
-                description="Just say hi or tell me what you'd like to learn!"
+                description="Just say hi or tell me what you&apos;d like to learn!"
               />
             ) : (
               messages.map((message) => (
                 <Message from={message.role} key={message.id}>
                   <MessageContent>
-                    {message.parts.map((part: any, i: number) => {
+                    {message.parts.map((part: { type?: string; output?: unknown; result?: unknown; state?: string; text?: string }, i: number) => {
                       if (part.type === 'text') {
                         return (
                           <Response key={`${message.id}-${i}`}>
@@ -72,6 +72,7 @@ export default function Chat() {
                       if (part.type?.startsWith('tool-')) {
                         const output = part.output || part.result;
                         if (output && typeof output === 'object' && 'plan' in output) {
+                          const planOutput = output as { plan: string };
                           return (
                             <div key={`${message.id}-${i}`} className="mt-4 space-y-3">
                               <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
@@ -81,7 +82,7 @@ export default function Chat() {
                                 Learning Plan Generated
                               </div>
                               <Response className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
-                                {output.plan}
+                                {planOutput.plan}
                               </Response>
                             </div>
                           );
