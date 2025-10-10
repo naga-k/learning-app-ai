@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Conversation,
   ConversationContent,
@@ -11,18 +11,95 @@ import {
 import { Message, MessageContent } from '@/components/ai-elements/message';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
-import { MessageSquare } from 'lucide-react';
+import { CourseWorkspace } from '@/components/course/course-workspace';
+import {
+  type CourseWithIds,
+  type LearningPlanWithIds,
+} from '@/lib/curriculum';
+import { MessageSquare, BookOpen } from 'lucide-react';
+
+type PlanToolOutput = {
+  plan: string;
+  structuredPlan?: LearningPlanWithIds;
+  summary?: string;
+};
+
+type CourseToolOutput = {
+  course: string;
+  courseStructured?: CourseWithIds;
+  summary?: string;
+};
+
+type CourseSnapshot = {
+  id: string;
+  output: CourseToolOutput;
+};
+
+const isPlanToolOutput = (value: unknown): value is PlanToolOutput =>
+  Boolean(
+    value &&
+      typeof value === 'object' &&
+      'plan' in value &&
+      typeof (value as Record<string, unknown>).plan === 'string',
+  );
+
+const isCourseToolOutput = (value: unknown): value is CourseToolOutput =>
+  Boolean(
+    value &&
+      typeof value === 'object' &&
+      'course' in value &&
+      typeof (value as Record<string, unknown>).course === 'string',
+  );
 
 export default function Chat() {
   const [input, setInput] = useState('');
+  const [viewMode, setViewMode] = useState<'chat' | 'course'>('chat');
   const { messages, sendMessage, status } = useChat();
+
+  const [courseState, setCourseState] = useState<CourseSnapshot | null>(null);
+  const courseRef = useRef<string | null>(null);
+
+  const latestCourse = useMemo<CourseSnapshot | null>(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      for (
+        let partIndex = message.parts.length - 1;
+        partIndex >= 0;
+        partIndex -= 1
+      ) {
+        const part = message.parts[partIndex] as {
+          type?: string;
+          output?: unknown;
+          result?: unknown;
+        };
+
+        if (!part.type?.startsWith('tool-')) continue;
+        const payload = part.output ?? part.result;
+        if (isCourseToolOutput(payload)) {
+          return {
+            id: `${message.id}-${partIndex}`,
+            output: payload,
+          };
+        }
+      }
+    }
+    return null;
+  }, [messages]);
+
+  useEffect(() => {
+    if (!latestCourse) return;
+    if (courseRef.current === latestCourse.id) return;
+
+    courseRef.current = latestCourse.id;
+    setCourseState(latestCourse);
+    setViewMode('course');
+  }, [latestCourse]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
-      sendMessage({ text: input });
-      setInput('');
-    }
+    if (!input.trim()) return;
+    sendMessage({ text: input });
+    setInput('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -34,152 +111,285 @@ export default function Chat() {
     }
   };
 
+  const showCourseToggle = Boolean(courseState?.output.courseStructured);
+
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            🎓 AI Learning-Plan Assistant
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Tell me what you want to learn, and I&apos;ll create a personalized plan for you
-          </p>
+    <div className="flex h-screen flex-col bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <header className="bg-white/95 shadow-sm backdrop-blur dark:bg-gray-900/80">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              🎓 AI Learning-Plan Assistant
+            </h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Shape your learning goal, review the plan, then turn it into a
+              fully structured course.
+            </p>
+          </div>
+
+          {showCourseToggle && (
+            <button
+              type="button"
+              onClick={() =>
+                setViewMode((mode) => (mode === 'course' ? 'chat' : 'course'))
+              }
+              className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-indigo-500/40 dark:bg-transparent dark:text-indigo-300 dark:hover:border-indigo-500/60 dark:hover:text-indigo-200"
+            >
+              {viewMode === 'course' ? (
+                <MessageSquare className="h-4 w-4" />
+              ) : (
+                <BookOpen className="h-4 w-4" />
+              )}
+              {viewMode === 'course' ? 'Back to chat' : 'Open course workspace'}
+            </button>
+          )}
         </div>
       </header>
 
-      <div className="flex-1 relative">
-        <Conversation className="absolute inset-0">
-          <ConversationContent>
-            {messages.length === 0 ? (
-              <ConversationEmptyState
-                icon={<MessageSquare className="w-12 h-12" />}
-                title="Ready to start learning?"
-                description="Just say hi or tell me what you&apos;d like to learn!"
-              />
-            ) : (
-              <>
-                {messages.map((message) => (
-                  <Message from={message.role} key={message.id}>
-                    <MessageContent>
-                      {message.parts.map((part: { type?: string; output?: unknown; result?: unknown; state?: string; text?: string }, i: number) => {
-                        if (part.type === 'text') {
+      <main className="flex-1 overflow-hidden">
+        {viewMode === 'course' && courseState?.output.courseStructured ? (
+          <CourseWorkspace
+            course={courseState.output.courseStructured}
+            summary={courseState.output.course}
+            onBack={() => setViewMode('chat')}
+          />
+        ) : (
+          <div className="flex h-full flex-col">
+            <div className="relative flex-1">
+              <Conversation className="absolute inset-0">
+                <ConversationContent>
+                  {messages.length === 0 ? (
+                    <ConversationEmptyState
+                      icon={<MessageSquare className="h-12 w-12" />}
+                      title="Ready to start learning?"
+                      description="Say hi or tell me what you’d like to learn."
+                    />
+                  ) : (
+                    <>
+                      {messages.map((message) => (
+                        <Message from={message.role} key={message.id}>
+                          <MessageContent>
+                            {message.parts.map(
+                              (
+                                part: {
+                                  type?: string;
+                                  output?: unknown;
+                                  result?: unknown;
+                                  state?: string;
+                                  text?: string;
+                                },
+                                index: number,
+                              ) => {
+                                if (part.type === 'text') {
+                                  return (
+                                    <Response key={`${message.id}-${index}`}>
+                                      {part.text}
+                                    </Response>
+                                  );
+                                }
+
+                                if (part.type?.startsWith('tool-')) {
+                                  const payload = part.output ?? part.result;
+
+                                  if (isPlanToolOutput(payload)) {
+                                    return (
+                                      <div
+                                        key={`${message.id}-${index}`}
+                                        className="mt-4 space-y-4"
+                                      >
+                                        <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                                          <svg
+                                            className="h-4 w-4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                            />
+                                          </svg>
+                                          Learning plan generated
+                                        </div>
+                                        <Response className="rounded-xl border border-gray-200/70 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/80">
+                                          {payload.plan}
+                                        </Response>
+                                        <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-800 shadow-sm dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
+                                          Ready for the next step? Ask me to
+                                          “Generate the course” when you’re
+                                          happy with this plan.
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+
+                                  if (isCourseToolOutput(payload)) {
+                                    return (
+                                      <div
+                                        key={`${message.id}-${index}`}
+                                        className="mt-4 space-y-3"
+                                      >
+                                        <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                          <svg
+                                            className="h-4 w-4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              strokeWidth={2}
+                                              d="M5 13l4 4L19 7"
+                                            />
+                                          </svg>
+                                          Course generated
+                                        </div>
+                                        <Response className="rounded-xl border border-emerald-200/70 bg-white/90 p-4 text-sm text-gray-800 shadow-sm backdrop-blur dark:border-emerald-500/40 dark:bg-gray-900/80 dark:text-gray-200">
+                                          {payload.course}
+                                        </Response>
+                                      </div>
+                                    );
+                                  }
+
+                                  if (
+                                    part.state === 'input-streaming' ||
+                                    !payload
+                                  ) {
+                                    return (
+                                      <div
+                                        key={`${message.id}-${index}`}
+                                        className="mt-2 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+                                      >
+                                        <Loader size={16} />
+                                        Creating your learning plan...
+                                      </div>
+                                    );
+                                  }
+                                }
+
+                                return null;
+                              },
+                            )}
+                          </MessageContent>
+                        </Message>
+                      ))}
+
+                      {(() => {
+                        const lastMessage = messages[messages.length - 1];
+                        const awaitingAssistant =
+                          status === 'streaming' && lastMessage?.role === 'user';
+                        const lastAssistantMessage =
+                          messages[messages.length - 1]?.role === 'assistant'
+                            ? messages[messages.length - 1]
+                            : null;
+                        const hasAssistantText =
+                          lastAssistantMessage?.parts?.some(
+                            (part: { type?: string }) => part.type === 'text',
+                          );
+
+                        if (
+                          awaitingAssistant ||
+                          (status === 'streaming' &&
+                            lastAssistantMessage &&
+                            !hasAssistantText)
+                        ) {
                           return (
-                            <Response key={`${message.id}-${i}`}>
-                              {part.text}
-                            </Response>
+                            <Message from="assistant">
+                              <MessageContent>
+                                <div className="flex items-center gap-3 py-2 text-gray-500 dark:text-gray-400">
+                                  <Loader size={20} />
+                                  <span className="text-sm animate-pulse">
+                                    Thinking...
+                                  </span>
+                                </div>
+                              </MessageContent>
+                            </Message>
                           );
                         }
-                        
-                        // Handle tool calls
-                        if (part.type?.startsWith('tool-')) {
-                          const output = part.output || part.result;
-                          if (output && typeof output === 'object' && 'plan' in output) {
-                            const planOutput = output as { plan: string };
-                            return (
-                              <div key={`${message.id}-${i}`} className="mt-4 space-y-3">
-                                <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  Learning Plan Generated
-                                </div>
-                                <Response className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
-                                  {planOutput.plan}
-                                </Response>
-                              </div>
-                            );
-                          } else if (part.state === 'input-streaming' || !output) {
-                            return (
-                              <div key={`${message.id}-${i}`} className="mt-2 flex items-center gap-2 text-sm text-gray-500">
-                                <Loader size={16} />
-                                Creating your learning plan...
-                              </div>
-                            );
-                          }
-                        }
-                        
                         return null;
-                      })}
-                    </MessageContent>
-                  </Message>
-                ))}
-                {(() => {
-                  // Show loading indicator when streaming and no assistant response has started yet
-                  const lastMessage = messages[messages.length - 1];
-                  const showLoader = 
-                    status === 'streaming' &&
-                    lastMessage?.role === 'user';
-                  
-                  // Also check if assistant message exists but has no text content yet
-                  const lastAssistantMessage = messages[messages.length - 1]?.role === 'assistant' 
-                    ? messages[messages.length - 1] 
-                    : null;
-                  
-                  const hasTextContent = lastAssistantMessage?.parts?.some(
-                    (part: { type?: string }) => part.type === 'text'
-                  );
-                  
-                  if (showLoader || (status === 'streaming' && lastAssistantMessage && !hasTextContent)) {
-                    return (
-                      <Message from="assistant">
-                        <MessageContent>
-                          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400 py-2">
-                            <Loader size={20} />
-                            <span className="text-sm animate-pulse">Thinking...</span>
-                          </div>
-                        </MessageContent>
-                      </Message>
-                    );
-                  }
-                  return null;
-                })()}
-              </>
-            )}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-      </div>
+                      })()}
+                    </>
+                  )}
+                </ConversationContent>
+                <ConversationScrollButton />
+              </Conversation>
+            </div>
 
-      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex gap-3 items-end">
-            <textarea
-              className="flex-1 rounded-2xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-6 py-3 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none min-h-[52px] max-h-[200px]"
-              value={input}
-              placeholder="Type your message... (Shift+Enter for new line)"
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={status === 'streaming'}
-              rows={1}
-              style={{
-                height: 'auto',
-                overflowY: input.split('\n').length > 3 ? 'auto' : 'hidden'
-              }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = 'auto';
-                target.style.height = Math.min(target.scrollHeight, 200) + 'px';
-              }}
-            />
-            <button
-              type="submit"
-              disabled={status === 'streaming' || !input.trim()}
-              className="rounded-full bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {status === 'streaming' ? (
-                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              )}
-            </button>
+            <div className="border-t border-gray-200 bg-white/95 shadow-lg backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">
+              <form
+                onSubmit={handleSubmit}
+                className="mx-auto flex w-full max-w-5xl gap-3 px-4 py-4"
+              >
+                <textarea
+                  className="flex-1 rounded-2xl border border-gray-300 bg-white px-6 py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400"
+                  value={input}
+                  placeholder="Type your message... (Shift+Enter for a new line)"
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={status === 'streaming'}
+                  rows={1}
+                  style={{
+                    height: 'auto',
+                    overflowY: input.split('\n').length > 3 ? 'auto' : 'hidden',
+                  }}
+                  onInput={(event) => {
+                    const target = event.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = `${Math.min(
+                      target.scrollHeight,
+                      200,
+                    )}px`;
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={status === 'streaming' || !input.trim()}
+                  className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {status === 'streaming' ? (
+                    <svg
+                      className="h-5 w-5 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </form>
+            </div>
           </div>
-        </form>
-      </div>
+        )}
+      </main>
     </div>
   );
 }
