@@ -1,36 +1,120 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Learning-Plan Assistant
+
+A Next.js application that helps users create personalized learning plans using the Vercel AI SDK and OpenAI.
+
+## Features
+
+- 🤖 **Intelligent Conversation Flow**: The AI naturally extracts learning goals, time constraints, and experience levels through conversation
+- 🎯 **Personalized Learning Plans**: Generates structured, actionable learning plans tailored to individual needs
+- 🛠️ **Tool Calling**: Uses AI function calling to generate detailed plans with a specialized planning agent
+- 💬 **Real-time Streaming**: Smooth, real-time chat experience with streaming responses
+- 🎨 **Modern UI**: Clean, responsive interface with dark mode support
+
+## Architecture
+
+This application replicates the Langflow workflow with:
+
+1. **Main Agent** (`/api/chat/route.ts`): 
+   - Handles user conversation
+   - Extracts learning requirements naturally
+   - Decides when to generate a plan
+
+2. **Planning Tool** (within the route):
+   - Generates detailed, structured learning plans
+   - Considers topic, time, experience level, and motivation
+   - Provides actionable steps and milestones
+
+3. **Chat UI** (`/app/page.tsx`):
+   - Interactive chat interface
+   - Real-time message streaming
+   - Tool invocation visualization
 
 ## Getting Started
 
-First, run the development server:
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+2. **Set up your OpenAI API key**:
+   - Edit `.env.local` and add your API key:
+   ```bash
+   OPENAI_API_KEY=your_actual_api_key_here
+   ```
+
+3. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Open your browser**:
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## How It Works
+
+### Conversation Flow
+
+1. User greets the assistant or states what they want to learn
+2. The assistant naturally asks follow-up questions about:
+   - The specific topic
+   - Available time (30 min - 3 hours)
+   - Current experience level
+   - Learning motivation
+3. Once all info is gathered, the assistant confirms and generates a plan
+4. User can request modifications to refine the plan
+
+### Tool Calling
+
+The app uses the Vercel AI SDK's tool calling feature to:
+- Trigger plan generation when ready
+- Pass structured data to the planning agent
+- Return formatted learning plans
+
+### Streaming
+
+Both the main conversation and plan generation use streaming for:
+- Immediate response feedback
+- Smooth user experience
+- Efficient token usage
+
+## Tech Stack
+
+- **Next.js 15**: React framework with App Router
+- **Vercel AI SDK**: AI/ML integration and streaming
+- **OpenAI**: GPT-4o-mini for both agents
+- **TypeScript**: Type-safe development
+- **Tailwind CSS**: Styling and responsive design
+- **Zod**: Schema validation for tool parameters
+
+## Customization
+
+### Modify the System Prompt
+Edit the `systemPrompt` in `/app/api/chat/route.ts` to change the assistant's behavior.
+
+### Add More Tools
+Add additional tools to the `tools` object in the `streamText` call:
+
+```typescript
+tools: {
+  generate_plan: generatePlanTool,
+  your_new_tool: yourNewTool,
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Change the Model
+Replace `openai('gpt-4o-mini')` with any supported model:
+- `openai('gpt-4')`
+- `openai('gpt-4-turbo')`
+- Or use other providers from `@ai-sdk/*`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Deploy to Vercel with one click:
 
-## Learn More
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-To learn more about Next.js, take a look at the following resources:
+Make sure to add your `OPENAI_API_KEY` environment variable in the Vercel dashboard.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
