@@ -17,16 +17,32 @@ export async function POST(req: Request) {
       experienceLevel: z.string().describe('The user\'s current experience level (beginner, intermediate, advanced)'),
       motivation: z.string().describe('Why the user wants to learn this topic'),
       specificFocus: z.string().optional().describe('Any specific area within the topic to focus on'),
+      modificationRequest: z.string().optional().describe('Requested changes to an existing plan'),
+      currentPlan: z.string().optional().describe('The current plan to be modified'),
     }),
-    execute: async ({ topic, timeAvailable, experienceLevel, motivation, specificFocus }: {
+    execute: async ({ topic, timeAvailable, experienceLevel, motivation, specificFocus, modificationRequest, currentPlan }: {
       topic: string;
       timeAvailable: string;
       experienceLevel: string;
       motivation: string;
       specificFocus?: string;
+      modificationRequest?: string;
+      currentPlan?: string;
     }) => {
       // Planning agent using GPT-5 with Responses API
-      const planningPrompt = `You are an expert learning plan creator. Generate a detailed, structured learning plan in **Markdown format**.
+      const planningPrompt = `You are an expert learning plan creator. Generate a high-level, structured learning plan.
+
+${modificationRequest ? `
+**MODIFICATION REQUEST:** ${modificationRequest}
+
+**CURRENT PLAN TO MODIFY:**
+${currentPlan}
+
+Adjust the plan based on the modification request while keeping the overall structure and quality.
+` : ''}
+
+**PURPOSE:** This is a learning PLAN (roadmap), not the full course content. Keep it scannable and adjustable. 
+Detailed lessons, code examples, and step-by-step exercises will be created later by other agents.
 
 Topic: ${topic}
 Time Available: ${timeAvailable}
@@ -35,39 +51,57 @@ Motivation: ${motivation}
 ${specificFocus ? `Specific Focus: ${specificFocus}` : ''}
 
 Create a practical learning plan that:
-1. Breaks down the topic into digestible sections
-2. Fits within the available time
+1. Breaks down the topic into digestible modules with clear time estimates
+2. Fits within the available time (distribute it logically across modules)
 3. Matches the user's experience level
-4. Includes specific activities or resources for each section
-5. Has clear milestones and checkpoints
+4. Provides a clear roadmap of what will be covered (not how it will be taught)
+5. Is easy to scan and adjust
 
-**IMPORTANT:** Format the plan using proper Markdown syntax:
-- Use ## for main section headings
-- Use ### for subsection headings
-- Use **bold** for emphasis
-- Use bullet points (-) for lists
-- Use numbered lists (1., 2., 3.) for steps
-- Use \`code\` for technical terms or commands
-- Add time estimates in each section like: **⏱️ Time: 30 minutes**
-- Use > blockquotes for important notes or tips
-- Add emojis where appropriate (📚, 🎯, ✅, 💡, etc.) to make it visually engaging
+**STRUCTURE:**
 
-Example structure:
-## 🎯 Learning Plan: [Topic Name]
+**START WITH OVERVIEW:**
+🧭 Overview
+Goal: [Clear one-sentence goal statement]
+Total Duration: [X hours/minutes]
+Outcome: You'll be able to:
+- [Concrete outcome 1]
+- [Concrete outcome 2]
+- [Concrete outcome 3]
 
-### 📋 Overview
-Brief introduction...
+**THEN CREATE MODULES:**
+MODULE [NUMBER] — [Module Title] ([Duration])
+Objective: [What the learner will grasp - one sentence]
 
-### 📚 Section 1: [Title]
-**⏱️ Time: X minutes**
-- Bullet point 1
-- Bullet point 2
+([Time]) [Subtopic 1]:
+- [Brief 5-15 word description of what's covered]
 
-> 💡 **Tip:** Helpful advice here
+([Time]) [Subtopic 2]:
+- [Brief description]
 
-### ✅ Milestones
-- [ ] Checkpoint 1
-- [ ] Checkpoint 2`;
+([Time]) [Subtopic 3]:
+- [Brief description]
+
+Deliverable: [One concrete outcome - what they'll understand or be able to do]
+
+**KEY FORMATTING RULES:**
+- Use plain text "MODULE 1 — Title (45 min)" format (not markdown headings)
+- Keep objectives to one clear sentence
+- List 2-4 subtopics per module with time estimates in parentheses: (10 min), (15 min)
+- Each subtopic gets ONE brief bullet point (5-15 words) describing what's covered
+- Add one "Deliverable:" per module describing the practical outcome
+- Use emojis sparingly: 🧭 for overview, ✅ for optional sections
+
+**END WITH OPTIONAL SECTION (if relevant):**
+✅ Optional Deep-Dive (post-course)
+If you want to go further:
+- [2-3 specific resource suggestions: books, papers, or practice ideas]
+
+**DO NOT:**
+- Use ## or ### markdown headings for modules
+- Include code blocks, formulas, or detailed examples (save for content generation phase)
+- Write detailed step-by-step activities or instructions
+- Add multiple bullet points per subtopic
+- Make it overly detailed—focus on WHAT will be covered, not HOW`;
 
 
       // Using GPT-5 with Responses API (default API in AI SDK 5)
@@ -80,6 +114,60 @@ Brief introduction...
       return {
         plan: planResponse.text,
         summary: `Generated a learning plan for ${topic} (${timeAvailable}, ${experienceLevel} level)`,
+      };
+    },
+  };
+
+  // Tool for generating course content
+  const generateCourseTool = {
+    description: 'Generate detailed course content based on an approved learning plan.',
+    inputSchema: z.object({
+      approvedPlan: z.string().describe('The approved learning plan'),
+      topic: z.string().describe('The main topic'),
+      experienceLevel: z.string().describe('User experience level'),
+    }),
+    execute: async ({ approvedPlan, topic, experienceLevel }: {
+      approvedPlan: string;
+      topic: string;
+      experienceLevel: string;
+    }) => {
+      // Course generator using GPT-5
+      const coursePrompt = `You are an expert course content creator.
+
+**APPROVED LEARNING PLAN:**
+${approvedPlan}
+
+Topic: ${topic}
+Experience Level: ${experienceLevel}
+
+Generate detailed course content for this plan. For now, create a structured outline with:
+
+For each MODULE in the plan:
+- Expand each subtopic with key concepts to cover
+- Suggest 1-2 concrete examples or exercises per subtopic
+- Keep it structured and ready for future content expansion
+
+Format as:
+**MODULE X — [Title]**
+
+**Subtopic 1: [Name]**
+  Key concepts: [list]
+  Example/Exercise: [brief description]
+
+**Subtopic 2: [Name]**
+  Key concepts: [list]
+  Example/Exercise: [brief description]
+
+(This is a dummy implementation - full content generation will be added later)`;
+
+      const courseResponse = await generateText({
+        model: openai('gpt-5'),
+        prompt: coursePrompt,
+      });
+
+      return {
+        course: courseResponse.text,
+        summary: `Generated course structure for ${topic}`,
       };
     },
   };
@@ -118,8 +206,18 @@ Do not write the plan yourself — let the tool handle it.
 When the plan appears:
 When you use the generate_plan tool, output its result directly to the user without any additional commentary or summary. Do not generate a separate message after the tool runs.
 Ask the user if they'd like to change or refine anything.
-If they ask for edits (shorter, longer, add/remove topics, etc.), gather the updated requirements and use the tool again.
+If they ask for edits (shorter, longer, add/remove topics, etc.):
+  - Gather what they want to modify
+  - Call generate_plan again with the original parameters AND the modification request
+  - Include the current plan so it can be adjusted (not recreated from scratch)
 Repeat this small adjustment loop until the user is happy with the plan.
+
+⚡ When plan is approved
+When the user approves the plan (says "looks good", "approve", "let's go", "ready", "start the course", etc.):
+- Confirm: "Great! Generating your course content now..."
+- Use the generate_course tool with the approved plan
+- Output the course structure directly to the user
+- Ask if they'd like any adjustments to the course content
 
 🗣️ Tone & style
 Friendly, direct, and short-winded.
@@ -134,6 +232,7 @@ Use plain sentences and conversational flow.`;
     messages: convertToModelMessages(messages), // Use the new function name
     tools: {
       generate_plan: generatePlanTool,
+      generate_course: generateCourseTool,
     },
   });
 
