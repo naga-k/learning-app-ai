@@ -11,6 +11,8 @@ import {
   type LearningPlanWithIds,
 } from '@/lib/curriculum';
 
+export const runtime = 'edge';
+
 const learningPlanJsonSchema = `
 {
   "overview": {
@@ -315,10 +317,15 @@ Use plain sentences and conversational flow.`;
   const result = streamText({
     model: openai('gpt-5-mini'),
     system: systemPrompt,
-    messages: convertToModelMessages(messages), // Use the new function name
+    messages: convertToModelMessages(messages),
     tools: {
       generate_plan: generatePlanTool,
       generate_course: generateCourseTool,
+    },
+    providerOptions: {
+      openai: {
+        reasoning_effort: 'minimal', // Minimal reasoning for faster, more direct responses
+      },
     },
   });
 
