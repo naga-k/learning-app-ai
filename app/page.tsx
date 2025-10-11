@@ -120,7 +120,7 @@ export default function Chat() {
             </p>
           </div>
 
-          {showCourseToggle && (
+          {showCourseToggle && viewMode === 'chat' && (
             <button
               type="button"
               onClick={() =>
@@ -128,12 +128,8 @@ export default function Chat() {
               }
               className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-indigo-500/40 dark:bg-transparent dark:text-indigo-300 dark:hover:border-indigo-500/60 dark:hover:text-indigo-200"
             >
-              {viewMode === 'course' ? (
-                <MessageSquare className="h-4 w-4" />
-              ) : (
-                <BookOpen className="h-4 w-4" />
-              )}
-              {viewMode === 'course' ? 'Back to chat' : 'Open course workspace'}
+              <BookOpen className="h-4 w-4" />
+              Open course workspace
             </button>
           )}
         </div>

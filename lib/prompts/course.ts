@@ -22,6 +22,12 @@ const courseJsonSchema = `
       ]
     }
   ],
+  "conclusion": {
+    "summary": "string (optional)",
+    "celebrationMessage": "string (optional)",
+    "recommendedNextSteps": ["string", "..."] (optional),
+    "stretchIdeas": ["string", "..."] (optional)
+  } (optional),
   "resources": [
     {
       "title": "string",
@@ -79,7 +85,8 @@ Requirements:
 5. Make each lesson substantial (10-15 minutes of reading/learning)
 6. Personalize everything - use their goals, motivations, and context throughout
 7. Let content flow naturally with whatever structure best teaches the material
-8. Return valid JSON matching the Course schema exactly
+8. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, advanced stretch ideas, or reflection prompts aligned to their goals
+9. Return valid JSON matching the Course schema exactly
 
 Course schema:
 ${courseJsonSchema}
@@ -98,6 +105,6 @@ ${fullContext}
 
 ${plan ? `Approved plan to reference:\n${JSON.stringify(plan, null, 2)}` : 'No structured plan JSON is available.'}
 
-Write the full course in engaging markdown with modules and lessons, ensuring each section references the learner’s goals, motivations, and constraints.`;
+Write the full course in engaging markdown with modules and lessons, ensuring each section references the learner’s goals, motivations, and constraints. Finish with a celebratory conclusion that provides tailored next steps and stretch ideas so they know how to keep growing after completion.`;
 
 export { courseJsonSchema };

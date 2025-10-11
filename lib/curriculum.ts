@@ -53,6 +53,29 @@ const CourseModuleSchema = z.object({
   submodules: z.array(CourseSubmoduleSchema).min(1),
 });
 
+const CourseConclusionSchema = z
+  .object({
+    summary: z
+      .string()
+      .optional()
+      .describe(
+        "A brief reflection tying the entire course together and acknowledging learner progress",
+      ),
+    celebrationMessage: z
+      .string()
+      .optional()
+      .describe("Encouraging note celebrating completion"),
+    recommendedNextSteps: z
+      .array(z.string().min(1))
+      .optional()
+      .describe("Concrete follow-up actions tailored to the learner"),
+    stretchIdeas: z
+      .array(z.string().min(1))
+      .optional()
+      .describe("Advanced or exploratory ideas for continued growth"),
+  })
+  .optional();
+
 export const CourseSchema = z.object({
   overview: z
     .object({
@@ -71,6 +94,7 @@ export const CourseSchema = z.object({
       })
     )
     .optional(),
+  conclusion: CourseConclusionSchema,
 });
 
 export type Course = z.infer<typeof CourseSchema>;
@@ -247,9 +271,14 @@ export const summarizeCourseForChat = (course: CourseWithIds): string => {
       }`,
   );
 
+  const conclusionLine = course.conclusion
+    ? "• Course wrap-up: Personalized reflection, next steps, and stretch ideas"
+    : null;
+
   return [
     "Your course workspace is ready! Here's what's inside:",
     ...moduleLines,
+    ...(conclusionLine ? [conclusionLine] : []),
     "Switch to the Course view to explore each module and lesson.",
   ].join("\n");
 };
