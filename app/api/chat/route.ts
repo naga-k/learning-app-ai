@@ -58,9 +58,8 @@ const courseJsonSchema = `
           "id": "string (reuse plan subtopic slug when available)",
           "title": "string",
           "duration": "string (optional)",
-          "keyConcepts": ["string", "..."],
-          "exercises": ["string", "..."],
-          "notes": ["string", "... (optional)"]
+          "content": "string (full lesson content in markdown format)",
+          "summary": "string (optional, brief one-sentence summary)"
         }
       ]
     }
@@ -103,6 +102,8 @@ export async function POST(req: Request) {
       modificationRequest?: string;
       currentPlan?: string;
     }) => {
+      console.log('[generate_plan] Tool called with:', { topic, timeAvailable, experienceLevel });
+      
       const planningPrompt = `You are an expert learning plan creator. Generate a high-level, structured learning plan that conforms to the provided JSON schema.
 
 ${modificationRequest ? `
@@ -134,11 +135,13 @@ Requirements:
 5. Optional deep-dive resources are only included when they add value.`;
 
       try {
+        console.log('[generate_plan] Calling generateObject...');
         const { object: planObject } = await generateObject({
           model: openai('gpt-5'),
           prompt: planningPrompt,
           schema: LearningPlanSchema,
         });
+        console.log('[generate_plan] Success!');
 
         const structuredPlan = normalizeLearningPlan(planObject);
         latestStructuredPlan = structuredPlan;
@@ -222,7 +225,7 @@ Keep it readable with line breaks so it can be shown directly to the learner.`;
         parsedPlan = latestStructuredPlan;
       }
 
-      const coursePrompt = `You are an expert course content creator.
+      const coursePrompt = `You are an expert course content creator and educational writer.
 
 APPROVED LEARNING PLAN (text):
 ${approvedPlan}
@@ -232,13 +235,23 @@ ${parsedPlan ? `APPROVED LEARNING PLAN (JSON):\n${JSON.stringify(parsedPlan, nul
 Topic: ${topic}
 Experience Level: ${experienceLevel}
 
-Generate detailed course content that adheres to the learning plan. Requirements:
+Generate COMPLETE, COMPREHENSIVE course content for each lesson. This is NOT an outline - write full educational content as if creating actual course materials.
+
+Requirements:
 1. Maintain the module order and intent from the approved plan.
-2. Provide at least one practical exercise or project idea per submodule.
-3. Surface the most important key concepts as bullet strings.
-4. When possible, include estimated time or pacing notes to help learners stay on track.
-5. Use clear and approachable language tuned to the stated experience level.
-6. Return valid JSON that matches the provided Course schema exactly.
+2. For each submodule, write FULL lesson content in markdown format including:
+   - Comprehensive explanations and conceptual walkthrough
+   - Code examples with detailed explanations (when relevant)
+   - Step-by-step instructions or demonstrations
+   - Practical exercises with clear instructions
+   - Tips, best practices, and common pitfalls
+   - Any additional notes or context that aids learning
+3. Use markdown formatting: headings (##, ###), code blocks (\`\`\`), lists, bold/italic emphasis, etc.
+4. Write in a clear, engaging style appropriate for the stated experience level.
+5. Each lesson should be substantial - aim for comprehensive coverage (roughly 10-15 minutes of reading/learning per submodule).
+6. Let the content flow naturally - organize it however makes most sense for teaching the topic effectively.
+7. The duration field from the plan should guide content depth.
+8. Return valid JSON that matches the provided Course schema exactly.
 
 Course schema:
 ${courseJsonSchema}`;
@@ -247,6 +260,12 @@ ${courseJsonSchema}`;
         model: openai('gpt-5'),
         prompt: coursePrompt,
         schema: CourseSchema,
+        providerOptions: {
+          openai: {
+            textVerbosity: 'high',        // Produces comprehensive, detailed responses
+            reasoning_effort: 'high',      // Increases thoughtful content generation
+          },
+        },
       });
 
       const structuredCourse = normalizeCourse(courseObject, parsedPlan);

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "./markdown-content";
 
 type CourseWorkspaceProps = {
   course: CourseWithIds;
@@ -175,59 +176,23 @@ export function CourseWorkspace({
 
         <div className="flex-1 overflow-y-auto px-8 py-8">
           <div className="rounded-2xl border border-white/60 bg-white/90 p-8 shadow-lg backdrop-blur dark:border-gray-800/80 dark:bg-gray-900/80">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  {activeSubmodule.order}. {activeSubmodule.title}
-                </h2>
-                {activeSubmodule.duration && (
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Suggested time: {activeSubmodule.duration}
-                  </p>
-                )}
-              </div>
+            <div className="mb-6 flex flex-col gap-2 border-b border-gray-200 pb-6 dark:border-gray-700">
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                {activeSubmodule.order}. {activeSubmodule.title}
+              </h2>
+              {activeSubmodule.duration && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  ⏱️ Suggested time: {activeSubmodule.duration}
+                </p>
+              )}
+              {activeSubmodule.summary && (
+                <p className="text-sm italic text-gray-600 dark:text-gray-400">
+                  {activeSubmodule.summary}
+                </p>
+              )}
             </div>
 
-            <div className="mt-6 grid gap-6 md:grid-cols-2">
-              <div className="rounded-xl border border-indigo-100/70 bg-indigo-50/70 p-6 dark:border-indigo-500/40 dark:bg-indigo-500/10">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
-                  Key Concepts
-                </h3>
-                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-gray-700 dark:text-gray-200">
-                  {activeSubmodule.keyConcepts.map((concept, index) => (
-                    <li key={`${activeSubmodule.id}-concept-${index}`}>
-                      • {concept}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-indigo-100/70 bg-indigo-50/70 p-6 dark:border-indigo-500/40 dark:bg-indigo-500/10">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
-                  Practice & Application
-                </h3>
-                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-gray-700 dark:text-gray-200">
-                  {activeSubmodule.exercises.map((exercise, index) => (
-                    <li key={`${activeSubmodule.id}-exercise-${index}`}>
-                      • {exercise}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {activeSubmodule.notes && activeSubmodule.notes.length > 0 && (
-              <div className="mt-6 rounded-xl border border-indigo-100/70 bg-indigo-50/70 p-6 dark:border-indigo-500/40 dark:bg-indigo-500/10">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
-                  Instructor Notes
-                </h3>
-                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-gray-700 dark:text-gray-200">
-                  {activeSubmodule.notes.map((note, index) => (
-                    <li key={`${activeSubmodule.id}-note-${index}`}>• {note}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <MarkdownContent content={activeSubmodule.content} />
           </div>
 
           {summary && (

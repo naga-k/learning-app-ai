@@ -37,10 +37,13 @@ export type LearningPlan = z.infer<typeof LearningPlanSchema>;
 const CourseSubmoduleSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1),
-  keyConcepts: z.array(z.string().min(1)).min(1),
-  exercises: z.array(z.string().min(1)).min(1),
   duration: z.string().optional(),
-  notes: z.array(z.string().min(1)).optional(),
+  content: z.string().min(1).describe(
+    "Complete lesson content in markdown format. Should include comprehensive explanations, examples, code snippets, exercises, and any relevant notes. Write as if creating a full textbook chapter or tutorial."
+  ),
+  summary: z.string().optional().describe(
+    "Brief one-sentence summary of the lesson for navigation purposes"
+  ),
 });
 
 const CourseModuleSchema = z.object({
