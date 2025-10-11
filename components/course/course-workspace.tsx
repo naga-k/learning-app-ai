@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ArrowLeft, BookOpen } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ArrowLeft,
+  BookOpen,
+  Flag,
+} from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";
@@ -23,7 +29,9 @@ export function CourseWorkspace({
   const [activeSubmoduleId, setActiveSubmoduleId] = useState<string>(
     course.modules[0]?.submodules[0]?.id ?? "",
   );
-  const [viewMode, setViewMode] = useState<"overview" | "lesson">(() => {
+  const [viewMode, setViewMode] = useState<
+    "overview" | "lesson" | "conclusion"
+  >(() => {
     const summaryExists = Boolean(summary?.trim());
     const resourcesExist = (course.resources?.length ?? 0) > 0;
     return summaryExists || resourcesExist ? "overview" : "lesson";
@@ -43,6 +51,14 @@ export function CourseWorkspace({
   const hasCourseSummary = Boolean(summary?.trim());
   const hasResources = (course.resources?.length ?? 0) > 0;
   const hasOverviewContent = hasCourseSummary || hasResources;
+  const conclusion = course.conclusion;
+  const hasConclusion =
+    Boolean(conclusion?.summary?.trim()) ||
+    Boolean(conclusion?.celebrationMessage?.trim()) ||
+    (conclusion?.recommendedNextSteps?.length ?? 0) > 0 ||
+    (conclusion?.stretchIdeas?.length ?? 0) > 0;
+  const firstModule = course.modules[0];
+  const firstLesson = firstModule?.submodules[0];
 
   const activeModule = useMemo(
     () =>
@@ -113,7 +129,8 @@ export function CourseWorkspace({
             </div>
           )}
           {course.modules.map((module) => {
-            const isActive = module.moduleId === activeModuleId;
+            const moduleSelected = module.moduleId === activeModuleId;
+            const isActiveModule = viewMode === "lesson" && moduleSelected;
             return (
               <div key={module.moduleId} className="mb-3">
                 <button
@@ -127,7 +144,7 @@ export function CourseWorkspace({
                   }}
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors",
-                    isActive
+                    isActiveModule
                       ? "border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-500/60 dark:bg-indigo-500/10 dark:text-indigo-100"
                       : "border-transparent bg-transparent text-gray-700 hover:border-indigo-100 hover:bg-indigo-50/70 dark:text-gray-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10",
                   )}
@@ -137,14 +154,14 @@ export function CourseWorkspace({
                       Module {module.order}: {module.title}
                     </p>
                   </div>
-                  {isActive ? (
+                  {isActiveModule ? (
                     <ChevronDown className="h-4 w-4 flex-shrink-0" />
                   ) : (
                     <ChevronRight className="h-4 w-4 flex-shrink-0" />
                   )}
                 </button>
 
-                {isActive && (
+                {isActiveModule && (
                   <ul className="mt-2 space-y-1 border-l border-indigo-200/60 pl-4 dark:border-indigo-500/40">
                     {module.submodules.map((submodule) => {
                       const submoduleActive = submodule.id === activeSubmoduleId;
@@ -173,13 +190,30 @@ export function CourseWorkspace({
               </div>
             );
           })}
+          {hasConclusion && (
+            <div className="mt-6 border-t border-indigo-100 pt-4 dark:border-indigo-800/50">
+              <button
+                type="button"
+                onClick={() => setViewMode("conclusion")}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors",
+                  viewMode === "conclusion"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/60 dark:bg-emerald-500/10 dark:text-emerald-100"
+                    : "border-transparent bg-transparent text-emerald-700 hover:border-emerald-100 hover:bg-emerald-50/70 dark:text-emerald-200 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10",
+                )}
+              >
+                <Flag className="h-4 w-4 flex-shrink-0" />
+                Course wrap-up
+              </button>
+            </div>
+          )}
         </nav>
       </aside>
 
       <section className="flex flex-1 flex-col bg-gradient-to-br from-indigo-50 via-white to-indigo-100/30 dark:from-gray-900 dark:via-gray-900 dark:to-indigo-950/30">
         <header className="flex items-center justify-between border-b border-indigo-100/80 px-8 py-6 backdrop-blur dark:border-gray-800/80">
           <div>
-            {viewMode === "overview" ? (
+            {viewMode === "overview" && (
               <>
                 <p className="text-xs uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
                   Course Overview
@@ -193,7 +227,8 @@ export function CourseWorkspace({
                   </p>
                 )}
               </>
-            ) : (
+            )}
+            {viewMode === "lesson" && (
               <>
                 <p className="text-xs uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
                   Module {activeModule.order}
@@ -206,6 +241,19 @@ export function CourseWorkspace({
                     {activeModule.summary}
                   </p>
                 )}
+              </>
+            )}
+            {viewMode === "conclusion" && (
+              <>
+                <p className="text-xs uppercase tracking-wide text-emerald-500 dark:text-emerald-300">
+                  Course Wrap-up
+                </p>
+                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                  Celebrate your progress
+                </h1>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Reflect on what you’ve achieved and line up your next steps.
+                </p>
               </>
             )}
           </div>
@@ -221,7 +269,7 @@ export function CourseWorkspace({
         </header>
 
         <div className="flex-1 overflow-y-auto px-8 py-8">
-          {viewMode === "lesson" ? (
+          {viewMode === "lesson" && (
             <div className="rounded-2xl border border-white/60 bg-white/90 p-8 shadow-lg backdrop-blur dark:border-gray-800/80 dark:bg-gray-900/80">
               <div className="mb-6 flex flex-col gap-2 border-b border-gray-200 pb-6 dark:border-gray-700">
                 <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
@@ -241,21 +289,48 @@ export function CourseWorkspace({
 
               <MarkdownContent content={activeSubmodule.content} />
             </div>
-          ) : (
+          )}
+
+          {viewMode === "overview" && (
             <div className="space-y-8">
               {hasCourseSummary && (
                 <div className="rounded-2xl border border-indigo-200/70 bg-white/90 p-6 text-sm text-gray-700 shadow-sm backdrop-blur dark:border-gray-800/80 dark:bg-gray-900/80 dark:text-gray-300">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
-                    Course Summary
+                    Course Introduction
                   </h3>
                   <p className="mt-2 whitespace-pre-line">{summary}</p>
+                </div>
+              )}
+
+              {firstModule && firstLesson && (
+                <div className="rounded-2xl border border-indigo-200/70 bg-indigo-50/60 p-6 shadow-sm backdrop-blur dark:border-indigo-500/40 dark:bg-indigo-500/10">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                    Ready to dive in?
+                  </h3>
+                  <p className="mt-2 text-sm text-indigo-900 dark:text-indigo-100">
+                    Start with Module {firstModule.order}: {firstModule.title}
+                  </p>
+                  <p className="mt-1 text-xs text-indigo-800/80 dark:text-indigo-200/80">
+                    Lesson 1 · {firstLesson.title}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    onClick={() => {
+                      setActiveModuleId(firstModule.moduleId);
+                      setActiveSubmoduleId(firstLesson.id);
+                      setViewMode("lesson");
+                    }}
+                  >
+                    Jump into the course
+                  </button>
                 </div>
               )}
 
               {hasResources && course.resources && (
                 <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/80 p-6 shadow-sm backdrop-blur dark:border-emerald-500/30 dark:bg-emerald-500/10">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                    Further Resources
+                    Resources to Explore
                   </h3>
                   <ul className="mt-3 space-y-2 text-sm text-emerald-900 dark:text-emerald-100">
                     {course.resources.map((resource, index) => (
@@ -275,6 +350,71 @@ export function CourseWorkspace({
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {viewMode === "conclusion" && (
+            <div className="space-y-8">
+              {conclusion?.summary && (
+                <div className="rounded-2xl border border-emerald-200/70 bg-white/90 p-6 text-sm text-gray-700 shadow-sm backdrop-blur dark:border-emerald-500/40 dark:bg-gray-900/80 dark:text-gray-300">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
+                    Final Reflection
+                  </h3>
+                  <p className="mt-2 whitespace-pre-line">
+                    {conclusion.summary}
+                  </p>
+                </div>
+              )}
+
+              {conclusion?.celebrationMessage && (
+                <div className="rounded-2xl border border-amber-200/70 bg-amber-50/80 p-6 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">
+                    Celebrate the win
+                  </h3>
+                  <p className="mt-2 whitespace-pre-line">
+                    {conclusion.celebrationMessage}
+                  </p>
+                </div>
+              )}
+
+              {conclusion?.recommendedNextSteps &&
+                conclusion.recommendedNextSteps.length > 0 && (
+                  <div className="rounded-2xl border border-indigo-200/70 bg-indigo-50/80 p-6 text-sm text-indigo-900 shadow-sm backdrop-blur dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-100">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                      Recommended Next Steps
+                    </h3>
+                    <ul className="mt-3 space-y-2 list-disc pl-4">
+                      {conclusion.recommendedNextSteps.map((step, index) => (
+                        <li key={`next-step-${index}`}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              {conclusion?.stretchIdeas && conclusion.stretchIdeas.length > 0 && (
+                  <div className="rounded-2xl border border-purple-200/70 bg-purple-50/80 p-6 text-sm text-purple-900 shadow-sm backdrop-blur dark:border-purple-500/40 dark:bg-purple-500/10 dark:text-purple-100">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
+                      Stretch Ideas
+                    </h3>
+                    <ul className="mt-3 space-y-2 list-disc pl-4">
+                      {conclusion.stretchIdeas.map((idea, index) => (
+                        <li key={`stretch-idea-${index}`}>{idea}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              {!hasConclusion && (
+                <div className="rounded-2xl border border-gray-200/70 bg-white/90 p-6 text-sm text-gray-700 shadow-sm backdrop-blur dark:border-gray-700/60 dark:bg-gray-900/80 dark:text-gray-200">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                    Wrap-up coming soon
+                  </h3>
+                  <p className="mt-2">
+                    This course doesn’t include a closing section yet. Review the
+                    lessons above or ask the assistant to add next steps.
+                  </p>
                 </div>
               )}
             </div>
