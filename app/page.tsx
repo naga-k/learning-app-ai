@@ -1,6 +1,11 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import {
+  getToolOrDynamicToolName,
+  isToolOrDynamicToolUIPart,
+  type UIMessage,
+} from 'ai';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Conversation,
@@ -51,6 +56,41 @@ const isCourseToolOutput = (value: unknown): value is CourseToolOutput =>
       typeof (value as Record<string, unknown>).course === 'string',
   );
 
+const hasRenderableAssistantContent = (message: UIMessage | null): boolean => {
+  if (!message || message.role !== 'assistant') return false;
+  if (message.parts.length === 0) return false;
+
+  return message.parts.some((part) => {
+    if (part.type === 'text') {
+      return Boolean(part.text && part.text.trim().length > 0);
+    }
+
+    if (!isToolOrDynamicToolUIPart(part)) return false;
+
+    if (
+      part.state === 'input-streaming' ||
+      part.state === 'input-available' ||
+      part.state === 'output-error'
+    ) {
+      return true;
+    }
+
+    if (part.state === 'output-available') {
+      if (part.preliminary) return true;
+
+      const payload =
+        (part as { output?: unknown }).output ??
+        (part as { result?: unknown }).result;
+
+      if (!payload) return false;
+
+      return isPlanToolOutput(payload) || isCourseToolOutput(payload);
+    }
+
+    return false;
+  });
+};
+
 export default function Chat() {
   const [input, setInput] = useState('');
   const [viewMode, setViewMode] = useState<'chat' | 'course'>('chat');
@@ -67,14 +107,15 @@ export default function Chat() {
         partIndex >= 0;
         partIndex -= 1
       ) {
-        const part = message.parts[partIndex] as {
-          type?: string;
-          output?: unknown;
-          result?: unknown;
-        };
+        const part = message.parts[partIndex];
 
-        if (!part.type?.startsWith('tool-')) continue;
-        const payload = part.output ?? part.result;
+        if (!isToolOrDynamicToolUIPart(part)) continue;
+        if (getToolOrDynamicToolName(part) !== 'generate_course') continue;
+        if (part.state !== 'output-available' || part.preliminary) continue;
+
+        const payload =
+          (part as { output?: unknown }).output ??
+          (part as { result?: unknown }).result;
         if (isCourseToolOutput(payload)) {
           return {
             id: `${message.id}-${partIndex}`,
@@ -110,6 +151,23 @@ export default function Chat() {
       }
     }
   };
+
+  const renderableMessages = useMemo(
+    () =>
+      messages.filter(
+        (message) =>
+          message.role !== 'assistant' || hasRenderableAssistantContent(message),
+      ),
+    [messages],
+  );
+
+  const lastAssistantMessage = useMemo(
+    () => [...messages].reverse().find((msg) => msg.role === 'assistant') ?? null,
+    [messages],
+  );
+
+  const shouldShowTypingIndicator =
+    status === 'streaming' && !hasRenderableAssistantContent(lastAssistantMessage);
 
   const showCourseToggle = Boolean(courseState?.output.courseStructured);
 
@@ -166,32 +224,65 @@ export default function Chat() {
                     />
                   ) : (
                     <>
-                      {messages.map((message) => (
+                      {renderableMessages.map((message) => (
                         <Message from={message.role} key={message.id}>
                           <MessageContent>
-                            {message.parts.map(
-                              (
-                                part: {
-                                  type?: string;
-                                  output?: unknown;
-                                  result?: unknown;
-                                  state?: string;
-                                  text?: string;
-                                },
-                                index: number,
-                              ) => {
-                                if (part.type === 'text') {
+                            {message.parts.map((part, index) => {
+                              if (part.type === 'text') {
+                                return (
+                                  <Response key={`${message.id}-${index}`}>
+                                    {part.text}
+                                  </Response>
+                                );
+                              }
+
+                              if (isToolOrDynamicToolUIPart(part)) {
+                                const toolName = getToolOrDynamicToolName(part);
+                                const isCourseTool = toolName === 'generate_course';
+                                const isPlanTool = toolName === 'generate_plan';
+                                const streamingMessage = isCourseTool
+                                  ? 'Creating your personalized course content...'
+                                  : isPlanTool
+                                    ? 'Creating your learning plan...'
+                                    : 'Working on your request...';
+                                const isStreamingState =
+                                  part.state === 'input-streaming' ||
+                                  part.state === 'input-available' ||
+                                  (part.state === 'output-available' && part.preliminary);
+
+                                if (isStreamingState) {
                                   return (
-                                    <Response key={`${message.id}-${index}`}>
-                                      {part.text}
-                                    </Response>
+                                    <div
+                                      key={`${message.id}-${index}`}
+                                      aria-live="polite"
+                                      className="mt-2 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+                                    >
+                                      <Loader size={16} />
+                                      <span className="animate-pulse">
+                                        {streamingMessage}
+                                      </span>
+                                    </div>
                                   );
                                 }
 
-                                if (part.type?.startsWith('tool-')) {
-                                  const payload = part.output ?? part.result;
+                                if (part.state === 'output-error') {
+                                  return (
+                                    <div
+                                      key={`${message.id}-${index}`}
+                                      className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200"
+                                    >
+                                      {part.errorText ??
+                                        'Something went wrong while running the tool.'}
+                                    </div>
+                                  );
+                                }
 
-                                  if (isPlanToolOutput(payload)) {
+                                if (part.state === 'output-available') {
+                                  const payload =
+                                    (part as { output?: unknown }).output ??
+                                    (part as { result?: unknown }).result;
+
+                                  if (payload && isPlanTool && isPlanToolOutput(payload)) {
                                     return (
                                       <div
                                         key={`${message.id}-${index}`}
@@ -225,7 +316,7 @@ export default function Chat() {
                                     );
                                   }
 
-                                  if (isCourseToolOutput(payload)) {
+                                  if (payload && isCourseTool && isCourseToolOutput(payload)) {
                                     return (
                                       <div
                                         key={`${message.id}-${index}`}
@@ -254,63 +345,39 @@ export default function Chat() {
                                     );
                                   }
 
-                                  if (
-                                    part.state === 'input-streaming' ||
-                                    !payload
-                                  ) {
+                                  if (payload) {
                                     return (
-                                      <div
+                                      <Response
                                         key={`${message.id}-${index}`}
-                                        className="mt-2 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+                                        className="mt-4 rounded-xl border border-gray-200/70 bg-white/90 p-4 text-sm text-gray-700 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-200"
                                       >
-                                        <Loader size={16} />
-                                        Creating your learning plan...
-                                      </div>
+                                        {typeof payload === 'string'
+                                          ? payload
+                                          : `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``}
+                                      </Response>
                                     );
                                   }
                                 }
+                              }
 
-                                return null;
-                              },
-                            )}
+                              return null;
+                            })}
                           </MessageContent>
                         </Message>
                       ))}
 
-                      {(() => {
-                        const lastMessage = messages[messages.length - 1];
-                        const awaitingAssistant =
-                          status === 'streaming' && lastMessage?.role === 'user';
-                        const lastAssistantMessage =
-                          messages[messages.length - 1]?.role === 'assistant'
-                            ? messages[messages.length - 1]
-                            : null;
-                        const hasAssistantText =
-                          lastAssistantMessage?.parts?.some(
-                            (part: { type?: string }) => part.type === 'text',
-                          );
-
-                        if (
-                          awaitingAssistant ||
-                          (status === 'streaming' &&
-                            lastAssistantMessage &&
-                            !hasAssistantText)
-                        ) {
-                          return (
-                            <Message from="assistant">
-                              <MessageContent>
-                                <div className="flex items-center gap-3 py-2 text-gray-500 dark:text-gray-400">
-                                  <Loader size={20} />
-                                  <span className="text-sm animate-pulse">
-                                    Thinking...
-                                  </span>
-                                </div>
-                              </MessageContent>
-                            </Message>
-                          );
-                        }
-                        return null;
-                      })()}
+                      {shouldShowTypingIndicator && (
+                        <Message from="assistant">
+                          <MessageContent>
+                            <div className="flex items-center gap-3 py-2 text-gray-500 dark:text-gray-400">
+                              <Loader size={20} />
+                              <span className="text-sm animate-pulse">
+                                Thinking...
+                              </span>
+                            </div>
+                          </MessageContent>
+                        </Message>
+                      )}
                     </>
                   )}
                 </ConversationContent>
