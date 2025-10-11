@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { streamText, generateObject, generateText, convertToModelMessages } from 'ai';
+import { streamText, generateText, convertToModelMessages } from 'ai';
 import { z } from 'zod';
 import {
   CourseSchema,
@@ -12,6 +12,23 @@ import {
 } from '@/lib/curriculum';
 
 export const runtime = 'edge';
+
+const webSearchTool = openai.tools.webSearch({
+  searchContextSize: 'high',
+});
+
+const extractJsonFromText = (raw: string) => {
+  const trimmed = raw.trim();
+
+  if (trimmed.startsWith('```')) {
+    const match = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return trimmed;
+};
 
 const learningPlanJsonSchema = `
 {
@@ -98,27 +115,40 @@ export async function POST(req: Request) {
 - Literally anything else that makes this course PERSONAL to them
 
 Be verbose and detailed - this context is used to create a truly personalized learning experience.`),
-      modificationRequest: z.string().optional().describe('If user wants to modify an existing plan, describe what changes they requested'),
-      currentPlan: z.string().optional().describe('If modifying, include the full text of the current plan being modified'),
+      modificationRequest: z.string().nullable().optional().describe('If user wants to modify an existing plan, describe what changes they requested'),
+      currentPlan: z.string().nullable().optional().describe('If modifying, include the full text of the current plan being modified'),
     }),
     execute: async ({ fullConversationContext, modificationRequest, currentPlan }: {
       fullConversationContext: string;
-      modificationRequest?: string;
-      currentPlan?: string;
+      modificationRequest?: string | null;
+      currentPlan?: string | null;
     }) => {
       console.log('[generate_plan] Creating personalized plan with context length:', fullConversationContext.length);
       
+      const trimmedModificationRequest =
+        typeof modificationRequest === 'string' ? modificationRequest.trim() : '';
+      const trimmedCurrentPlan =
+        typeof currentPlan === 'string' ? currentPlan.trim() : '';
+
+      const modificationSection =
+        trimmedModificationRequest.length > 0
+          ? `**MODIFICATION REQUEST:**
+${trimmedModificationRequest}
+
+${
+  trimmedCurrentPlan.length > 0
+    ? `**CURRENT PLAN TO MODIFY:**
+${trimmedCurrentPlan}
+
+`
+    : ''
+}Adjust the plan based on the modification request while maintaining personalization.
+`
+          : '';
+
       const planningPrompt = `You are an expert learning plan creator specializing in HYPER-PERSONALIZED education.
 
-${modificationRequest ? `
-**MODIFICATION REQUEST:**
-${modificationRequest}
-
-**CURRENT PLAN TO MODIFY:**
-${currentPlan}
-
-Adjust the plan based on the modification request while maintaining personalization.
-` : ''}
+${modificationSection}
 
 **COMPLETE LEARNER CONTEXT:**
 ${fullConversationContext}
@@ -143,15 +173,30 @@ Requirements:
 3. Frame objectives and deliverables around their stated goals
 4. Include 2-4 subtopics per module that address their specific interests
 5. Reference their real-world use cases when describing what they'll learn
-6. Make it feel personal - like this plan was crafted just for them (because it was!)`;
+6. Make it feel personal - like this plan was crafted just for them (because it was!)
+
+Return ONLY valid JSON that conforms to this schema. Do not include markdown fences or additional commentary.`;
 
       try {
-        console.log('[generate_plan] Calling generateObject with personalization...');
-        const { object: planObject } = await generateObject({
+        console.log('[generate_plan] Calling generateText with web search for personalized plan...');
+        const planGeneration = await generateText({
           model: openai('gpt-5'),
           prompt: planningPrompt,
-          schema: LearningPlanSchema,
+          tools: {
+            web_search: webSearchTool,
+          },
+          providerOptions: {
+            openai: {
+              reasoning_effort: 'high',
+              textVerbosity: 'high',
+            },
+          },
         });
+
+        const planJsonText = extractJsonFromText(planGeneration.text);
+        const parsedPlan = JSON.parse(planJsonText);
+        const planObject = LearningPlanSchema.parse(parsedPlan);
+
         console.log('[generate_plan] Personalized plan generated successfully!');
 
         const structuredPlan = normalizeLearningPlan(planObject);
@@ -183,6 +228,9 @@ Make it personal and tailored to their unique context. Keep it readable with lin
         const fallbackPlan = await generateText({
           model: openai('gpt-5'),
           prompt: fallbackPrompt,
+          tools: {
+            web_search: webSearchTool,
+          },
         });
 
         return {
@@ -208,6 +256,7 @@ Make it personal and tailored to their unique context. Keep it readable with lin
 Be comprehensive - this is used to create course content that feels custom-made for them.`),
       planStructure: z
         .string()
+        .nullable()
         .optional()
         .describe(
           'JSON string representing the structured learning plan',
@@ -218,7 +267,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
       planStructure,
     }: {
       fullContext: string;
-      planStructure?: string;
+      planStructure?: string | null;
     }) => {
       console.log('[generate_course] Creating personalized course with context length:', fullContext.length);
       
@@ -278,28 +327,72 @@ Requirements:
 Course schema:
 ${courseJsonSchema}
 
-Remember: Every paragraph, every example, every exercise should feel tailored to this specific learner's needs and goals.`;
+Remember: Every paragraph, every example, every exercise should feel tailored to this specific learner's needs and goals.
 
-      const { object: courseObject } = await generateObject({
-        model: openai('gpt-5'),
-        prompt: coursePrompt,
-        schema: CourseSchema,
-        providerOptions: {
-          openai: {
-            textVerbosity: 'high',        // Maximum detail and comprehensiveness
-            reasoning_effort: 'high',      // Deep thought for personalization
+Return ONLY valid JSON that matches this schema. Do not wrap the response in markdown fences or include commentary before or after the JSON.`;
+
+      try {
+        const courseGeneration = await generateText({
+          model: openai('gpt-5'),
+          prompt: coursePrompt,
+          tools: {
+            web_search: webSearchTool,
           },
-        },
-      });
+          providerOptions: {
+            openai: {
+              textVerbosity: 'high', // Maximum detail and comprehensiveness
+              reasoning_effort: 'high', // Deep thought for personalization
+            },
+          },
+        });
 
-      const structuredCourse = normalizeCourse(courseObject, parsedPlan);
-      const courseSummary = summarizeCourseForChat(structuredCourse);
+        const courseJsonText = extractJsonFromText(courseGeneration.text);
+        const parsedCourse = JSON.parse(courseJsonText);
+        const courseObject = CourseSchema.parse(parsedCourse);
 
-      return {
-        course: courseSummary,
-        courseStructured: structuredCourse,
-        summary: `Generated your personalized course with content tailored to your specific goals and needs`,
-      };
+        const structuredCourse = normalizeCourse(courseObject, parsedPlan);
+        const courseSummary = summarizeCourseForChat(structuredCourse);
+
+        return {
+          course: courseSummary,
+          courseStructured: structuredCourse,
+          summary: `Generated your personalized course with content tailored to your specific goals and needs`,
+        };
+      } catch (error) {
+        console.error('[generate_course] structured course failed', error);
+
+        const fallbackPrompt = `You are an expert course content creator.
+
+Create a richly detailed learning experience tailored to the following learner context:
+${fullContext}
+
+${
+  parsedPlan
+    ? `Approved plan to reference:\n${JSON.stringify(parsedPlan, null, 2)}`
+    : 'No structured plan JSON is available.'
+}
+
+Write the full course in engaging markdown with modules and lessons, ensuring each section references the learner’s goals, motivations, and constraints.`;
+
+        const fallbackResult = await generateText({
+          model: openai('gpt-5'),
+          prompt: fallbackPrompt,
+          tools: {
+            web_search: webSearchTool,
+          },
+          providerOptions: {
+            openai: {
+              textVerbosity: 'high',
+              reasoning_effort: 'high',
+            },
+          },
+        });
+
+        return {
+          course: fallbackResult.text,
+          summary: `Generated fallback course text tailored to your context`,
+        };
+      }
     },
   };
 
