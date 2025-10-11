@@ -1,11 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import {
-  getToolOrDynamicToolName,
-  isToolOrDynamicToolUIPart,
-  type UIMessage,
-} from 'ai';
+import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart } from 'ai';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Conversation,
@@ -18,77 +14,16 @@ import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
 import { CourseWorkspace } from '@/components/course/course-workspace';
 import {
-  type CourseWithIds,
-  type LearningPlanWithIds,
-} from '@/lib/curriculum';
+  hasRenderableAssistantContent,
+  isCourseToolOutput,
+  isPlanToolOutput,
+  type CourseToolOutput,
+} from '@/lib/ai/tool-output';
 import { MessageSquare, BookOpen } from 'lucide-react';
-
-type PlanToolOutput = {
-  plan: string;
-  structuredPlan?: LearningPlanWithIds;
-  summary?: string;
-};
-
-type CourseToolOutput = {
-  course: string;
-  courseStructured?: CourseWithIds;
-  summary?: string;
-};
 
 type CourseSnapshot = {
   id: string;
   output: CourseToolOutput;
-};
-
-const isPlanToolOutput = (value: unknown): value is PlanToolOutput =>
-  Boolean(
-    value &&
-      typeof value === 'object' &&
-      'plan' in value &&
-      typeof (value as Record<string, unknown>).plan === 'string',
-  );
-
-const isCourseToolOutput = (value: unknown): value is CourseToolOutput =>
-  Boolean(
-    value &&
-      typeof value === 'object' &&
-      'course' in value &&
-      typeof (value as Record<string, unknown>).course === 'string',
-  );
-
-const hasRenderableAssistantContent = (message: UIMessage | null): boolean => {
-  if (!message || message.role !== 'assistant') return false;
-  if (message.parts.length === 0) return false;
-
-  return message.parts.some((part) => {
-    if (part.type === 'text') {
-      return Boolean(part.text && part.text.trim().length > 0);
-    }
-
-    if (!isToolOrDynamicToolUIPart(part)) return false;
-
-    if (
-      part.state === 'input-streaming' ||
-      part.state === 'input-available' ||
-      part.state === 'output-error'
-    ) {
-      return true;
-    }
-
-    if (part.state === 'output-available') {
-      if (part.preliminary) return true;
-
-      const payload =
-        (part as { output?: unknown }).output ??
-        (part as { result?: unknown }).result;
-
-      if (!payload) return false;
-
-      return isPlanToolOutput(payload) || isCourseToolOutput(payload);
-    }
-
-    return false;
-  });
 };
 
 export default function Chat() {
