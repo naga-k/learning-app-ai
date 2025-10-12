@@ -60,10 +60,12 @@ Be verbose and detailed - this context is used to create a truly personalized le
         currentPlan,
       });
 
+      const startTime = Date.now();
+
       try {
         console.log('[generate_plan] Calling generateText with web search for personalized plan...');
         const planGeneration = await generateText({
-          model: openai('gpt-5'),
+          model: openai('gpt-5-mini'),
           prompt: planningPrompt,
           tools: {
             web_search: webSearchTool,
@@ -81,6 +83,8 @@ Be verbose and detailed - this context is used to create a truly personalized le
         const planObject = LearningPlanSchema.parse(parsedPlan);
 
         console.log('[generate_plan] Personalized plan generated successfully!');
+        const elapsedMs = Date.now() - startTime;
+        console.log('[generate_plan] Total generation time (ms):', elapsedMs);
 
         const structuredPlan = normalizeLearningPlan(planObject);
         latestStructuredPlan = structuredPlan;
@@ -90,9 +94,11 @@ Be verbose and detailed - this context is used to create a truly personalized le
           plan: planText,
           structuredPlan,
           summary: `Created a personalized learning plan tailored to your specific goals and context`,
+          startedAt: startTime,
+          durationMs: elapsedMs,
         };
       } catch (error) {
-        console.error('[generate_plan] structured plan failed', error);
+        console.error('[generate_plan] structured plan failed after ms:', Date.now() - startTime, error);
         latestStructuredPlan = null;
         if (error instanceof Error) {
           throw error;
@@ -152,6 +158,8 @@ Be comprehensive - this is used to create course content that feels custom-made 
         plan: parsedPlan,
       });
 
+      const startTime = Date.now();
+
       try {
         const courseGeneration = await generateText({
           model: openai('gpt-5'),
@@ -174,13 +182,18 @@ Be comprehensive - this is used to create course content that feels custom-made 
         const structuredCourse = normalizeCourse(courseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);
 
+        const elapsedMs = Date.now() - startTime;
+        console.log('[generate_course] Total generation time (ms):', elapsedMs);
+
         return {
           course: courseSummary,
           courseStructured: structuredCourse,
           summary: `Generated your personalized course with content tailored to your specific goals and needs`,
+          startedAt: startTime,
+          durationMs: elapsedMs,
         };
       } catch (error) {
-        console.error('[generate_course] structured course failed', error);
+        console.error('[generate_course] structured course failed after ms:', Date.now() - startTime, error);
         if (error instanceof Error) {
           throw error;
         }

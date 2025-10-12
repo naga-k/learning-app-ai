@@ -8,12 +8,16 @@ export type PlanToolOutput = {
   plan: string;
   structuredPlan?: LearningPlanWithIds;
   summary?: string;
+  startedAt?: number;
+  durationMs?: number;
 };
 
 export type CourseToolOutput = {
   course: string;
   courseStructured?: CourseWithIds;
   summary?: string;
+  startedAt?: number;
+  durationMs?: number;
 };
 
 const hasStringProperty = (value: unknown, key: string): boolean =>
