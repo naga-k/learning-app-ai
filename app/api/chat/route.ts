@@ -129,15 +129,18 @@ Be comprehensive - this is used to create course content that feels custom-made 
           'JSON string representing the structured learning plan',
         ),
     }),
-    execute: async ({
-      fullContext,
-      planStructure,
-    }: {
-      fullContext: string;
-      planStructure?: string | null;
-    }) => {
+    execute: async function* (
+      {
+        fullContext,
+        planStructure,
+      }: {
+        fullContext: string;
+        planStructure?: string | null;
+      },
+      options?: { abortSignal?: AbortSignal },
+    ) {
       console.log('[generate_course] Creating personalized course with context length:', fullContext.length);
-      
+
       let parsedPlan: LearningPlanWithIds | null = null;
 
       if (planStructure) {
@@ -159,45 +162,84 @@ Be comprehensive - this is used to create course content that feels custom-made 
       });
 
       const startTime = Date.now();
+      const HEARTBEAT_INTERVAL_MS = 5_000;
+      const makeHeartbeatPayload = (durationMs: number) => ({
+        course: '',
+        summary: 'Generating your personalized course...',
+        startedAt: startTime,
+        durationMs,
+      });
 
-      try {
-        const courseGeneration = await generateText({
-          model: openai('gpt-5'),
-          prompt: coursePrompt,
-          tools: {
-            web_search: webSearchTool,
-          },
-          providerOptions: {
-            openai: {
-              textVerbosity: 'high', // Maximum detail and comprehensiveness
-              reasoning_effort: 'low', // Favor quicker generation to keep content focused
+      const coursePromise = (async () => {
+        try {
+          const courseGeneration = await generateText({
+            model: openai('gpt-5'),
+            prompt: coursePrompt,
+            tools: {
+              web_search: webSearchTool,
             },
-          },
-        });
+            providerOptions: {
+              openai: {
+                textVerbosity: 'high', // Maximum detail and comprehensiveness
+                reasoning_effort: 'low', // Favor quicker generation to keep content focused
+              },
+            },
+          });
 
-        const courseJsonText = extractJsonFromText(courseGeneration.text);
-        const parsedCourse = JSON.parse(courseJsonText);
-        const courseObject = CourseSchema.parse(parsedCourse);
+          const courseJsonText = extractJsonFromText(courseGeneration.text);
+          const parsedCourse = JSON.parse(courseJsonText);
+          const courseObject = CourseSchema.parse(parsedCourse);
 
-        const structuredCourse = normalizeCourse(courseObject, parsedPlan);
-        const courseSummary = summarizeCourseForChat(structuredCourse);
+          const structuredCourse = normalizeCourse(courseObject, parsedPlan);
+          const courseSummary = summarizeCourseForChat(structuredCourse);
 
-        const elapsedMs = Date.now() - startTime;
-        console.log('[generate_course] Total generation time (ms):', elapsedMs);
+          const elapsedMs = Date.now() - startTime;
+          console.log('[generate_course] Total generation time (ms):', elapsedMs);
 
-        return {
-          course: courseSummary,
-          courseStructured: structuredCourse,
-          summary: `Generated your personalized course with content tailored to your specific goals and needs`,
-          startedAt: startTime,
-          durationMs: elapsedMs,
-        };
-      } catch (error) {
-        console.error('[generate_course] structured course failed after ms:', Date.now() - startTime, error);
-        if (error instanceof Error) {
-          throw error;
+          return {
+            course: courseSummary,
+            courseStructured: structuredCourse,
+            summary: `Generated your personalized course with content tailored to your specific goals and needs`,
+            startedAt: startTime,
+            durationMs: elapsedMs,
+          };
+        } catch (error) {
+          console.error('[generate_course] structured course failed after ms:', Date.now() - startTime, error);
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error(String(error));
         }
-        throw new Error(String(error));
+      })();
+
+      // Kick off streaming immediately so the edge function stays active.
+      yield makeHeartbeatPayload(0);
+
+      while (true) {
+        const result = await Promise.race([
+          coursePromise
+            .then((output) => ({ kind: 'result' as const, output }))
+            .catch((error) => ({ kind: 'error' as const, error })),
+          new Promise<{ kind: 'heartbeat' }>((resolve) => {
+            setTimeout(() => resolve({ kind: 'heartbeat' }), HEARTBEAT_INTERVAL_MS);
+          }),
+        ]);
+
+        if (result.kind === 'heartbeat') {
+          if (options?.abortSignal?.aborted) {
+            throw new Error('generate_course tool execution aborted');
+          }
+          yield makeHeartbeatPayload(Date.now() - startTime);
+          continue;
+        }
+
+        if (result.kind === 'error') {
+          const { error } = result;
+          throw error instanceof Error ? error : new Error(String(error));
+        }
+
+        yield result.output;
+        return;
       }
     },
   };
