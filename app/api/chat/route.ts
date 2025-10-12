@@ -11,14 +11,8 @@ import {
   type LearningPlanWithIds,
 } from '@/lib/curriculum';
 import { extractJsonFromText } from '@/lib/ai/json';
-import {
-  buildLearningPlanFallbackPrompt,
-  buildLearningPlanPrompt,
-} from '@/lib/prompts/plan';
-import {
-  buildCourseFallbackPrompt,
-  buildCoursePrompt,
-} from '@/lib/prompts/course';
+import { buildLearningPlanPrompt } from '@/lib/prompts/plan';
+import { buildCoursePrompt } from '@/lib/prompts/course';
 import { systemPrompt } from '@/lib/prompts/system';
 
 export const runtime = 'edge';
@@ -76,8 +70,8 @@ Be verbose and detailed - this context is used to create a truly personalized le
           },
           providerOptions: {
             openai: {
-              reasoning_effort: 'high',
-              textVerbosity: 'high',
+              reasoning_effort: 'low',
+              textVerbosity: 'medium',
             },
           },
         });
@@ -100,22 +94,10 @@ Be verbose and detailed - this context is used to create a truly personalized le
       } catch (error) {
         console.error('[generate_plan] structured plan failed', error);
         latestStructuredPlan = null;
-
-        const fallbackPrompt =
-          buildLearningPlanFallbackPrompt(fullConversationContext);
-
-        const fallbackPlan = await generateText({
-          model: openai('gpt-5'),
-          prompt: fallbackPrompt,
-          tools: {
-            web_search: webSearchTool,
-          },
-        });
-
-        return {
-          plan: fallbackPlan.text,
-          summary: `Created a personalized learning plan tailored to your context`,
-        };
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(String(error));
       }
     },
   };
@@ -180,7 +162,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
           providerOptions: {
             openai: {
               textVerbosity: 'high', // Maximum detail and comprehensiveness
-              reasoning_effort: 'high', // Deep thought for personalization
+              reasoning_effort: 'low', // Favor quicker generation to keep content focused
             },
           },
         });
@@ -199,30 +181,10 @@ Be comprehensive - this is used to create course content that feels custom-made 
         };
       } catch (error) {
         console.error('[generate_course] structured course failed', error);
-
-        const fallbackPrompt = buildCourseFallbackPrompt({
-          fullContext,
-          plan: parsedPlan,
-        });
-
-        const fallbackResult = await generateText({
-          model: openai('gpt-5'),
-          prompt: fallbackPrompt,
-          tools: {
-            web_search: webSearchTool,
-          },
-          providerOptions: {
-            openai: {
-              textVerbosity: 'high',
-              reasoning_effort: 'high',
-            },
-          },
-        });
-
-        return {
-          course: fallbackResult.text,
-          summary: `Generated fallback course text tailored to your context`,
-        };
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(String(error));
       }
     },
   };

@@ -193,8 +193,9 @@ export function ChatPanel({
                                       {payload.plan}
                                     </Response>
                                     <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
-                                      Ready for the next step? Ask me to “Generate the
-                                      course” when you’re happy with this plan.
+                                      Want tweaks before we move on? Ask me to adjust
+                                      the plan—or say “Generate the course” when
+                                      you’re ready.
                                     </div>
                                   </div>
                                 );
@@ -259,7 +260,7 @@ export function ChatPanel({
                   <Message from="assistant">
                     <MessageContent
                       variant="flat"
-                      className="flex items-center gap-3 rounded-2xl bg-white/10 px-5 py-3 text-sm text-slate-300"
+                      className="inline-flex items-center gap-3 whitespace-nowrap rounded-2xl bg-white/10 px-5 py-3 text-sm text-slate-300"
                     >
                       <Loader size={20} />
                       <span className="animate-pulse">Thinking...</span>
