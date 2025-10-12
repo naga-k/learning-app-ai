@@ -22,15 +22,17 @@ const webSearchTool = openai.tools.webSearch({
 });
 
 // Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
   let latestStructuredPlan: LearningPlanWithIds | null = null;
 
-  // Tool for generating learning plans
+  // ------------------------------
+  // Tool: Generate Personalized Plan
+  // ------------------------------
   const generatePlanTool = {
-    description: 'Generate a hyper-personalized learning plan based on ALL the context gathered from the conversation. This creates truly customized courses unlike generic platforms.',
+    description:
+      'Generate a hyper-personalized learning plan based on ALL the context gathered from the conversation. This creates truly customized courses unlike generic platforms.',
     inputSchema: z.object({
       fullConversationContext: z.string().describe(`A comprehensive, detailed summary of EVERYTHING discussed with the user. Include:
 - What they want to learn (topic, subject, skill)
@@ -45,15 +47,20 @@ export async function POST(req: Request) {
 - Literally anything else that makes this course PERSONAL to them
 
 Be verbose and detailed - this context is used to create a truly personalized learning experience.`),
-      modificationRequest: z.string().nullable().optional().describe('If user wants to modify an existing plan, describe what changes they requested'),
-      currentPlan: z.string().nullable().optional().describe('If modifying, include the full text of the current plan being modified'),
+      modificationRequest: z.string().nullable().optional(),
+      currentPlan: z.string().nullable().optional(),
     }),
-    execute: async ({ fullConversationContext, modificationRequest, currentPlan }: {
+    execute: async ({
+      fullConversationContext,
+      modificationRequest,
+      currentPlan,
+    }: {
       fullConversationContext: string;
       modificationRequest?: string | null;
       currentPlan?: string | null;
     }) => {
       console.log('[generate_plan] Creating personalized plan with context length:', fullConversationContext.length);
+
       const planningPrompt = buildLearningPlanPrompt({
         fullConversationContext,
         modificationRequest,
@@ -63,7 +70,7 @@ Be verbose and detailed - this context is used to create a truly personalized le
       const startTime = Date.now();
 
       try {
-        console.log('[generate_plan] Calling generateText with web search for personalized plan...');
+        console.log('[generate_plan] Calling generateText (reasoningEffort=low)...');
         const planGeneration = await generateText({
           model: openai('gpt-5-mini'),
           prompt: planningPrompt,
@@ -72,7 +79,7 @@ Be verbose and detailed - this context is used to create a truly personalized le
           },
           providerOptions: {
             openai: {
-              reasoning_effort: 'low',
+              reasoningEffort: 'low',
               textVerbosity: 'medium',
             },
           },
@@ -84,7 +91,6 @@ Be verbose and detailed - this context is used to create a truly personalized le
 
         console.log('[generate_plan] Personalized plan generated successfully!');
         const elapsedMs = Date.now() - startTime;
-        console.log('[generate_plan] Total generation time (ms):', elapsedMs);
 
         const structuredPlan = normalizeLearningPlan(planObject);
         latestStructuredPlan = structuredPlan;
@@ -98,19 +104,19 @@ Be verbose and detailed - this context is used to create a truly personalized le
           durationMs: elapsedMs,
         };
       } catch (error) {
-        console.error('[generate_plan] structured plan failed after ms:', Date.now() - startTime, error);
+        console.error('[generate_plan] failed after ms:', Date.now() - startTime, error);
         latestStructuredPlan = null;
-        if (error instanceof Error) {
-          throw error;
-        }
-        throw new Error(String(error));
+        throw error instanceof Error ? error : new Error(String(error));
       }
     },
   };
 
-  // Tool for generating course content
+  // ------------------------------
+  // Tool: Generate Personalized Course
+  // ------------------------------
   const generateCourseTool = {
-    description: 'Generate complete, hyper-personalized course content with full lessons tailored exactly to this learner.',
+    description:
+      'Generate complete, hyper-personalized course content with full lessons tailored exactly to this learner.',
     inputSchema: z.object({
       fullContext: z.string().describe(`Everything about this learner and their approved plan. Include:
 - The complete approved learning plan
@@ -121,13 +127,7 @@ Be verbose and detailed - this context is used to create a truly personalized le
 - Literally everything that makes this course PERSONAL
 
 Be comprehensive - this is used to create course content that feels custom-made for them.`),
-      planStructure: z
-        .string()
-        .nullable()
-        .optional()
-        .describe(
-          'JSON string representing the structured learning plan',
-        ),
+      planStructure: z.string().nullable().optional(),
     }),
     execute: async ({
       fullContext,
@@ -137,7 +137,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
       planStructure?: string | null;
     }) => {
       console.log('[generate_course] Creating personalized course with context length:', fullContext.length);
-      
+
       let parsedPlan: LearningPlanWithIds | null = null;
 
       if (planStructure) {
@@ -149,9 +149,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
         }
       }
 
-      if (!parsedPlan && latestStructuredPlan) {
-        parsedPlan = latestStructuredPlan;
-      }
+      if (!parsedPlan && latestStructuredPlan) parsedPlan = latestStructuredPlan;
 
       const coursePrompt = buildCoursePrompt({
         fullContext,
@@ -161,16 +159,17 @@ Be comprehensive - this is used to create course content that feels custom-made 
       const startTime = Date.now();
 
       try {
+        console.log('[generate_course] Calling generateText (reasoningEffort=low)...');
         const courseGeneration = await generateText({
-          model: openai('gpt-5'),
+          model: openai('gpt-5-mini'),
           prompt: coursePrompt,
           tools: {
             web_search: webSearchTool,
           },
           providerOptions: {
             openai: {
-              textVerbosity: 'high', // Maximum detail and comprehensiveness
-              reasoning_effort: 'low', // Favor quicker generation to keep content focused
+              reasoningEffort: 'low',
+              textVerbosity: 'high',
             },
           },
         });
@@ -193,17 +192,15 @@ Be comprehensive - this is used to create course content that feels custom-made 
           durationMs: elapsedMs,
         };
       } catch (error) {
-        console.error('[generate_course] structured course failed after ms:', Date.now() - startTime, error);
-        if (error instanceof Error) {
-          throw error;
-        }
-        throw new Error(String(error));
+        console.error('[generate_course] failed after ms:', Date.now() - startTime, error);
+        throw error instanceof Error ? error : new Error(String(error));
       }
     },
   };
 
-  // Main agent system prompt
-  // Main agent using GPT-5-mini
+  // ------------------------------
+  // Main Agent (GPT-5-mini)
+  // ------------------------------
   const result = streamText({
     model: openai('gpt-5-mini'),
     system: systemPrompt,
@@ -214,7 +211,9 @@ Be comprehensive - this is used to create course content that feels custom-made 
     },
     providerOptions: {
       openai: {
-        reasoning_effort: 'minimal',
+        reasoningEffort: 'low',
+        textVerbosity: 'low',
+        parallelToolCalls: false,
       },
     },
   });
