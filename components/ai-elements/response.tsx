@@ -10,7 +10,7 @@ export const Response = memo(
   ({ className, ...props }: ResponseProps) => (
     <Streamdown
       className={cn(
-        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "size-full leading-6 [&>p]:my-1.5 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0",
         className
       )}
       {...props}
