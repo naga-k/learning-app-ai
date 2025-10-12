@@ -11,25 +11,17 @@ const ModuleSchema = z.object({
   duration: z.string().min(1),
   objective: z.string().min(1),
   subtopics: z.array(SubtopicSchema).min(1),
-  deliverable: z.string().min(1),
+  deliverable: z.string().min(1).optional(),
 });
-
-const OptionalDeepDiveSchema = z
-  .object({
-    title: z.string().min(1).default("Optional Deep-Dive"),
-    description: z.string().optional(),
-    resources: z.array(z.string().min(1)).optional(),
-  })
-  .optional();
 
 export const LearningPlanSchema = z.object({
   overview: z.object({
     goal: z.string().min(1),
     totalDuration: z.string().min(1),
-    outcomes: z.array(z.string().min(1)).min(1),
+    outcomes: z.array(z.string().min(1)).min(1).optional(),
   }),
   modules: z.array(ModuleSchema).min(1),
-  optionalDeepDive: OptionalDeepDiveSchema,
+  notes: z.array(z.string().min(1)).optional(),
 });
 
 export type LearningPlan = z.infer<typeof LearningPlanSchema>;
@@ -222,45 +214,46 @@ export const normalizeCourse = (
 ): CourseWithIds => ensureCourseIds(course, plan);
 
 export const formatLearningPlanText = (plan: LearningPlanWithIds): string => {
-  const overview = [
-    "🧭 Overview",
-    `Goal: ${plan.overview.goal}`,
-    `Total Duration: ${plan.overview.totalDuration}`,
-    "Outcome: You'll be able to:",
-    ...plan.overview.outcomes.map((outcome) => `- ${outcome}`),
-    "",
-  ];
+  const lines: string[] = [];
 
-  const modules = plan.modules.flatMap((module) => {
-    const header = `MODULE ${module.order} — ${module.title} (${module.duration})`;
-    const objective = `Objective: ${module.objective}`;
-    const subtopics = module.subtopics.flatMap((subtopic) => [
-      `(${subtopic.duration}) ${subtopic.title}:`,
-      `- ${subtopic.description}`,
-    ]);
-    return [
-      header,
-      objective,
-      ...subtopics,
-      `Deliverable: ${module.deliverable}`,
-      "",
-    ];
-  });
+  lines.push("Quick plan overview:");
+  lines.push(`• Goal: ${plan.overview.goal}`);
+  lines.push(`• Total time: ${plan.overview.totalDuration}`);
 
-  const optional: string[] = [];
-  if (plan.optionalDeepDive) {
-    optional.push("✅ Optional Deep-Dive");
-    optional.push(
-      plan.optionalDeepDive.description
-        ? plan.optionalDeepDive.description
-        : "If you want to go further:",
-    );
-    const resources = plan.optionalDeepDive.resources ?? [];
-    optional.push(...resources.map((item) => `- ${item}`));
-    optional.push("");
+  const outcomes = plan.overview.outcomes ?? [];
+  if (outcomes.length === 1) {
+    lines.push(`• Outcome: ${outcomes[0]}`);
+  } else if (outcomes.length > 1) {
+    lines.push("• Outcomes:");
+    outcomes.forEach((outcome) => {
+      lines.push(`  - ${outcome}`);
+    });
   }
 
-  return [...overview, ...modules, ...optional].join("\n").trim();
+  if (plan.notes && plan.notes.length > 0) {
+    lines.push("• Notes:");
+    plan.notes.forEach((note) => {
+      lines.push(`  - ${note}`);
+    });
+  }
+
+  lines.push("");
+
+  plan.modules.forEach((module) => {
+    lines.push(`Module ${module.order} — ${module.title} (${module.duration})`);
+    lines.push(`  Objective: ${module.objective}`);
+    module.subtopics.forEach((subtopic) => {
+      lines.push(
+        `  - ${subtopic.title} (${subtopic.duration}): ${subtopic.description}`,
+      );
+    });
+    if (module.deliverable) {
+      lines.push(`  Deliverable: ${module.deliverable}`);
+    }
+    lines.push("");
+  });
+
+  return lines.join("\n").trim();
 };
 
 export const summarizeCourseForChat = (course: CourseWithIds): string => {

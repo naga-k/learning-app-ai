@@ -11,14 +11,8 @@ import {
   type LearningPlanWithIds,
 } from '@/lib/curriculum';
 import { extractJsonFromText } from '@/lib/ai/json';
-import {
-  buildLearningPlanFallbackPrompt,
-  buildLearningPlanPrompt,
-} from '@/lib/prompts/plan';
-import {
-  buildCourseFallbackPrompt,
-  buildCoursePrompt,
-} from '@/lib/prompts/course';
+import { buildLearningPlanPrompt } from '@/lib/prompts/plan';
+import { buildCoursePrompt } from '@/lib/prompts/course';
 import { systemPrompt } from '@/lib/prompts/system';
 
 export const runtime = 'edge';
@@ -66,18 +60,20 @@ Be verbose and detailed - this context is used to create a truly personalized le
         currentPlan,
       });
 
+      const startTime = Date.now();
+
       try {
         console.log('[generate_plan] Calling generateText with web search for personalized plan...');
         const planGeneration = await generateText({
-          model: openai('gpt-5'),
+          model: openai('gpt-5-mini'),
           prompt: planningPrompt,
           tools: {
             web_search: webSearchTool,
           },
           providerOptions: {
             openai: {
-              reasoning_effort: 'high',
-              textVerbosity: 'high',
+              reasoning_effort: 'low',
+              textVerbosity: 'medium',
             },
           },
         });
@@ -87,6 +83,8 @@ Be verbose and detailed - this context is used to create a truly personalized le
         const planObject = LearningPlanSchema.parse(parsedPlan);
 
         console.log('[generate_plan] Personalized plan generated successfully!');
+        const elapsedMs = Date.now() - startTime;
+        console.log('[generate_plan] Total generation time (ms):', elapsedMs);
 
         const structuredPlan = normalizeLearningPlan(planObject);
         latestStructuredPlan = structuredPlan;
@@ -96,26 +94,16 @@ Be verbose and detailed - this context is used to create a truly personalized le
           plan: planText,
           structuredPlan,
           summary: `Created a personalized learning plan tailored to your specific goals and context`,
+          startedAt: startTime,
+          durationMs: elapsedMs,
         };
       } catch (error) {
-        console.error('[generate_plan] structured plan failed', error);
+        console.error('[generate_plan] structured plan failed after ms:', Date.now() - startTime, error);
         latestStructuredPlan = null;
-
-        const fallbackPrompt =
-          buildLearningPlanFallbackPrompt(fullConversationContext);
-
-        const fallbackPlan = await generateText({
-          model: openai('gpt-5'),
-          prompt: fallbackPrompt,
-          tools: {
-            web_search: webSearchTool,
-          },
-        });
-
-        return {
-          plan: fallbackPlan.text,
-          summary: `Created a personalized learning plan tailored to your context`,
-        };
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(String(error));
       }
     },
   };
@@ -170,6 +158,8 @@ Be comprehensive - this is used to create course content that feels custom-made 
         plan: parsedPlan,
       });
 
+      const startTime = Date.now();
+
       try {
         const courseGeneration = await generateText({
           model: openai('gpt-5'),
@@ -180,7 +170,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
           providerOptions: {
             openai: {
               textVerbosity: 'high', // Maximum detail and comprehensiveness
-              reasoning_effort: 'high', // Deep thought for personalization
+              reasoning_effort: 'low', // Favor quicker generation to keep content focused
             },
           },
         });
@@ -192,37 +182,22 @@ Be comprehensive - this is used to create course content that feels custom-made 
         const structuredCourse = normalizeCourse(courseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);
 
+        const elapsedMs = Date.now() - startTime;
+        console.log('[generate_course] Total generation time (ms):', elapsedMs);
+
         return {
           course: courseSummary,
           courseStructured: structuredCourse,
           summary: `Generated your personalized course with content tailored to your specific goals and needs`,
+          startedAt: startTime,
+          durationMs: elapsedMs,
         };
       } catch (error) {
-        console.error('[generate_course] structured course failed', error);
-
-        const fallbackPrompt = buildCourseFallbackPrompt({
-          fullContext,
-          plan: parsedPlan,
-        });
-
-        const fallbackResult = await generateText({
-          model: openai('gpt-5'),
-          prompt: fallbackPrompt,
-          tools: {
-            web_search: webSearchTool,
-          },
-          providerOptions: {
-            openai: {
-              textVerbosity: 'high',
-              reasoning_effort: 'high',
-            },
-          },
-        });
-
-        return {
-          course: fallbackResult.text,
-          summary: `Generated fallback course text tailored to your context`,
-        };
+        console.error('[generate_course] structured course failed after ms:', Date.now() - startTime, error);
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error(String(error));
       }
     },
   };

@@ -52,6 +52,7 @@ ${JSON.stringify(plan, null, 2)}
 };
 
 export const buildCoursePrompt = ({ fullContext, plan }: BuildCoursePromptArgs) => `You are an expert course content creator specializing in HYPER-PERSONALIZED education.
+When you need current facts, examples, tools, or resources, call the web_search tool and cite what you discover. Do not invent references—ground the course in real sources.
 
 **COMPLETE LEARNER & PLAN CONTEXT:**
 ${fullContext}
@@ -82,11 +83,12 @@ Requirements:
    - Real-world applications they specifically care about
 3. Use rich markdown formatting: headings (##, ###), code blocks (\`\`\`), lists, bold/italic, etc.
 4. Write in a clear, engaging style that speaks directly to them
-5. Make each lesson substantial (10-15 minutes of reading/learning)
+5. Keep lessons focused so the entire experience fits inside the approved 30–180 minute window—prioritize what helps them take action quickly
 6. Personalize everything - use their goals, motivations, and context throughout
 7. Let content flow naturally with whatever structure best teaches the material
-8. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, advanced stretch ideas, or reflection prompts aligned to their goals
-9. Return valid JSON matching the Course schema exactly
+8. Cite web_search sources inline (e.g., [Source Name](url)) whenever you rely on them
+9. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, advanced stretch ideas, or reflection prompts aligned to their goals
+10. Return valid JSON matching the Course schema exactly
 
 Course schema:
 ${courseJsonSchema}
@@ -94,17 +96,5 @@ ${courseJsonSchema}
 Remember: Every paragraph, every example, every exercise should feel tailored to this specific learner's needs and goals.
 
 Return ONLY valid JSON that matches this schema. Do not wrap the response in markdown fences or include commentary before or after the JSON.`;
-
-export const buildCourseFallbackPrompt = ({
-  fullContext,
-  plan,
-}: BuildCoursePromptArgs) => `You are an expert course content creator.
-
-Create a richly detailed learning experience tailored to the following learner context:
-${fullContext}
-
-${plan ? `Approved plan to reference:\n${JSON.stringify(plan, null, 2)}` : 'No structured plan JSON is available.'}
-
-Write the full course in engaging markdown with modules and lessons, ensuring each section references the learner’s goals, motivations, and constraints. Finish with a celebratory conclusion that provides tailored next steps and stretch ideas so they know how to keep growing after completion.`;
 
 export { courseJsonSchema };

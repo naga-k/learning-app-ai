@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import {
   getToolOrDynamicToolName,
@@ -36,6 +36,19 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const toolStartTimesRef = useRef<
+    Map<string, { localStart: number; serverStart?: number }>
+  >(new Map());
+  const toolTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [, forceToolTimerTick] = useState(0);
+  const formatDuration = (ms?: number) => {
+    if (!ms || ms <= 0) return null;
+    const seconds = ms / 1000;
+    if (seconds < 10) {
+      return `${seconds.toFixed(1)}s`;
+    }
+    return `${Math.round(seconds)}s`;
+  };
 
   const renderableMessages = useMemo(
     () =>
@@ -53,6 +66,44 @@ export function ChatPanel({
 
   const shouldShowTypingIndicator =
     status === "streaming" && !hasRenderableAssistantContent(lastAssistantMessage);
+
+  const hasActiveToolStream = useMemo(
+    () =>
+      messages.some((message) =>
+        message.parts.some((part) => {
+          if (!isToolOrDynamicToolUIPart(part)) return false;
+          return (
+            part.state === "input-streaming" ||
+            part.state === "input-available" ||
+            (part.state === "output-available" && part.preliminary)
+          );
+        }),
+      ),
+    [messages],
+  );
+
+  useEffect(() => {
+    if (hasActiveToolStream) {
+      if (!toolTimerIntervalRef.current) {
+        toolTimerIntervalRef.current = setInterval(() => {
+          forceToolTimerTick((tick) => tick + 1);
+        }, 200);
+      }
+    } else {
+      if (toolTimerIntervalRef.current) {
+        clearInterval(toolTimerIntervalRef.current);
+        toolTimerIntervalRef.current = null;
+      }
+      toolStartTimesRef.current.clear();
+    }
+
+    return () => {
+      if (toolTimerIntervalRef.current) {
+        clearInterval(toolTimerIntervalRef.current);
+        toolTimerIntervalRef.current = null;
+      }
+    };
+  }, [hasActiveToolStream]);
 
   const resetTextareaHeight = (target: HTMLTextAreaElement) => {
     target.style.height = "auto";
@@ -110,6 +161,7 @@ export function ChatPanel({
                         )}
                       >
                         {message.parts.map((part, index) => {
+                          const partKey = `${message.id}-${index}`;
                           if (part.type === "text") {
                             return (
                               <Response
@@ -136,6 +188,18 @@ export function ChatPanel({
                               (part.state === "output-available" && part.preliminary);
 
                             if (isStreamingState) {
+                              const startInfo = toolStartTimesRef.current.get(partKey);
+                              if (!startInfo) {
+                                toolStartTimesRef.current.set(partKey, {
+                                  localStart: Date.now(),
+                                });
+                              }
+                              const activeInfo = toolStartTimesRef.current.get(partKey)!;
+                              const baseStart =
+                                typeof activeInfo.serverStart === "number"
+                                  ? activeInfo.serverStart
+                                  : activeInfo.localStart;
+                              const elapsedLabel = formatDuration(Date.now() - baseStart);
                               return (
                                 <div
                                   key={`${message.id}-${index}`}
@@ -143,9 +207,12 @@ export function ChatPanel({
                                   className="mt-2 flex items-center gap-2 text-sm text-slate-300"
                                 >
                                   <Loader size={16} />
-                                  <span className="animate-pulse">
-                                    {streamingMessage}
-                                  </span>
+                                  <span className="animate-pulse">{streamingMessage}</span>
+                                  {elapsedLabel && (
+                                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                      {elapsedLabel}
+                                    </span>
+                                  )}
                                 </div>
                               );
                             }
@@ -166,6 +233,22 @@ export function ChatPanel({
                               const payload =
                                 (part as { output?: unknown }).output ??
                                 (part as { result?: unknown }).result;
+
+                              if (payload && typeof (payload as { startedAt?: number }).startedAt === "number") {
+                                const existing = toolStartTimesRef.current.get(partKey);
+                                const serverStart = (payload as { startedAt: number }).startedAt;
+                                if (existing) {
+                                  toolStartTimesRef.current.set(partKey, {
+                                    ...existing,
+                                    serverStart,
+                                  });
+                                } else {
+                                  toolStartTimesRef.current.set(partKey, {
+                                    localStart: serverStart,
+                                    serverStart,
+                                  });
+                                }
+                              }
 
                               if (payload && isPlanTool && isPlanToolOutput(payload)) {
                                 return (
@@ -188,13 +271,19 @@ export function ChatPanel({
                                         />
                                       </svg>
                                       Learning plan generated
+                                      {typeof payload.durationMs === "number" && (
+                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-indigo-100/80">
+                                          {formatDuration(payload.durationMs)}
+                                        </span>
+                                      )}
                                     </div>
                                     <Response className="prose-sm prose-invert max-w-none text-slate-100">
                                       {payload.plan}
                                     </Response>
                                     <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
-                                      Ready for the next step? Ask me to “Generate the
-                                      course” when you’re happy with this plan.
+                                      Want tweaks before we move on? Ask me to adjust
+                                      the plan—or say “Generate the course” when
+                                      you’re ready.
                                     </div>
                                   </div>
                                 );
@@ -225,6 +314,11 @@ export function ChatPanel({
                                         />
                                       </svg>
                                       Course generated
+                                      {typeof payload.durationMs === "number" && (
+                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-emerald-100/80">
+                                          {formatDuration(payload.durationMs)}
+                                        </span>
+                                      )}
                                     </div>
                                     <Response className="prose-sm prose-invert max-w-none text-emerald-50">
                                       {payload.course}
@@ -259,7 +353,7 @@ export function ChatPanel({
                   <Message from="assistant">
                     <MessageContent
                       variant="flat"
-                      className="flex items-center gap-3 rounded-2xl bg-white/10 px-5 py-3 text-sm text-slate-300"
+                      className="inline-flex items-center gap-3 whitespace-nowrap rounded-2xl bg-white/10 px-5 py-3 text-sm text-slate-300"
                     >
                       <Loader size={20} />
                       <span className="animate-pulse">Thinking...</span>
