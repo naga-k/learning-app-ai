@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ChevronDown,
-  ChevronRight,
   ArrowLeft,
   BookOpen,
+  ChevronDown,
+  ChevronRight,
   Flag,
 } from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
@@ -57,8 +57,6 @@ export function CourseWorkspace({
     Boolean(conclusion?.celebrationMessage?.trim()) ||
     (conclusion?.recommendedNextSteps?.length ?? 0) > 0 ||
     (conclusion?.stretchIdeas?.length ?? 0) > 0;
-  const firstModule = course.modules[0];
-  const firstLesson = firstModule?.submodules[0];
 
   const activeModule = useMemo(
     () =>
@@ -76,19 +74,24 @@ export function CourseWorkspace({
     );
   }, [activeModule, activeSubmoduleId]);
 
+  const moduleCount = course.modules.length;
+  const totalLessons = course.modules.reduce(
+    (sum, courseModule) => sum + courseModule.submodules.length,
+    0,
+  );
+
   if (!activeModule || !activeSubmodule) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 bg-gradient-to-br from-white to-indigo-50 p-8 text-center dark:from-gray-900 dark:to-gray-800">
-        <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-slate-950/40 px-8 text-center">
+        <p className="text-lg font-medium text-slate-100">
           The generated course is missing lesson details.
         </p>
-        <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
-          Please head back to the chat and ask the assistant to regenerate the
-          course.
+        <p className="max-w-md text-sm text-slate-400">
+          Please head back to the chat and request a fresh course.
         </p>
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(79,70,229,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
           type="button"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -99,28 +102,28 @@ export function CourseWorkspace({
   }
 
   return (
-    <div className="flex h-full">
-      <aside className="flex w-80 flex-col border-r border-indigo-100 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-900/75">
-        <div className="border-b border-indigo-100 px-4 py-5 dark:border-gray-800">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+    <div className="flex h-full w-full flex-col overflow-hidden text-slate-100 md:flex-row">
+      <aside className="flex w-full shrink-0 flex-col border-b border-white/10 bg-white/[0.05] backdrop-blur-xl md:w-80 md:border-b-0 md:border-r">
+        <div className="border-white/10 px-5 py-6">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
             Course Modules
           </h2>
-          <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            Click a module to explore its lessons.
+          <p className="mt-2 text-xs text-slate-400">
+            Navigate the journey from blueprint to mastery.
           </p>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 py-4">
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
           {hasOverviewContent && (
             <div className="mb-4">
               <button
                 type="button"
                 onClick={() => setViewMode("overview")}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors",
+                  "flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition",
                   viewMode === "overview"
-                    ? "border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-500/60 dark:bg-indigo-500/10 dark:text-indigo-100"
-                    : "border-transparent bg-transparent text-gray-700 hover:border-indigo-100 hover:bg-indigo-50/70 dark:text-gray-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10",
+                    ? "border-white/20 bg-white/10 text-slate-100 shadow-[0_0_30px_rgba(129,140,248,0.35)]"
+                    : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5",
                 )}
               >
                 <BookOpen className="h-4 w-4 flex-shrink-0" />
@@ -128,9 +131,11 @@ export function CourseWorkspace({
               </button>
             </div>
           )}
+
           {course.modules.map((module) => {
             const moduleSelected = module.moduleId === activeModuleId;
             const isActiveModule = viewMode === "lesson" && moduleSelected;
+
             return (
               <div key={module.moduleId} className="mb-3">
                 <button
@@ -143,10 +148,10 @@ export function CourseWorkspace({
                     setViewMode("lesson");
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors",
+                    "flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition",
                     isActiveModule
-                      ? "border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-500/60 dark:bg-indigo-500/10 dark:text-indigo-100"
-                      : "border-transparent bg-transparent text-gray-700 hover:border-indigo-100 hover:bg-indigo-50/70 dark:text-gray-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10",
+                      ? "border-indigo-400/30 bg-indigo-500/20 text-indigo-100 shadow-[0_0_35px_rgba(79,70,229,0.35)]"
+                      : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5",
                   )}
                 >
                   <div>
@@ -162,7 +167,7 @@ export function CourseWorkspace({
                 </button>
 
                 {isActiveModule && (
-                  <ul className="mt-2 space-y-1 border-l border-indigo-200/60 pl-4 dark:border-indigo-500/40">
+                  <ul className="mt-3 space-y-1 border-l border-white/10 pl-3">
                     {module.submodules.map((submodule) => {
                       const submoduleActive = submodule.id === activeSubmoduleId;
                       return (
@@ -174,10 +179,10 @@ export function CourseWorkspace({
                               setViewMode("lesson");
                             }}
                             className={cn(
-                              "w-full rounded-md px-2 py-2 text-left text-sm transition",
+                              "w-full rounded-xl px-2 py-2 text-left text-sm transition",
                               submoduleActive
-                                ? "bg-indigo-100 font-medium text-indigo-900 dark:bg-indigo-500/20 dark:text-indigo-100"
-                                : "text-gray-600 hover:bg-indigo-50 dark:text-gray-300 dark:hover:bg-indigo-500/10",
+                                ? "bg-indigo-500/20 font-medium text-indigo-100 shadow-[0_0_25px_rgba(79,70,229,0.35)]"
+                                : "text-slate-400 hover:bg-white/5",
                             )}
                           >
                             {submodule.order}. {submodule.title}
@@ -190,16 +195,17 @@ export function CourseWorkspace({
               </div>
             );
           })}
+
           {hasConclusion && (
-            <div className="mt-6 border-t border-indigo-100 pt-4 dark:border-indigo-800/50">
+            <div className="mt-6 border-t border-white/10 pt-4">
               <button
                 type="button"
                 onClick={() => setViewMode("conclusion")}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors",
+                  "flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition",
                   viewMode === "conclusion"
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/60 dark:bg-emerald-500/10 dark:text-emerald-100"
-                    : "border-transparent bg-transparent text-emerald-700 hover:border-emerald-100 hover:bg-emerald-50/70 dark:text-emerald-200 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10",
+                    ? "border-emerald-300/40 bg-emerald-500/20 text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+                    : "border-transparent text-emerald-200 hover:border-emerald-200/30 hover:bg-emerald-500/10",
                 )}
               >
                 <Flag className="h-4 w-4 flex-shrink-0" />
@@ -210,78 +216,70 @@ export function CourseWorkspace({
         </nav>
       </aside>
 
-      <section className="flex flex-1 flex-col bg-gradient-to-br from-indigo-50 via-white to-indigo-100/30 dark:from-gray-900 dark:via-gray-900 dark:to-indigo-950/30">
-        <header className="flex items-center justify-between border-b border-indigo-100/80 px-8 py-6 backdrop-blur dark:border-gray-800/80">
-          <div>
+      <section className="flex flex-1 flex-col overflow-hidden bg-transparent">
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
+          <div className="space-y-3">
             {viewMode === "overview" && (
               <>
-                <p className="text-xs uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
                   Course Overview
                 </p>
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                <h1 className="text-2xl font-semibold text-white md:text-[2rem]">
                   {course.overview?.focus ?? "Your personalized learning path"}
                 </h1>
                 {course.overview?.totalDuration && (
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-slate-400">
                     Estimated total time: {course.overview.totalDuration}
                   </p>
                 )}
               </>
             )}
+
             {viewMode === "lesson" && (
               <>
-                <p className="text-xs uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
                   Module {activeModule.order}
                 </p>
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                <h1 className="text-2xl font-semibold text-white md:text-[2rem]">
                   {activeModule.title}
                 </h1>
                 {activeModule.summary && (
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    {activeModule.summary}
-                  </p>
+                  <p className="text-sm text-slate-400">{activeModule.summary}</p>
                 )}
               </>
             )}
+
             {viewMode === "conclusion" && (
               <>
-                <p className="text-xs uppercase tracking-wide text-emerald-500 dark:text-emerald-300">
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-200">
                   Course Wrap-up
                 </p>
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                <h1 className="text-2xl font-semibold text-white md:text-[2rem]">
                   Celebrate your progress
                 </h1>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-slate-400">
                   Reflect on what you’ve achieved and line up your next steps.
                 </p>
               </>
             )}
           </div>
 
-          <button
-            onClick={onBack}
-            type="button"
-            className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-indigo-500/40 dark:bg-transparent dark:text-indigo-300 dark:hover:border-indigo-500/60 dark:hover:text-indigo-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to chat
-          </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-8 py-8">
+        <div className="flex-1 overflow-y-auto px-6 py-8">
           {viewMode === "lesson" && (
-            <div className="rounded-2xl border border-white/60 bg-white/90 p-8 shadow-lg backdrop-blur dark:border-gray-800/80 dark:bg-gray-900/80">
-              <div className="mb-6 flex flex-col gap-2 border-b border-gray-200 pb-6 dark:border-gray-700">
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            <div className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-8 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
+              <div className="mb-6 flex flex-col gap-3 border-b border-white/10 pb-6">
+                <h2 className="text-2xl font-semibold text-white">
                   {activeSubmodule.order}. {activeSubmodule.title}
                 </h2>
                 {activeSubmodule.duration && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    ⏱️ Suggested time: {activeSubmodule.duration}
+                  <p className="text-sm text-slate-400">
+                    ⏱ Suggested time: {activeSubmodule.duration}
                   </p>
                 )}
                 {activeSubmodule.summary && (
-                  <p className="text-sm italic text-gray-600 dark:text-gray-400">
+                  <p className="text-sm italic text-slate-300">
                     {activeSubmodule.summary}
                   </p>
                 )}
@@ -294,56 +292,75 @@ export function CourseWorkspace({
           {viewMode === "overview" && (
             <div className="space-y-8">
               {hasCourseSummary && (
-                <div className="rounded-2xl border border-indigo-200/70 bg-white/90 p-6 text-sm text-gray-700 shadow-sm backdrop-blur dark:border-gray-800/80 dark:bg-gray-900/80 dark:text-gray-300">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-6 text-sm text-slate-200 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
                     Course Introduction
                   </h3>
-                  <p className="mt-2 whitespace-pre-line">{summary}</p>
+                  <p className="mt-3 whitespace-pre-line">{summary}</p>
                 </div>
               )}
 
-              {firstModule && firstLesson && (
-                <div className="rounded-2xl border border-indigo-200/70 bg-indigo-50/60 p-6 shadow-sm backdrop-blur dark:border-indigo-500/40 dark:bg-indigo-500/10">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                    Ready to dive in?
-                  </h3>
-                  <p className="mt-2 text-sm text-indigo-900 dark:text-indigo-100">
-                    Start with Module {firstModule.order}: {firstModule.title}
-                  </p>
-                  <p className="mt-1 text-xs text-indigo-800/80 dark:text-indigo-200/80">
-                    Lesson 1 · {firstLesson.title}
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                    onClick={() => {
-                      setActiveModuleId(firstModule.moduleId);
-                      setActiveSubmoduleId(firstLesson.id);
-                      setViewMode("lesson");
-                    }}
-                  >
-                    Jump into the course
-                  </button>
+              {course.overview && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {course.overview.focus && (
+                    <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
+                        Primary Focus
+                      </h3>
+                      <p className="mt-3 whitespace-pre-line">
+                        {course.overview.focus}
+                      </p>
+                    </div>
+                  )}
+                  {course.overview.totalDuration && (
+                    <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
+                        Estimated Time
+                      </h3>
+                      <p className="mt-3">{course.overview.totalDuration}</p>
+                    </div>
+                  )}
+                  {moduleCount > 0 && (
+                    <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
+                        Modules
+                      </h3>
+                      <p className="mt-3">{moduleCount}</p>
+                    </div>
+                  )}
+                  {totalLessons > 0 && (
+                    <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
+                        Lessons
+                      </h3>
+                      <p className="mt-3">{totalLessons}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
               {hasResources && course.resources && (
-                <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/80 p-6 shadow-sm backdrop-blur dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                    Resources to Explore
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.04] px-6 py-6 text-sm text-slate-100 shadow-[0_0_30px_-25px_rgba(15,23,42,0.6)] backdrop-blur">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-200">
+                    Resources to explore
                   </h3>
-                  <ul className="mt-3 space-y-2 text-sm text-emerald-900 dark:text-emerald-100">
+                  <ul className="mt-4 space-y-3">
                     {course.resources.map((resource, index) => (
-                      <li key={`resource-${index}`}>
-                        <span className="font-medium">{resource.title}</span>
+                      <li
+                        key={`resource-${index}`}
+                        className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-emerald-50"
+                      >
+                        <span className="font-semibold text-white">
+                          {resource.title}
+                        </span>
                         {resource.description && (
-                          <span className="text-emerald-800/80 dark:text-emerald-200/80">
+                          <span className="text-emerald-100/80">
                             {" "}
                             — {resource.description}
                           </span>
                         )}
                         {resource.url && (
-                          <span className="block text-xs text-emerald-700/70 dark:text-emerald-300/70">
+                          <span className="block text-xs text-emerald-100/70">
                             {resource.url}
                           </span>
                         )}
@@ -358,22 +375,22 @@ export function CourseWorkspace({
           {viewMode === "conclusion" && (
             <div className="space-y-8">
               {conclusion?.summary && (
-                <div className="rounded-2xl border border-emerald-200/70 bg-white/90 p-6 text-sm text-gray-700 shadow-sm backdrop-blur dark:border-emerald-500/40 dark:bg-gray-900/80 dark:text-gray-300">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.04] px-6 py-6 text-sm text-slate-100 shadow-[0_0_30px_-25px_rgba(15,23,42,0.6)] backdrop-blur">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-200">
                     Final Reflection
                   </h3>
-                  <p className="mt-2 whitespace-pre-line">
+                  <p className="mt-3 whitespace-pre-line">
                     {conclusion.summary}
                   </p>
                 </div>
               )}
 
               {conclusion?.celebrationMessage && (
-                <div className="rounded-2xl border border-amber-200/70 bg-amber-50/80 p-6 text-sm text-amber-900 shadow-sm backdrop-blur dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.04] px-6 py-6 text-sm text-slate-100 shadow-[0_0_30px_-25px_rgba(15,23,42,0.6)] backdrop-blur">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
                     Celebrate the win
                   </h3>
-                  <p className="mt-2 whitespace-pre-line">
+                  <p className="mt-3 whitespace-pre-line">
                     {conclusion.celebrationMessage}
                   </p>
                 </div>
@@ -381,11 +398,11 @@ export function CourseWorkspace({
 
               {conclusion?.recommendedNextSteps &&
                 conclusion.recommendedNextSteps.length > 0 && (
-                  <div className="rounded-2xl border border-indigo-200/70 bg-indigo-50/80 p-6 text-sm text-indigo-900 shadow-sm backdrop-blur dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-100">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                  <div className="rounded-[26px] border border-white/10 bg-white/[0.04] px-6 py-6 text-sm text-slate-100 shadow-[0_0_30px_-25px_rgba(15,23,42,0.6)] backdrop-blur">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
                       Recommended Next Steps
                     </h3>
-                    <ul className="mt-3 space-y-2 list-disc pl-4">
+                    <ul className="mt-4 space-y-2 list-disc pl-5 text-slate-100">
                       {conclusion.recommendedNextSteps.map((step, index) => (
                         <li key={`next-step-${index}`}>{step}</li>
                       ))}
@@ -394,26 +411,26 @@ export function CourseWorkspace({
                 )}
 
               {conclusion?.stretchIdeas && conclusion.stretchIdeas.length > 0 && (
-                  <div className="rounded-2xl border border-purple-200/70 bg-purple-50/80 p-6 text-sm text-purple-900 shadow-sm backdrop-blur dark:border-purple-500/40 dark:bg-purple-500/10 dark:text-purple-100">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
-                      Stretch Ideas
-                    </h3>
-                    <ul className="mt-3 space-y-2 list-disc pl-4">
-                      {conclusion.stretchIdeas.map((idea, index) => (
-                        <li key={`stretch-idea-${index}`}>{idea}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.04] px-6 py-6 text-sm text-slate-100 shadow-[0_0_30px_-25px_rgba(15,23,42,0.6)] backdrop-blur">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
+                    Stretch Ideas
+                  </h3>
+                  <ul className="mt-4 space-y-2 list-disc pl-5 text-slate-100">
+                    {conclusion.stretchIdeas.map((idea, index) => (
+                      <li key={`stretch-idea-${index}`}>{idea}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {!hasConclusion && (
-                <div className="rounded-2xl border border-gray-200/70 bg-white/90 p-6 text-sm text-gray-700 shadow-sm backdrop-blur dark:border-gray-700/60 dark:bg-gray-900/80 dark:text-gray-200">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-6 text-sm text-slate-200 shadow-[0_0_30px_-25px_rgba(15,23,42,0.6)] backdrop-blur">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-300">
                     Wrap-up coming soon
                   </h3>
-                  <p className="mt-2">
+                  <p className="mt-3 text-slate-400">
                     This course doesn’t include a closing section yet. Review the
-                    lessons above or ask the assistant to add next steps.
+                    lessons above or request additional next steps in chat.
                   </p>
                 </div>
               )}
