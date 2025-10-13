@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
+import { sanitizeUrl } from "@/lib/utils";
 
 type MarkdownContentProps = {
   content: string;
@@ -15,6 +16,12 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
+        components={{
+          a: ({ href, ...props }) => (
+            // open links in a new tab and use safe rel; sanitize href
+            <a href={href ? sanitizeUrl(String(href)) : href} {...props} target="_blank" rel="noopener noreferrer" />
+          ),
+        }}
       >
         {content}
       </ReactMarkdown>

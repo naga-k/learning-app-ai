@@ -9,8 +9,9 @@ import {
   Flag,
 } from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeUrl } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";
+import { Linkify } from "./linkify";
 
 type CourseWorkspaceProps = {
   course: CourseWithIds;
@@ -296,7 +297,7 @@ export function CourseWorkspace({
                   <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
                     Course Introduction
                   </h3>
-                  <p className="mt-3 whitespace-pre-line">{summary}</p>
+                  <p className="mt-3 whitespace-pre-line"><Linkify text={summary ?? ""} /></p>
                 </div>
               )}
 
@@ -308,7 +309,7 @@ export function CourseWorkspace({
                         Primary Focus
                       </h3>
                       <p className="mt-3 whitespace-pre-line">
-                        {course.overview.focus}
+                        <Linkify text={course.overview.focus ?? ""} />
                       </p>
                     </div>
                   )}
@@ -350,19 +351,21 @@ export function CourseWorkspace({
                         key={`resource-${index}`}
                         className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-emerald-50"
                       >
-                        <span className="font-semibold text-white">
-                          {resource.title}
-                        </span>
-                        {resource.description && (
-                          <span className="text-emerald-100/80">
-                            {" "}
-                            — {resource.description}
-                          </span>
+                        {resource.url ? (
+                          <a
+                            href={sanitizeUrl(resource.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-white hover:underline"
+                          >
+                            {resource.title}
+                          </a>
+                        ) : (
+                          <span className="font-semibold text-white">{resource.title}</span>
                         )}
-                        {resource.url && (
-                          <span className="block text-xs text-emerald-100/70">
-                            {resource.url}
-                          </span>
+
+                        {resource.description && (
+                          <p className="mt-1 text-emerald-100/80 text-sm">— {resource.description}</p>
                         )}
                       </li>
                     ))}
@@ -380,7 +383,7 @@ export function CourseWorkspace({
                     Final Reflection
                   </h3>
                   <p className="mt-3 whitespace-pre-line">
-                    {conclusion.summary}
+                    <Linkify text={conclusion.summary ?? ""} />
                   </p>
                 </div>
               )}
@@ -391,7 +394,7 @@ export function CourseWorkspace({
                     Celebrate the win
                   </h3>
                   <p className="mt-3 whitespace-pre-line">
-                    {conclusion.celebrationMessage}
+                    <Linkify text={conclusion.celebrationMessage ?? ""} />
                   </p>
                 </div>
               )}
