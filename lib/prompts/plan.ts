@@ -75,7 +75,7 @@ ${fullConversationContext}
 Design a quick, high-level learning plan that fits inside a 30 to 180 minute sprint. Keep it laser-focused on what helps THIS learner make immediate progress. Tie everything back to their:
 - Goals and motivations
 - Time budget (stick to the 30–180 minute window)
-- Current level and confidence
+- Current familiarity and confidence (echo their own words when useful)
 - Interests, use cases, and constraints
 
 **PURPOSE:** Produce a scannable roadmap (not full lessons). The plan should be easy to skim in under a minute and simple to tweak.
@@ -90,7 +90,7 @@ Requirements:
 4. Include deliverables only if they clearly help the learner (otherwise omit them).
     5. When you reference resources, cite the web_search results you used.
     6. Add a note only if there’s a quick tip or reminder the learner should keep in mind.
-    7. Make it obviously personal—mention the learner’s goals, motivations, and constraints.
+  7. Make it obviously personal—mention the learner’s goals, motivations, constraints, and mirror their own phrasing about familiarity instead of generic level labels.
 8. Keep it punchy: limit the overall plan to ~120 words. Use short, telegraphic phrases—no long sentences.
 9. Enforce brevity at every level:
    - overview.goal ≤ 20 words; each outcome ≤ 12 words.
