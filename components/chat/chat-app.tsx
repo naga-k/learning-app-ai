@@ -4,7 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart } from 'ai';
 import { ArrowLeft, BookOpen, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { CourseWorkspace } from '@/components/course/course-workspace';
 import {
@@ -33,9 +33,11 @@ function createAssistantMessage(text: string) {
 
 export function ChatApp() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { supabase } = useSupabase();
   const [viewMode, setViewMode] = useState<'chat' | 'course'>('chat');
   const { messages, sendMessage, status, setMessages } = useChat();
+  const hasSentInitialPromptRef = useRef(false);
 
   const appendAssistantMessage = useCallback(
     (text: string) =>
@@ -84,6 +86,17 @@ export function ChatApp() {
   }, [latestCourse]);
 
   const showCourseToggle = Boolean(courseState?.output.courseStructured);
+
+  useEffect(() => {
+    if (hasSentInitialPromptRef.current) return;
+
+    const prompt = searchParams.get('prompt');
+    if (!prompt || prompt.trim().length === 0) return;
+
+    hasSentInitialPromptRef.current = true;
+    sendMessage({ text: prompt });
+    router.replace('/chat');
+  }, [router, searchParams, sendMessage]);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();

@@ -482,37 +482,35 @@ export function ChatPanel({
         </Conversation>
       </div>
 
-      <div className="border-t border-white/10 bg-gradient-to-b from-white/0 to-white/[0.05] px-4 py-4 sm:px-6">
+      <div className="border-t border-white/10 bg-transparent px-4 pb-6 pt-4 sm:px-6">
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex w-full max-w-4xl items-end gap-3"
+          className="mx-auto flex w-full max-w-4xl items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl"
         >
-          <div className="relative flex-1">
-            <textarea
-              ref={textareaRef}
-              className="h-12 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
-              value={input}
-              placeholder="Ask for a course, outline a goal, or iterate on the plan..."
-              onChange={(event) => {
-                setInput(event.target.value);
-                resetTextareaHeight(event.target);
-              }}
-              onKeyDown={handleKeyDown}
-              disabled={status === "streaming"}
-              rows={1}
-              style={{
-                height: "auto",
-                overflowY: input.split("\n").length > 3 ? "auto" : "hidden",
-              }}
-              onInput={(event) => {
-                resetTextareaHeight(event.target as HTMLTextAreaElement);
-              }}
-            />
-          </div>
+          <textarea
+            ref={textareaRef}
+            className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-full border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            value={input}
+            placeholder="Ask for a course, outline a goal, or iterate on the plan..."
+            onChange={(event) => {
+              setInput(event.target.value);
+              resetTextareaHeight(event.target);
+            }}
+            onKeyDown={handleKeyDown}
+            disabled={status === "streaming"}
+            rows={1}
+            style={{
+              height: "auto",
+              overflowY: input.split("\n").length > 3 ? "auto" : "hidden",
+            }}
+            onInput={(event) => {
+              resetTextareaHeight(event.target as HTMLTextAreaElement);
+            }}
+          />
           <button
             type="submit"
             disabled={status === "streaming" || !input.trim()}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 px-5 text-sm font-semibold text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {status === "streaming" ? (
               <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
