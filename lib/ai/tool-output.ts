@@ -20,6 +20,12 @@ export type CourseToolOutput = {
   durationMs?: number;
 };
 
+export type ToolErrorOutput = {
+  errorMessage: string;
+  startedAt?: number;
+  durationMs?: number;
+};
+
 const hasStringProperty = (value: unknown, key: string): boolean =>
   Boolean(
     value &&
@@ -33,6 +39,9 @@ export const isPlanToolOutput = (value: unknown): value is PlanToolOutput =>
 
 export const isCourseToolOutput = (value: unknown): value is CourseToolOutput =>
   hasStringProperty(value, 'course');
+
+export const isToolErrorOutput = (value: unknown): value is ToolErrorOutput =>
+  hasStringProperty(value, 'errorMessage');
 
 export const hasRenderableAssistantContent = (
   message: UIMessage | null,
@@ -64,7 +73,11 @@ export const hasRenderableAssistantContent = (
 
       if (!payload) return false;
 
-      return isPlanToolOutput(payload) || isCourseToolOutput(payload);
+      return (
+        isPlanToolOutput(payload) ||
+        isCourseToolOutput(payload) ||
+        isToolErrorOutput(payload)
+      );
     }
 
     return false;

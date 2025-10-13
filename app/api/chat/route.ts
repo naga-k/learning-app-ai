@@ -72,8 +72,8 @@ Be verbose and detailed - this context is used to create a truly personalized le
           },
           providerOptions: {
             openai: {
-              reasoning_effort: 'low',
-              textVerbosity: 'medium',
+              reasoningEffort: 'low',
+              textVerbosity: 'low',
             },
           },
         });
@@ -93,7 +93,7 @@ Be verbose and detailed - this context is used to create a truly personalized le
         return {
           plan: planText,
           structuredPlan,
-          summary: `Created a personalized learning plan tailored to your specific goals and context`,
+          summary: `Created a personalized learning plan tailored to your specific goals and context. Ask the learner if they want tweaks before generating the course.`,
           startedAt: startTime,
           durationMs: elapsedMs,
         };
@@ -170,7 +170,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
           providerOptions: {
             openai: {
               textVerbosity: 'high', // Maximum detail and comprehensiveness
-              reasoning_effort: 'low', // Favor quicker generation to keep content focused
+              reasoningEffort: 'low', // Favor quicker generation to keep content focused
             },
           },
         });
@@ -193,11 +193,33 @@ Be comprehensive - this is used to create course content that feels custom-made 
           durationMs: elapsedMs,
         };
       } catch (error) {
-        console.error('[generate_course] structured course failed after ms:', Date.now() - startTime, error);
+        const elapsedMs = Date.now() - startTime;
+        console.error(
+          '[generate_course] structured course failed after ms:',
+          elapsedMs,
+          error,
+        );
+
+        let friendlyMessage =
+          'Course generation failed due to an unexpected error. Please try again.';
+
         if (error instanceof Error) {
-          throw error;
+          const message = error.message?.trim();
+          if (error.name === 'AI_APICallError' || /timeout/i.test(message ?? '')) {
+            friendlyMessage =
+              'Course generation timed out while contacting the model. Please try again.';
+          } else if (message) {
+            friendlyMessage = `Course generation failed: ${message}`;
+          }
+        } else if (typeof error === 'string' && error.trim().length > 0) {
+          friendlyMessage = `Course generation failed: ${error.trim()}`;
         }
-        throw new Error(String(error));
+
+        return {
+          errorMessage: friendlyMessage,
+          startedAt: startTime,
+          durationMs: elapsedMs,
+        };
       }
     },
   };
@@ -214,7 +236,8 @@ Be comprehensive - this is used to create course content that feels custom-made 
     },
     providerOptions: {
       openai: {
-        reasoning_effort: 'minimal',
+        reasoningEffort: 'minimal',
+        textVerbosity:'low',
       },
     },
   });
