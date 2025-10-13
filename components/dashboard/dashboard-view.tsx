@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Brain, Send, TrendingUp } from 'lucide-react';
 import { DashboardCourse } from '@/lib/dashboard/courses';
+import { DashboardSession } from '@/lib/dashboard/sessions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,9 +12,10 @@ import { Progress } from '@/components/ui/progress';
 
 type DashboardViewProps = {
   courses: DashboardCourse[];
+  sessions: DashboardSession[];
 };
 
-export function DashboardView({ courses }: DashboardViewProps) {
+export function DashboardView({ courses, sessions }: DashboardViewProps) {
   const router = useRouter();
   const [draftMessage, setDraftMessage] = useState('');
 
@@ -174,6 +176,48 @@ export function DashboardView({ courses }: DashboardViewProps) {
             ))}
           </section>
         )}
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-50">Recent chats</h2>
+            <p className="text-sm text-slate-400">
+              Jump back into a conversation to keep refining your plan.
+            </p>
+          </div>
+
+          {sessions.length === 0 ? (
+            <Card className="border-white/10 bg-white/[0.04] p-8 text-center text-slate-300">
+              No conversations yet. Start chatting to see sessions here.
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {sessions.map((session) => (
+                <Card
+                  key={session.id}
+                  className="border-white/10 bg-white/[0.04] p-4 text-slate-100 transition hover:border-white/20 hover:bg-white/[0.06]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-medium text-slate-50">
+                        {session.title}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Updated {new Date(session.updatedAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => router.push(`/chat?session=${session.id}`)}
+                      variant="outline"
+                      className="border-white/20 bg-white/[0.02] text-slate-100 hover:bg-white/10"
+                    >
+                      Open
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
       <div className="pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-6 pt-10 sm:px-6 lg:px-8">
         <div className="pointer-events-auto">

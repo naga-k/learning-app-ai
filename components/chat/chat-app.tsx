@@ -1,7 +1,8 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart } from 'ai';
+import { DefaultChatTransport } from 'ai';
+import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
 import { ArrowLeft, BookOpen, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -36,7 +37,32 @@ export function ChatApp() {
   const searchParams = useSearchParams();
   const { supabase } = useSupabase();
   const [viewMode, setViewMode] = useState<'chat' | 'course'>('chat');
-  const { messages, sendMessage, status, setMessages } = useChat();
+  const sessionParam = searchParams.get('session');
+  const promptParam = searchParams.get('prompt');
+  const [sessionId, setSessionId] = useState<string | null>(sessionParam);
+  const [initializingSession, setInitializingSession] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const transport = useMemo(() => {
+    if (!sessionId) return undefined;
+
+    return new DefaultChatTransport({
+      api: '/api/chat',
+      prepareSendMessagesRequest(request) {
+        return {
+          body: {
+            sessionId,
+            message: request.messages.at(-1),
+          },
+        };
+      },
+    });
+  }, [sessionId]);
+
+  const { messages, sendMessage, status, setMessages } = useChat({
+    id: sessionId ?? undefined,
+    transport,
+  });
   const hasSentInitialPromptRef = useRef(false);
 
   const appendAssistantMessage = useCallback(
@@ -51,6 +77,7 @@ export function ChatApp() {
   const latestCourse = useMemo<CourseSnapshot | null>(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const message = messages[i];
+      if (!message || !Array.isArray(message.parts)) continue;
       for (
         let partIndex = message.parts.length - 1;
         partIndex >= 0;
@@ -88,20 +115,102 @@ export function ChatApp() {
   const showCourseToggle = Boolean(courseState?.output.courseStructured);
 
   useEffect(() => {
-    if (hasSentInitialPromptRef.current) return;
+    let cancelled = false;
 
-    const prompt = searchParams.get('prompt');
-    if (!prompt || prompt.trim().length === 0) return;
+    async function ensureSession() {
+      const existingSessionId = searchParams.get('session');
+
+      if (existingSessionId) {
+        const response = await fetch(`/api/chat/session?sessionId=${existingSessionId}`);
+        if (!response.ok) {
+          setSessionError('This chat session could not be loaded.');
+          setInitializingSession(false);
+          return;
+        }
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        setSessionId(data.session.id);
+        const storedMessages: UIMessage[] = data.messages.map((row: { content: UIMessage }) => row.content);
+        if (storedMessages.length > 0) {
+          setMessages(storedMessages);
+        }
+        setInitializingSession(false);
+        return;
+      }
+
+      const response = await fetch('/api/chat/session', { method: 'POST' });
+      if (!response.ok) {
+        setSessionError('We were unable to start a new chat. Please try again.');
+        setInitializingSession(false);
+        return;
+      }
+
+      const data = await response.json();
+      if (cancelled) return;
+
+      setSessionId(data.sessionId);
+      router.replace(`/chat?session=${data.sessionId}${promptParam ? `&prompt=${encodeURIComponent(promptParam)}` : ''}`);
+      setInitializingSession(false);
+    }
+
+    ensureSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, searchParams, setMessages, promptParam]);
+
+  const sendMessageWithSession = useCallback(
+    (text: string) => {
+      if (!sessionId) return;
+      sendMessage({ text });
+    },
+    [sendMessage, sessionId],
+  );
+
+  useEffect(() => {
+    if (!sessionId) return;
+    if (hasSentInitialPromptRef.current) return;
+    if (!promptParam || promptParam.trim().length === 0) return;
 
     hasSentInitialPromptRef.current = true;
-    sendMessage({ text: prompt });
-    router.replace('/chat');
-  }, [router, searchParams, sendMessage]);
+    sendMessageWithSession(promptParam);
+    router.replace(`/chat?session=${sessionId}`);
+  }, [router, sessionId, promptParam, sendMessageWithSession]);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     router.push('/login');
   }, [router, supabase]);
+
+  if (sessionError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-slate-200">
+        <p>{sessionError}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setSessionError(null);
+            setInitializingSession(true);
+            hasSentInitialPromptRef.current = false;
+          }}
+          className="mt-4 rounded-full border border-white/10 px-4 py-2 text-sm text-slate-100"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (initializingSession || !sessionId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
+        Preparing your chat workspace...
+      </div>
+    );
+  }
 
   return (
     <>
@@ -167,7 +276,7 @@ export function ChatApp() {
             <ChatPanel
               messages={messages}
               status={status}
-              onSendMessage={(text) => sendMessage({ text })}
+              onSendMessage={sendMessageWithSession}
               onAppendAssistantMessage={appendAssistantMessage}
             />
           )}

@@ -69,6 +69,7 @@ export function ChatPanel({
 
     messages.forEach((message, index) => {
       if (message.role !== "assistant") return;
+      if (!Array.isArray(message.parts)) return;
 
       const hasPlanPayload = message.parts.some((part) => {
         if (!isToolOrDynamicToolUIPart(part)) return false;
@@ -157,6 +158,7 @@ export function ChatPanel({
   const hasActiveToolStream = useMemo(
     () =>
       messages.some((message) =>
+        Array.isArray(message.parts) &&
         message.parts.some((part) => {
           if (!isToolOrDynamicToolUIPart(part)) return false;
           return (
@@ -234,25 +236,25 @@ export function ChatPanel({
               </ConversationEmptyState>
             ) : (
               <>
-                {renderableMessages.map((message) => {
+                {renderableMessages.map((message, messageIndex) => {
                   const isUser = message.role === "user";
-                  return (
-                    <Message from={message.role} key={message.id}>
-                      <MessageContent
-                        variant="flat"
-                        className={cn(
-                          "max-w-3xl space-y-1 rounded-xl px-3 py-2 text-sm leading-6 transition-colors",
-                          isUser
-                            ? "bg-indigo-500/45 text-white/95"
-                            : "bg-slate-900/45 text-slate-100",
-                        )}
-                      >
-                        {message.parts.map((part, index) => {
-                          const partKey = `${message.id}-${index}`;
-                          if (part.type === "text") {
-                            return (
-                              <Response
-                                key={`${message.id}-${index}`}
+              return (
+                  <Message from={message.role} key={message.id ?? `message-${messageIndex}`}>
+                    <MessageContent
+                      variant="flat"
+                      className={cn(
+                        "max-w-3xl space-y-1 rounded-xl px-3 py-2 text-sm leading-6 transition-colors",
+                        isUser
+                          ? "bg-indigo-500/45 text-white/95"
+                          : "bg-slate-900/45 text-slate-100",
+                      )}
+                    >
+                      {(Array.isArray(message.parts) ? message.parts : []).map((part, index) => {
+                        const partKey = `${message.id}-${index}`;
+                        if (part.type === "text") {
+                          return (
+                            <Response
+                              key={`${message.id}-${index}`}
                                 className="prose-sm prose-invert max-w-none text-slate-100"
                               >
                                 {part.text}
