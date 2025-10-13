@@ -1,6 +1,7 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText, generateText, convertToModelMessages } from 'ai';
 import { z } from 'zod';
+import { NextResponse } from 'next/server';
 import {
   CourseSchema,
   LearningPlanSchema,
@@ -14,8 +15,9 @@ import { extractJsonFromText } from '@/lib/ai/json';
 import { buildLearningPlanPrompt } from '@/lib/prompts/plan';
 import { buildCoursePrompt } from '@/lib/prompts/course';
 import { systemPrompt } from '@/lib/prompts/system';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 const webSearchTool = openai.tools.webSearch({
   searchContextSize: 'high',
@@ -24,6 +26,18 @@ const webSearchTool = openai.tools.webSearch({
 // Allow streaming responses up to 30 seconds
 
 export async function POST(req: Request) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json(
+      { error: 'Not authenticated' },
+      { status: 401 },
+    );
+  }
+
   const { messages } = await req.json();
   let latestStructuredPlan: LearningPlanWithIds | null = null;
 
