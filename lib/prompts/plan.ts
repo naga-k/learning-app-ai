@@ -91,6 +91,12 @@ Requirements:
     5. When you reference resources, cite the web_search results you used.
     6. Add a note only if there’s a quick tip or reminder the learner should keep in mind.
     7. Make it obviously personal—mention the learner’s goals, motivations, and constraints.
+8. Keep it punchy: limit the overall plan to ~120 words. Use short, telegraphic phrases—no long sentences.
+9. Enforce brevity at every level:
+   - overview.goal ≤ 20 words; each outcome ≤ 12 words.
+   - module objectives ≤ 14 words.
+   - subtopic descriptions = single action phrases ≤ 10 words (no extra sentences).
+   - notes (if any) ≤ 12 words each.
 
 Return ONLY valid JSON that conforms to this schema. Do not include markdown fences or additional commentary.`;
 };

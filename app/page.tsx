@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart } from 'ai';
 import { ArrowLeft, BookOpen } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { CourseWorkspace } from '@/components/course/course-workspace';
 import {
@@ -16,9 +16,28 @@ type CourseSnapshot = {
   output: CourseToolOutput;
 };
 
+function createAssistantMessage(text: string) {
+  return {
+    id: `assistant-follow-up-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
+    role: 'assistant' as const,
+    parts: [
+      {
+        type: 'text' as const,
+        text,
+      },
+    ],
+  };
+}
+
 export default function Chat() {
   const [viewMode, setViewMode] = useState<'chat' | 'course'>('chat');
-  const { messages, sendMessage, status } = useChat();
+  const { messages, sendMessage, status, setMessages } = useChat();
+
+  const appendAssistantMessage = useCallback(
+    (text: string) =>
+      setMessages((current) => [...current, createAssistantMessage(text)]),
+    [setMessages],
+  );
 
   const [courseState, setCourseState] = useState<CourseSnapshot | null>(null);
   const courseRef = useRef<string | null>(null);
@@ -116,6 +135,7 @@ export default function Chat() {
               messages={messages}
               status={status}
               onSendMessage={(text) => sendMessage({ text })}
+              onAppendAssistantMessage={appendAssistantMessage}
             />
           )}
         </div>

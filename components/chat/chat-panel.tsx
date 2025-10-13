@@ -20,6 +20,7 @@ import {
   hasRenderableAssistantContent,
   isCourseToolOutput,
   isPlanToolOutput,
+  isToolErrorOutput,
 } from "@/lib/ai/tool-output";
 import { cn } from "@/lib/utils";
 
@@ -27,12 +28,14 @@ type ChatPanelProps = {
   messages: UIMessage[];
   status: UseChatHelpers<UIMessage>["status"];
   onSendMessage: (text: string) => void;
+  onAppendAssistantMessage: (text: string) => void;
 };
 
 export function ChatPanel({
   messages,
   status,
   onSendMessage,
+  onAppendAssistantMessage,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -49,6 +52,90 @@ export function ChatPanel({
     }
     return `${Math.round(seconds)}s`;
   };
+
+  const extractToolPayload = (
+    part: Parameters<typeof isToolOrDynamicToolUIPart>[0],
+  ): unknown =>
+    (part as { output?: unknown }).output ??
+    (part as { result?: unknown }).result ??
+    null;
+
+  const isPreliminaryPart = (
+    part: Parameters<typeof isToolOrDynamicToolUIPart>[0],
+  ): boolean => Boolean((part as { preliminary?: boolean }).preliminary);
+
+  const planMessagesNeedingFollowUp = useMemo(() => {
+    const pending: string[] = [];
+
+    messages.forEach((message, index) => {
+      if (message.role !== "assistant") return;
+
+      const hasPlanPayload = message.parts.some((part) => {
+        if (!isToolOrDynamicToolUIPart(part)) return false;
+        if (isPreliminaryPart(part)) return false;
+        if (part.state !== "output-available") return false;
+
+        const payload = extractToolPayload(part);
+
+        return payload && isPlanToolOutput(payload);
+      });
+
+      if (!hasPlanPayload) return;
+
+      let assistantTextAfterPlan = false;
+
+      for (let cursor = index + 1; cursor < messages.length; cursor += 1) {
+        const nextMessage = messages[cursor];
+
+        if (nextMessage.role === "user") {
+          break;
+        }
+
+        if (nextMessage.role === "assistant") {
+          const hasTextPart = nextMessage.parts.some(
+            (part) => part.type === "text" && Boolean(part.text?.trim().length),
+          );
+
+          if (hasTextPart) {
+            assistantTextAfterPlan = true;
+            break;
+          }
+
+          const nextHasPlanPayload = nextMessage.parts.some((part) => {
+            if (!isToolOrDynamicToolUIPart(part)) return false;
+            if (isPreliminaryPart(part)) return false;
+            if (part.state !== "output-available") return false;
+
+            const payload = extractToolPayload(part);
+
+            return payload && isPlanToolOutput(payload);
+          });
+
+          if (nextHasPlanPayload) {
+            break;
+          }
+        }
+      }
+
+      if (!assistantTextAfterPlan) {
+        pending.push(message.id);
+      }
+    });
+
+    return pending;
+  }, [messages]);
+
+  const handledPlanIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    planMessagesNeedingFollowUp.forEach((planId) => {
+      if (handledPlanIdsRef.current.has(planId)) return;
+      handledPlanIdsRef.current.add(planId);
+      onAppendAssistantMessage(
+        "How does this plan look? Want tweaks before we generate the course?",
+      );
+    });
+  }, [planMessagesNeedingFollowUp, onAppendAssistantMessage]);
 
   const renderableMessages = useMemo(
     () =>
@@ -75,7 +162,7 @@ export function ChatPanel({
           return (
             part.state === "input-streaming" ||
             part.state === "input-available" ||
-            (part.state === "output-available" && part.preliminary)
+            (part.state === "output-available" && isPreliminaryPart(part))
           );
         }),
       ),
@@ -185,7 +272,7 @@ export function ChatPanel({
                             const isStreamingState =
                               part.state === "input-streaming" ||
                               part.state === "input-available" ||
-                              (part.state === "output-available" && part.preliminary);
+                              (part.state === "output-available" && isPreliminaryPart(part));
 
                             if (isStreamingState) {
                               const startInfo = toolStartTimesRef.current.get(partKey);
@@ -230,9 +317,7 @@ export function ChatPanel({
                             }
 
                             if (part.state === "output-available") {
-                              const payload =
-                                (part as { output?: unknown }).output ??
-                                (part as { result?: unknown }).result;
+                              const payload = extractToolPayload(part);
 
                               if (payload && typeof (payload as { startedAt?: number }).startedAt === "number") {
                                 const existing = toolStartTimesRef.current.get(partKey);
@@ -280,11 +365,40 @@ export function ChatPanel({
                                     <Response className="prose-sm prose-invert max-w-none text-slate-100">
                                       {payload.plan}
                                     </Response>
-                                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
-                                      Want tweaks before we move on? Ask me to adjust
-                                      the plan—or say “Generate the course” when
-                                      you’re ready.
+                                  </div>
+                                );
+                              }
+
+                              if (payload && isToolErrorOutput(payload)) {
+                                return (
+                                  <div
+                                    key={`${message.id}-${index}`}
+                                    className="space-y-2.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100"
+                                  >
+                                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-200">
+                                      <svg
+                                        className="h-4 w-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        />
+                                      </svg>
+                                      Something went wrong
+                                      {typeof payload.durationMs === "number" && (
+                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-rose-100/80">
+                                          {formatDuration(payload.durationMs)}
+                                        </span>
+                                      )}
                                     </div>
+                                    <p className="text-sm text-rose-100/90">
+                                      {payload.errorMessage}
+                                    </p>
                                   </div>
                                 );
                               }
@@ -360,6 +474,7 @@ export function ChatPanel({
                     </MessageContent>
                   </Message>
                 )}
+
               </>
             )}
           </ConversationContent>
