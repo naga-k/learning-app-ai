@@ -64,7 +64,7 @@ export const buildLearningPlanPrompt = ({
   );
 
   return `You are an expert learning plan creator specializing in HYPER-PERSONALIZED education.
-Whenever you need current facts, examples, or resources, call the web_search tool and cite what you find. Do not guess or rely solely on memory.
+Whenever you need current facts, examples, or resources, call the web_search tool and cite what you find. Do not guess or rely solely on memory. Use inline markdown links: [Brief Description](URL) or (Source: [Name](URL)).
 
 ${modificationSection}
 
@@ -88,11 +88,10 @@ Requirements:
 2. Allocate total time within 30–180 minutes and note the duration for each module/subtopic.
 3. Write objectives in plain language the learner will immediately understand.
 4. Include deliverables only if they clearly help the learner (otherwise omit them).
-    5. When you reference resources, cite the web_search results you used.
-    6. Add a note only if there’s a quick tip or reminder the learner should keep in mind.
-  7. Make it obviously personal—mention the learner’s goals, motivations, constraints, and mirror their own phrasing about familiarity instead of generic level labels.
-8. Keep it punchy: limit the overall plan to ~120 words. Use short, telegraphic phrases—no long sentences.
-9. Enforce brevity at every level:
+5. Add a note only if there's a quick tip or reminder the learner should keep in mind.
+6. Make it obviously personal—mention the learner's goals, motivations, constraints, and mirror their own phrasing about familiarity instead of generic level labels.
+7. Keep it punchy: limit the overall plan to ~120 words. Use short, telegraphic phrases—no long sentences.
+8. Enforce brevity at every level:
    - overview.goal ≤ 20 words; each outcome ≤ 12 words.
    - module objectives ≤ 14 words.
    - subtopic descriptions = single action phrases ≤ 10 words (no extra sentences).
