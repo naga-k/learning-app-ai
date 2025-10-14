@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useSupabase } from '@/components/supabase-provider';
+import { validatePassword } from '@/lib/security/password-validator';
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -49,18 +50,23 @@ export default function UpdatePasswordPage() {
     }
   }, [supabase]);
 
-  const canSubmit = useMemo(() => password.length >= 6 && password === confirmPassword, [
-    password,
-    confirmPassword,
-  ]);
+  const passwordValidation = useMemo(() => validatePassword(password), [password]);
+  const passwordRules = passwordValidation.rules;
+  const passwordIsValid = passwordValidation.valid;
+
+  const canSubmit = useMemo(
+    () => passwordIsValid && password === confirmPassword,
+    [confirmPassword, passwordIsValid, password],
+  );
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
     setStatusMessage(null);
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    const validationResult = validatePassword(password);
+    if (!validationResult.valid) {
+      setError(validationResult.issues[0]);
       return;
     }
 
@@ -110,14 +116,34 @@ export default function UpdatePasswordPage() {
             <input
               id="new-password"
               type="password"
-              minLength={6}
+              minLength={12}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
               autoComplete="new-password"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/50"
             />
+          <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+            <p className="font-medium text-slate-200">Your password must:</p>
+            <ul className="list-disc space-y-1 pl-5 text-left">
+              <li className={passwordRules.length ? 'text-emerald-300' : undefined}>
+                Use at least 12 characters.
+              </li>
+              <li className={passwordRules.letter ? 'text-emerald-300' : undefined}>
+                Include at least one letter.
+              </li>
+              <li className={passwordRules.number ? 'text-emerald-300' : undefined}>
+                Include at least one number.
+              </li>
+              <li className={passwordRules.special ? 'text-emerald-300' : undefined}>
+                Include at least one special character (e.g. !@#$).
+              </li>
+              <li className={passwordRules.common ? 'text-emerald-300' : undefined}>
+                Avoid common or easily guessed phrases.
+              </li>
+            </ul>
           </div>
+        </div>
 
           <div className="space-y-2">
             <label htmlFor="confirm-new-password" className="block text-sm font-medium text-slate-300">
@@ -126,7 +152,7 @@ export default function UpdatePasswordPage() {
             <input
               id="confirm-new-password"
               type="password"
-              minLength={6}
+              minLength={12}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required

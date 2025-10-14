@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSupabase } from '@/components/supabase-provider';
+import { validatePassword } from '@/lib/security/password-validator';
 
 export type AuthMode = 'sign-in' | 'sign-up' | 'recover';
 
@@ -69,6 +70,12 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
   useEffect(() => {
     onModeChange?.(mode);
   }, [mode, onModeChange]);
+
+  const passwordValidation = useMemo(() => {
+    if (mode !== 'sign-up') return null;
+    return validatePassword(password);
+  }, [mode, password]);
+  const passwordRules = passwordValidation?.rules;
 
   const heading = useMemo(
     () => {
@@ -149,6 +156,14 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
             setActiveAction(null);
             return;
           }
+
+          const validationResult = validatePassword(password);
+          if (!validationResult.valid) {
+            setError(validationResult.issues[0]);
+            setActiveAction(null);
+            return;
+          }
+
           const emailRedirectTo =
             typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
 
@@ -252,13 +267,35 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
             <input
               id="password"
               type="password"
-              minLength={6}
+              minLength={mode === 'sign-up' ? 12 : 6}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
               autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/50"
             />
+            {mode === 'sign-up' && passwordRules && (
+              <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 text-left">
+                <p className="font-medium text-slate-200">Your password must:</p>
+                <ul className="list-disc space-y-1 pl-5 text-left">
+                  <li className={passwordRules.length ? 'text-emerald-300' : undefined}>
+                    Use at least 12 characters.
+                  </li>
+                  <li className={passwordRules.letter ? 'text-emerald-300' : undefined}>
+                    Include at least one letter.
+                  </li>
+                  <li className={passwordRules.number ? 'text-emerald-300' : undefined}>
+                    Include at least one number.
+                  </li>
+                  <li className={passwordRules.special ? 'text-emerald-300' : undefined}>
+                    Include at least one special character (e.g. !@#$).
+                  </li>
+                  <li className={passwordRules.common ? 'text-emerald-300' : undefined}>
+                    Avoid common or easily guessed phrases.
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
@@ -270,7 +307,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
             <input
               id="confirm-password"
               type="password"
-              minLength={6}
+              minLength={12}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
