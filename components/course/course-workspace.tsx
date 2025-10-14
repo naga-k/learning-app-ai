@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -12,6 +12,7 @@ import { CourseWithIds } from "@/lib/curriculum";
 import { cn, sanitizeUrl } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";
 import { Linkify } from "./linkify";
+import { CourseAssistantPanel } from "@/components/course/course-assistant-panel";
 
 type CourseWorkspaceProps = {
   course: CourseWithIds;
@@ -24,6 +25,7 @@ export function CourseWorkspace({
   summary,
   onBack,
 }: CourseWorkspaceProps) {
+  const lessonContentRef = useRef<HTMLDivElement | null>(null);
   const [activeModuleId, setActiveModuleId] = useState<string>(
     course.modules[0]?.moduleId ?? "",
   );
@@ -266,13 +268,17 @@ export function CourseWorkspace({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-8">
-          {viewMode === "lesson" && (
-            <div className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-8 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
-              <div className="mb-6 flex flex-col gap-3 border-b border-white/10 pb-6">
-                <h2 className="text-2xl font-semibold text-white">
-                  {activeSubmodule.order}. {activeSubmodule.title}
-                </h2>
+          <div className="flex-1 overflow-y-auto px-6 py-8">
+            {viewMode === "lesson" && (
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <div
+                  ref={lessonContentRef}
+                  className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-8 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur"
+                >
+                  <div className="mb-6 flex flex-col gap-3 border-b border-white/10 pb-6">
+                    <h2 className="text-2xl font-semibold text-white">
+                      {activeSubmodule.order}. {activeSubmodule.title}
+                    </h2>
                 {activeSubmodule.duration && (
                   <p className="text-sm text-slate-400">
                     ⏱ Suggested time: {activeSubmodule.duration}
@@ -285,9 +291,19 @@ export function CourseWorkspace({
                 )}
               </div>
 
-              <MarkdownContent content={activeSubmodule.content} />
-            </div>
-          )}
+                <MarkdownContent content={activeSubmodule.content} />
+                </div>
+
+                <CourseAssistantPanel
+                  moduleTitle={activeModule.title}
+                  moduleSummary={activeModule.summary}
+                  lessonTitle={activeSubmodule.title}
+                  lessonSummary={activeSubmodule.summary}
+                  lessonContent={activeSubmodule.content}
+                  selectionSourceRef={lessonContentRef}
+                />
+              </div>
+            )}
 
           {viewMode === "overview" && (
             <div className="space-y-8">
