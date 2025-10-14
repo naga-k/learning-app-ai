@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
   ChevronDown,
   ChevronRight,
   Flag,
+  LayoutDashboard,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { CourseWithIds } from "@/lib/curriculum";
 import { cn, sanitizeUrl } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";
@@ -24,6 +26,11 @@ export function CourseWorkspace({
   summary,
   onBack,
 }: CourseWorkspaceProps) {
+  const router = useRouter();
+  const handleGoToDashboard = useCallback(() => {
+    router.push("/dashboard");
+  }, [router]);
+
   const [activeModuleId, setActiveModuleId] = useState<string>(
     course.modules[0]?.moduleId ?? "",
   );
@@ -219,7 +226,16 @@ export function CourseWorkspace({
 
       <section className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleGoToDashboard}
+              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </button>
+            <div className="space-y-3">
             {viewMode === "overview" && (
               <>
                 <p className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
@@ -263,6 +279,18 @@ export function CourseWorkspace({
                 </p>
               </>
             )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to chat
+            </button>
           </div>
 
         </header>

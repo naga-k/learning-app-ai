@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
-import { ArrowLeft, BookOpen, LogOut } from 'lucide-react';
+import { ArrowLeft, BookOpen, LayoutDashboard, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -166,6 +166,10 @@ export function ChatApp() {
     router.push('/login');
   }, [router, supabase]);
 
+  const handleGoToDashboard = useCallback(() => {
+    router.push('/dashboard');
+  }, [router]);
+
   if (sessionError) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-slate-200">
@@ -196,14 +200,24 @@ export function ChatApp() {
   return (
     <>
       <header className="sticky top-0 z-10 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-6 px-4 py-6 sm:px-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold md:text-[2.35rem]">
-              Course Architect
-            </h1>
-            <p className="text-sm text-slate-400 md:text-base">
-              Set your goal, refine the roadmap, and build lessons that fit the way you learn.
-            </p>
+        <div className="flex w-full items-center justify-between gap-6 px-4 py-6 sm:px-6">
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleGoToDashboard}
+              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </button>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold md:text-[2.35rem]">
+                Course Architect
+              </h1>
+              <p className="text-sm text-slate-400 md:text-base">
+                Set your goal, refine the roadmap, and build lessons that fit the way you learn.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -243,8 +257,8 @@ export function ChatApp() {
         </div>
       </header>
 
-      <main className="flex flex-1 justify-center px-4 pb-10 pt-6 sm:px-6 lg:pb-12">
-        <div className="flex w-full max-w-5xl flex-1">
+      <main className="flex flex-1 px-4 pb-10 pt-6 sm:px-6 lg:pb-12">
+        <div className="flex w-full flex-1">
           {viewMode === 'course' && courseState?.output.courseStructured ? (
             <div className="flex min-h-[60vh] w-full flex-1 overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
               <CourseWorkspace
