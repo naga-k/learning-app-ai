@@ -22,14 +22,8 @@ A Next.js application that helps users create personalized learning plans using 
    CEREBRAS_API_KEY=your_cerebras_api_key
    # Optional: override the base URL if you are using a private deployment
    # CEREBRAS_BASE_URL=https://api.cerebras.ai/v1
-
-   # Optional: override the model used for different flows
-   # AI_MODEL_ID=gpt-5-mini
-   # AI_MODEL_CHAT=gpt-5-mini
-   # AI_MODEL_PLAN=gpt-5-mini
-   # AI_MODEL_COURSE=gpt-5-mini
    ```
-   - For Cerebras, set `AI_MODEL_ID` (or the per-use-case variables) to a model offered by the service, for example `llama3.1-8b-instruct`.
+   - Modify `lib/ai/config.ts` to adjust the default models for each provider/use case. For example, `gpt-oss-120b` for Cerebras chat or `gpt-5-mini` for OpenAI.
 
 3. **Set up Supabase (required for persistence)**:
    Add these variables to `.env.local`:

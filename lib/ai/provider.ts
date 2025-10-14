@@ -1,11 +1,13 @@
 import { createOpenAI, type OpenAIProvider } from '@ai-sdk/openai';
+import {
+  AI_MODEL_CONFIG,
+  type AIModelUseCase,
+  type AIProviderName,
+} from '@/lib/ai/config';
 
 const DEFAULT_CEREBRAS_BASE_URL = 'https://api.cerebras.ai/v1';
 
-const SUPPORTED_PROVIDERS = ['openai', 'cerebras'] as const;
-
-export type AIProviderName = (typeof SUPPORTED_PROVIDERS)[number];
-export type AIModelUseCase = 'chat' | 'plan' | 'course';
+const SUPPORTED_PROVIDERS = Object.keys(AI_MODEL_CONFIG) as AIProviderName[];
 
 function resolveProviderName(): AIProviderName {
   const raw = process.env.AI_PROVIDER?.trim().toLowerCase() ?? 'openai';
@@ -47,24 +49,10 @@ const provider: OpenAIProvider =
         ),
       });
 
-const defaultModel =
-  process.env.AI_MODEL_ID?.trim() ||
-  (providerName === 'openai' ? 'gpt-5-mini' : 'llama3.1-8b-instruct');
-
-const modelMap: Record<AIModelUseCase, string> = {
-  chat: process.env.AI_MODEL_CHAT?.trim() || defaultModel,
-  plan:
-    process.env.AI_MODEL_PLAN?.trim() ||
-    process.env.AI_MODEL_CHAT?.trim() ||
-    defaultModel,
-  course:
-    process.env.AI_MODEL_COURSE?.trim() ||
-    process.env.AI_MODEL_CHAT?.trim() ||
-    defaultModel,
-};
+const modelConfig = AI_MODEL_CONFIG[providerName];
 
 export function getModelId(useCase: AIModelUseCase = 'chat'): string {
-  return modelMap[useCase];
+  return modelConfig[useCase];
 }
 
 export function getModel(useCase: AIModelUseCase = 'chat') {
