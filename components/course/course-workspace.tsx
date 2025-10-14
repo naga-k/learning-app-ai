@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
 import { cn, sanitizeUrl } from "@/lib/utils";
-import { MarkdownContent } from "./markdown-content";
+import { MarkdownContent, MarkdownInline } from "./markdown-content";
 import { Linkify } from "./linkify";
 import { CourseAssistantPanel } from "@/components/course/course-assistant-panel";
 import { useSidebarContent } from "@/components/dashboard/sidebar-provider";
@@ -450,7 +450,9 @@ export function CourseWorkspace({
                     </h3>
                     <ul className="mt-4 space-y-2 list-disc pl-5 text-slate-100">
                       {conclusion.recommendedNextSteps.map((step, index) => (
-                        <li key={`next-step-${index}`}>{step}</li>
+                        <li key={`next-step-${index}`}>
+                          <MarkdownInline content={step} />
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -463,7 +465,9 @@ export function CourseWorkspace({
                   </h3>
                   <ul className="mt-4 space-y-2 list-disc pl-5 text-slate-100">
                     {conclusion.stretchIdeas.map((idea, index) => (
-                      <li key={`stretch-idea-${index}`}>{idea}</li>
+                      <li key={`stretch-idea-${index}`}>
+                        <MarkdownInline content={idea} />
+                      </li>
                     ))}
                   </ul>
                 </div>
