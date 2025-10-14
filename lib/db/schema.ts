@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
 
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -21,8 +21,6 @@ export const courses = pgTable("courses", {
   userId: uuid("user_id").notNull(),
   sessionId: uuid("session_id"),
   title: text("title").notNull(),
-  durationMinutes: integer("duration_minutes"),
-  progress: integer("progress").default(0).notNull(),
   activeVersionId: uuid("active_version_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
