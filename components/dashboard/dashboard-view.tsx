@@ -2,13 +2,11 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, Brain, LogOut, Send, TrendingUp } from 'lucide-react';
+import { BookOpen, Brain, LogOut, Send } from 'lucide-react';
 import { DashboardCourse } from '@/lib/dashboard/courses';
 import { DashboardSession } from '@/lib/dashboard/sessions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { useSupabase } from '@/components/supabase-provider';
 
 type DashboardViewProps = {
@@ -35,22 +33,12 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
     [router],
   );
 
-  const stats = useMemo(() => {
-    const total = courses.length;
-    const completed = courses.filter((course) => course.completed).length;
-    const averageProgress =
-      total === 0
-        ? 0
-        : Math.round(
-            courses.reduce((sum, course) => sum + (course.progress ?? 0), 0) / total,
-          );
-
-    return {
-      total,
-      completed,
-      averageProgress,
-    };
-  }, [courses]);
+  const stats = useMemo(
+    () => ({
+      total: courses.length,
+    }),
+    [courses],
+  );
 
   const handleSubmit = () => {
     const trimmed = draftMessage.trim();
@@ -97,19 +85,6 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
               </div>
             </div>
           </Card>
-
-          <Card className="border-white/10 bg-white/[0.04] p-6 text-slate-100">
-            <div className="flex items-center gap-4">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-300">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">Completed</p>
-                <p className="text-2xl font-semibold text-slate-50">{stats.completed}</p>
-              </div>
-            </div>
-          </Card>
-
         </section>
 
         <section className="flex items-center justify-between gap-3">
@@ -146,7 +121,7 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
                 key={course.id}
                 className="border-white/10 bg-white/[0.04] p-6 text-slate-100 transition hover:border-white/20 hover:bg-white/[0.06]"
               >
-                <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="mb-4">
                   <div>
                     <h3 className="text-base font-semibold text-slate-50">
                       {course.topic}
@@ -159,38 +134,7 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
                       })}
                     </p>
                   </div>
-
-                  {course.completed ? (
-                    <Badge
-                      variant="outline"
-                      className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                    >
-                      ✓ Completed
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="border-indigo-500/30 bg-indigo-500/10 text-indigo-200"
-                    >
-                      In progress
-                    </Badge>
-                  )}
                 </div>
-
-                <div className="mb-4 flex items-center gap-2 text-sm text-slate-300">
-                  <span>{course.durationMinutes} min expected</span>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm text-slate-400">
-                    <span>Progress</span>
-                    <span className="font-medium text-slate-200">
-                      {course.progress ?? 0}%
-                    </span>
-                  </div>
-                  <Progress value={course.progress ?? 0} />
-                </div>
-
                 <Button
                   onClick={() => handleOpenCourse(course)}
                   variant="outline"

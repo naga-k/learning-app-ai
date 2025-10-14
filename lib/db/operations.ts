@@ -106,7 +106,6 @@ export async function saveCourseVersion(params: {
       userId: params.userId,
       sessionId: params.sessionId ?? null,
       title: params.title,
-      progress: 0,
     })
     .returning();
 
@@ -132,10 +131,8 @@ export async function listCoursesForDashboard(userId: string) {
     .select({
       id: courses.id,
       title: courses.title,
-      progress: courses.progress,
       sessionId: courses.sessionId,
       createdAt: courses.createdAt,
-      duration: courses.durationMinutes,
     })
     .from(courses)
     .where(eq(courses.userId, userId))
