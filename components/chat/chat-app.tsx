@@ -27,6 +27,7 @@ export function ChatApp() {
   const [sessionId, setSessionId] = useState<string | null>(sessionParam);
   const [initializingSession, setInitializingSession] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const transport = useMemo(() => {
     if (!sessionId) return undefined;
@@ -92,6 +93,30 @@ export function ChatApp() {
   }, [latestCourse]);
 
   const showCourseToggle = Boolean(courseState?.output.courseStructured);
+
+  useEffect(() => {
+    scrollContainerRef.current = document.getElementById(
+      'app-scroll-container',
+    ) as HTMLDivElement | null;
+  }, []);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    requestAnimationFrame(() => {
+      if (!scrollContainerRef.current) return;
+      if (viewMode === 'chat') {
+        scrollContainerRef.current.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
+          behavior: 'auto',
+        });
+        return;
+      }
+
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  }, [messages.length, viewMode]);
 
   useEffect(() => {
     let cancelled = false;
