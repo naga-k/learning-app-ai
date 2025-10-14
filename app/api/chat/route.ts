@@ -1,4 +1,3 @@
-import { openai } from '@ai-sdk/openai';
 import { streamText, generateText, convertToModelMessages, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
@@ -24,12 +23,51 @@ import {
 } from '@/lib/db/operations';
 import { randomUUID } from 'crypto';
 import type { UIMessage } from 'ai';
+import {
+  activeAIProvider,
+  activeAIProviderName,
+  getModel,
+  getModelId,
+  supportsOpenAIWebSearch,
+} from '@/lib/ai/provider';
 
 export const runtime = 'nodejs';
 
-const webSearchTool = openai.tools.webSearch({
-  searchContextSize: 'high',
-});
+const isOpenAIProvider = activeAIProviderName === 'openai';
+const webSearchTool = supportsOpenAIWebSearch
+  ? activeAIProvider.tools.webSearch({
+      searchContextSize: 'high',
+    })
+  : undefined;
+const webSearchTools = webSearchTool ? { web_search: webSearchTool } : undefined;
+
+const planProviderOptions = isOpenAIProvider
+  ? {
+      openai: {
+        reasoningEffort: 'low',
+        textVerbosity: 'low',
+      },
+    }
+  : undefined;
+
+const courseProviderOptions = isOpenAIProvider
+  ? {
+      openai: {
+        reasoningEffort: 'low',
+        textVerbosity: 'high',
+      },
+    }
+  : undefined;
+
+const chatProviderOptions = isOpenAIProvider
+  ? {
+      openai: {
+        reasoningEffort: 'low',
+        textVerbosity: 'low',
+        parallelToolCalls: false,
+      },
+    }
+  : undefined;
 
 // Allow streaming responses up to 30 seconds
 
@@ -85,6 +123,12 @@ export async function POST(req: Request) {
 
   let latestStructuredPlan: LearningPlanWithIds | null = null;
 
+  console.log('[chat] using AI provider:', activeAIProviderName, {
+    chat: getModelId('chat'),
+    plan: getModelId('plan'),
+    course: getModelId('course'),
+  });
+
   // ------------------------------
   // Tool: Generate Personalized Plan
   // ------------------------------
@@ -125,23 +169,16 @@ Be verbose and detailed - this context is used to create a truly personalized le
         currentPlan,
       });
 
-      const startTime = Date.now();
+        const startTime = Date.now();
 
-      try {
-        console.log('[generate_plan] Calling generateText (reasoningEffort=low)...');
-        const planGeneration = await generateText({
-          model: openai('gpt-5-mini'),
-          prompt: planningPrompt,
-          tools: {
-            web_search: webSearchTool,
-          },
-          providerOptions: {
-            openai: {
-              reasoningEffort: 'low',
-              textVerbosity: 'low',
-            },
-          },
-        });
+        try {
+          console.log('[generate_plan] Calling generateText (reasoningEffort=low)...');
+          const planGeneration = await generateText({
+            model: getModel('plan'),
+            prompt: planningPrompt,
+            tools: webSearchTools,
+            providerOptions: planProviderOptions,
+          });
 
         const planJsonText = extractJsonFromText(planGeneration.text);
         const parsedPlan = JSON.parse(planJsonText);
@@ -216,21 +253,14 @@ Be comprehensive - this is used to create course content that feels custom-made 
 
       const startTime = Date.now();
 
-      try {
-        console.log('[generate_course] Calling generateText (reasoningEffort=low)...');
-        const courseGeneration = await generateText({
-          model: openai('gpt-5-mini'),
-          prompt: coursePrompt,
-          tools: {
-            web_search: webSearchTool,
-          },
-          providerOptions: {
-            openai: {
-              reasoningEffort: 'low',
-              textVerbosity: 'high',
-            },
-          },
-        });
+        try {
+          console.log('[generate_course] Calling generateText (reasoningEffort=low)...');
+          const courseGeneration = await generateText({
+            model: getModel('course'),
+            prompt: coursePrompt,
+            tools: webSearchTools,
+            providerOptions: courseProviderOptions,
+          });
 
         const courseJsonText = extractJsonFromText(courseGeneration.text);
         const parsedCourse = JSON.parse(courseJsonText);
@@ -290,14 +320,14 @@ Be comprehensive - this is used to create course content that feels custom-made 
   };
 
   // ------------------------------
-  // Main Agent (GPT-5-mini)
+  // Main Agent (Primary Model)
   // ------------------------------
   const convertibleMessages = messages.filter((message) =>
     message.role === 'system' || message.role === 'user' || message.role === 'assistant',
   );
 
   const result = streamText({
-    model: openai('gpt-5-mini'),
+    model: getModel('chat'),
     system: systemPrompt,
     messages: convertToModelMessages(convertibleMessages),
     tools: {
@@ -305,13 +335,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
       generate_course: generateCourseTool,
     },
     stopWhen: stepCountIs(3),
-    providerOptions: {
-      openai: {
-        reasoningEffort: 'low',
-        textVerbosity: 'low',
-        parallelToolCalls: false,
-      },
-    },
+    providerOptions: chatProviderOptions,
   });
   const generateResponseMessageId = () => randomUUID();
 
