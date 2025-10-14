@@ -51,7 +51,7 @@ ${JSON.stringify(plan, null, 2)}
 `;
 };
 
-export const buildCoursePrompt = ({ fullContext, plan }: BuildCoursePromptArgs) => `You are an expert course content creator specializing in HYPER-PERSONALIZED education.
+export const buildCoursePrompt = ({ fullContext, plan }: BuildCoursePromptArgs) => `You are an expert teacher and mentor specializing in HYPER-PERSONALIZED education.
 When you need current facts, examples, tools, or resources, call the web_search tool and cite what you discover. Do not invent references--ground the course in real sources. Use inline markdown links: [Brief Description](URL) or (Source: [Name](URL)).
 
 CRITICAL OUTPUT FORMAT: Return ONLY valid JSON matching the Course schema (provided below). No markdown fences (\`\`\`json or \`\`\`), no preamble, no commentary before or after the JSON.
@@ -71,25 +71,21 @@ This IS:
 - Full educational content written specifically for THIS learner
 - Examples and exercises tailored to THEIR goals and interests
 - Language and depth matched to THEIR experience level
+- Thorough explanations of any new vocabulary or concepts as needed
 - References to THEIR specific use cases and motivations
 - A course that feels like it was custom-made just for them (because it is!)
 
 Requirements:
 1. Maintain the module order and intent from the approved plan.
-2. For EACH submodule, return full lesson content in markdown format. Begin with \`## {Submodule Title}\`, then organize the remainder in the structure that best fits the learner while still weaving in:
-   - Why this matters, explicitly tying the topic to their goals, constraints, or motivations.
-   - Key vocabulary (3-5 terms) with right-sized definitions tuned to their level.
-   - A concept walkthrough that progresses from foundations to application and reinforces plan objectives or prerequisites.
-   - Guided practice that spells out objectives, prerequisites, steps, and success criteria - especially when the plan calls for projects, exercises, builds, labs, or challenges.
-   - Reflection or next-step prompts that help them self-check, connect to their real-world context, or extend the idea.
-   Use headings, callouts, tables, lists, and other markdown patterns to keep the narrative readable, and lean toward offering richer clarity rather than assuming prior knowledge.
+2. For EACH submodule, return full lesson content in markdown. Start with \`## {Submodule Title}\`, then shape the rest of the narrative however it best serves this learner.
+   Vary formatting (callouts, tables, lists, code blocks, mini case studies) to keep the lesson skimmable, and err on the side of providing generous context instead of assuming prior knowledge.
 3. Tailor depth dynamically:
    - Beginners: define every new term, include analogies, and explain the "why" behind each step before showing code. Spend more words in Concept walkthrough before expecting action.
    - Intermediate: connect new ideas to what they already know, highlight differences or gotchas, and use vocabulary definitions to point out nuances.
    - Advanced: emphasize trade-offs, architectural considerations, and edge cases. Vocabulary can be concise reminders, but do not skip it.
 4. Before every hands-on task, ensure learners understand objectives, success criteria, and how the activity reinforces earlier modules. Call out pitfalls or troubleshooting tips relevant to their context.
 5. Use rich markdown formatting: headings, lists, tables, callout blocks, code fences, and inline emphasis that make the lesson easy to follow.
-6. Keep lessons scoped so the entire experience fits within the approved 30-180 minute window. Use the pacing guidance below to size explanations, examples, and exercises. If time feels tight, trim optional extensions before removing foundational context.
+6. Keep lessons scoped so the entire experience fits within the approved time window (up to 180 minutes). Use the pacing guidance below to size explanations, examples, and exercises. If time feels tight, trim optional extensions before removing foundational context.
 7. Personalize everything: mirror their goals, desired outcomes, personal interests, tools, constraints, motivations, and phrasing. When offering examples, align them with their industry, passions, or specific projects.
 8. If the plan or conversation clarified that this sprint is a narrow slice or a high-level overview (because of time or scope), call that out explicitly and stay within that promise.
 9. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, stretch ideas, or reflection prompts aligned to their goals.
