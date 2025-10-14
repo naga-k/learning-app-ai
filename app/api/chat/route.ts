@@ -69,6 +69,60 @@ const chatProviderOptions = isOpenAIProvider
     }
   : undefined;
 
+type GenerateTextParams = Parameters<typeof generateText>[0];
+
+const JSON_ONLY_REMINDER =
+  '\n\nReminder: Respond with valid JSON that matches the required schema. Do not include commentary before or after the JSON.';
+
+const isJsonStructureError = (error: unknown) => {
+  if (error instanceof z.ZodError) return true;
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message ?? '';
+
+  if (/Could not extract valid JSON/i.test(message)) return true;
+  if (/Unexpected token/i.test(message) && message.includes('JSON')) return true;
+  if (/Unexpected end of JSON input/i.test(message)) return true;
+  if (error.name === 'SyntaxError' && /JSON/.test(message)) return true;
+
+  return false;
+};
+
+type GenerateJsonWithRetryParams<T> = {
+  prompt: string;
+  model: GenerateTextParams['model'];
+  tools?: GenerateTextParams['tools'];
+  providerOptions?: GenerateTextParams['providerOptions'];
+  parse: (text: string) => T;
+};
+
+const generateJsonWithRetry = async <T>({
+  prompt,
+  model,
+  tools,
+  providerOptions,
+  parse,
+}: GenerateJsonWithRetryParams<T>) => {
+  const attempt = async (effectivePrompt: string) => {
+    const options: GenerateTextParams = {
+      model,
+      prompt: effectivePrompt,
+      tools,
+      providerOptions,
+    };
+    const generation = await generateText(options);
+
+    return parse(generation.text);
+  };
+
+  try {
+    return await attempt(prompt);
+  } catch (error) {
+    if (!isJsonStructureError(error)) throw error;
+    return await attempt(`${prompt}${JSON_ONLY_REMINDER}`);
+  }
+};
+
 // Allow streaming responses up to 30 seconds
 
 export async function POST(req: Request) {
@@ -173,16 +227,17 @@ Be verbose and detailed - this context is used to create a truly personalized le
 
         try {
           console.log('[generate_plan] Calling generateText (reasoningEffort=low)...');
-          const planGeneration = await generateText({
-            model: getModel('plan'),
+          const planObject = await generateJsonWithRetry({
             prompt: planningPrompt,
+            model: getModel('plan'),
             tools: webSearchTools,
             providerOptions: planProviderOptions,
+            parse: (text) => {
+              const planJsonText = extractJsonFromText(text);
+              const parsedPlan = JSON.parse(planJsonText);
+              return LearningPlanSchema.parse(parsedPlan);
+            },
           });
-
-        const planJsonText = extractJsonFromText(planGeneration.text);
-        const parsedPlan = JSON.parse(planJsonText);
-        const planObject = LearningPlanSchema.parse(parsedPlan);
 
         console.log('[generate_plan] Personalized plan generated successfully!');
         const elapsedMs = Date.now() - startTime;
@@ -222,14 +277,16 @@ Be verbose and detailed - this context is used to create a truly personalized le
 - Literally everything that makes this course PERSONAL
 
 Be comprehensive - this is used to create course content that feels custom-made for them.`),
-      planStructure: z.string().nullable().optional(),
+      planStructure: z.union([z.string(), z.any()])
+        .nullable()
+        .optional(),
     }),
     execute: async ({
       fullContext,
       planStructure,
     }: {
       fullContext: string;
-      planStructure?: string | null;
+      planStructure?: string | unknown | null;
     }) => {
       console.log('[generate_course] Creating personalized course with context length:', fullContext.length);
 
@@ -237,7 +294,10 @@ Be comprehensive - this is used to create course content that feels custom-made 
 
       if (planStructure) {
         try {
-          const json = JSON.parse(planStructure);
+          const json =
+            typeof planStructure === 'string'
+              ? JSON.parse(planStructure)
+              : planStructure;
           parsedPlan = normalizeLearningPlan(LearningPlanSchema.parse(json));
         } catch {
           parsedPlan = null;
@@ -255,16 +315,17 @@ Be comprehensive - this is used to create course content that feels custom-made 
 
         try {
           console.log('[generate_course] Calling generateText (reasoningEffort=low)...');
-          const courseGeneration = await generateText({
-            model: getModel('course'),
+          const courseObject = await generateJsonWithRetry({
             prompt: coursePrompt,
+            model: getModel('course'),
             tools: webSearchTools,
             providerOptions: courseProviderOptions,
+            parse: (text) => {
+              const courseJsonText = extractJsonFromText(text);
+              const parsedCourse = JSON.parse(courseJsonText);
+              return CourseSchema.parse(parsedCourse);
+            },
           });
-
-        const courseJsonText = extractJsonFromText(courseGeneration.text);
-        const parsedCourse = JSON.parse(courseJsonText);
-        const courseObject = CourseSchema.parse(parsedCourse);
 
         const structuredCourse = normalizeCourse(courseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);

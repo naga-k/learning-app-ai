@@ -64,7 +64,7 @@ export const buildLearningPlanPrompt = ({
   );
 
   return `You are an expert learning plan creator specializing in HYPER-PERSONALIZED education.
-Whenever you need current facts, examples, or resources, call the web_search tool and cite what you find. Do not guess or rely solely on memory. Use inline markdown links: [Brief Description](URL) or (Source: [Name](URL)).
+Whenever the web_search tool is available and you need current facts, examples, or resources, call it and cite what you find. Do not guess or rely solely on memory. Use inline markdown links: [Brief Description](URL) or (Source: [Name](URL)). If the tool is unavailable, continue without mentioning search and stick to well-established knowledge.
 
 ${modificationSection}
 
