@@ -52,7 +52,9 @@ ${JSON.stringify(plan, null, 2)}
 };
 
 export const buildCoursePrompt = ({ fullContext, plan }: BuildCoursePromptArgs) => `You are an expert course content creator specializing in HYPER-PERSONALIZED education.
-When you need current facts, examples, tools, or resources, call the web_search tool and cite what you discover. Do not invent references—ground the course in real sources.
+When you need current facts, examples, tools, or resources, call the web_search tool and cite what you discover. Do not invent references--ground the course in real sources. Use inline markdown links: [Brief Description](URL) or (Source: [Name](URL)).
+
+CRITICAL OUTPUT FORMAT: Return ONLY valid JSON matching the Course schema (provided below). No markdown fences (\`\`\`json or \`\`\`), no preamble, no commentary before or after the JSON.
 
 **COMPLETE LEARNER & PLAN CONTEXT:**
 ${fullContext}
@@ -73,28 +75,42 @@ This IS:
 - A course that feels like it was custom-made just for them (because it is!)
 
 Requirements:
-1. Maintain the module order and intent from the approved plan
-2. For EACH submodule, write FULL lesson content in markdown format including:
-   - Comprehensive explanations written at their experience level
-   - Code examples (when relevant) that relate to their interests/goals
-   - Step-by-step instructions tailored to their background
-   - Practical exercises that align with their stated use cases
-   - Tips and best practices relevant to their situation
-   - Real-world applications they specifically care about
-3. Use rich markdown formatting: headings (##, ###), code blocks (\`\`\`), lists, bold/italic, etc.
-4. Write in a clear, engaging style that speaks directly to them
-5. Keep lessons focused so the entire experience fits inside the approved 30–180 minute window—prioritize what helps them take action quickly
-6. Personalize everything - use their goals, motivations, and context throughout
-7. Let content flow naturally with whatever structure best teaches the material
-8. Cite web_search sources inline (e.g., [Source Name](url)) whenever you rely on them
-9. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, advanced stretch ideas, or reflection prompts aligned to their goals
-10. Return valid JSON matching the Course schema exactly
+1. Maintain the module order and intent from the approved plan.
+2. For EACH submodule, return full lesson content in markdown format. Begin with \`## {Submodule Title}\`, then organize the remainder in the structure that best fits the learner while still weaving in:
+   - Why this matters, explicitly tying the topic to their goals, constraints, or motivations.
+   - Key vocabulary (3-5 terms) with right-sized definitions tuned to their level.
+   - A concept walkthrough that progresses from foundations to application and reinforces plan objectives or prerequisites.
+   - Guided practice that spells out objectives, prerequisites, steps, and success criteria - especially when the plan calls for projects, exercises, builds, labs, or challenges.
+   - Reflection or next-step prompts that help them self-check, connect to their real-world context, or extend the idea.
+   Use headings, callouts, tables, lists, and other markdown patterns to keep the narrative readable, and lean toward offering richer clarity rather than assuming prior knowledge.
+3. Tailor depth dynamically:
+   - Beginners: define every new term, include analogies, and explain the "why" behind each step before showing code. Spend more words in Concept walkthrough before expecting action.
+   - Intermediate: connect new ideas to what they already know, highlight differences or gotchas, and use vocabulary definitions to point out nuances.
+   - Advanced: emphasize trade-offs, architectural considerations, and edge cases. Vocabulary can be concise reminders, but do not skip it.
+4. Before every hands-on task, ensure learners understand objectives, success criteria, and how the activity reinforces earlier modules. Call out pitfalls or troubleshooting tips relevant to their context.
+5. Use rich markdown formatting: headings, lists, tables, callout blocks, code fences, and inline emphasis that make the lesson easy to follow.
+6. Keep lessons scoped so the entire experience fits within the approved 30-180 minute window. Use the pacing guidance below to size explanations, examples, and exercises. If time feels tight, trim optional extensions before removing foundational context.
+7. Personalize everything: mirror their goals, desired outcomes, personal interests, tools, constraints, motivations, and phrasing. When offering examples, align them with their industry, passions, or specific projects.
+8. If the plan or conversation clarified that this sprint is a narrow slice or a high-level overview (because of time or scope), call that out explicitly and stay within that promise.
+9. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, stretch ideas, or reflection prompts aligned to their goals.
+10. Return valid JSON matching the Course schema exactly.
+
+PACING GUIDANCE -- Adapt depth to expertise level:
+
+Time estimates for different content types:
+- Reading or conceptual explanation: roughly 200-250 words per learner minute.
+- Code examples to study: 2-3x the reading time because learners pause to trace and experiment.
+- Hands-on exercises or projects: estimate actual build time, not word count.
+  * Small exercise (modify existing code, try one feature): 5-10 minutes.
+  * Medium project (build a component, write a script): 15-30 minutes.
+  * Larger project (integrate multiple concepts, mini-app): 30-60 minutes.
+- Build in a 10-15 percent buffer for breaks, troubleshooting, or going deeper on tricky parts.
+
+Remember: it is better to provide too much helpful context than to leave learners confused. Every paragraph, example, and exercise should feel tailored to this specific learner's needs and goals.
 
 Course schema:
 ${courseJsonSchema}
 
-Remember: Every paragraph, every example, every exercise should feel tailored to this specific learner's needs and goals.
-
-Return ONLY valid JSON that matches this schema. Do not wrap the response in markdown fences or include commentary before or after the JSON.`;
+Final reminder: keep the course deeply personalized, grounded in real sources, and delivered only as valid JSON.`;
 
 export { courseJsonSchema };
