@@ -3,7 +3,7 @@ const learningPlanJsonSchema = `
   "overview": {
     "goal": "string",
     "totalDuration": "string",
-    "outcomes": ["string", "..."] (optional)
+    "outcomes": ["string"]
   },
   "modules": [
     {
@@ -17,10 +17,10 @@ const learningPlanJsonSchema = `
           "description": "string"
         }
       ],
-      "deliverable": "string (optional)"
+      "deliverable": "string"
     }
   ],
-  "notes": ["string", "..."] (optional)
+  "notes": ["string"]
 }`.trim();
 
 type BuildLearningPlanPromptArgs = {
@@ -83,6 +83,8 @@ Design a quick, high-level learning plan that fits inside a sprint of up to 180 
 
 JSON schema:
 ${learningPlanJsonSchema}
+
+Optional fields: "overview.outcomes", "modules[].deliverable", "notes". Omit them when not applicable.
 
 Requirements:
 1. Shape the modules and subtopics around what will unlock the learner fastest--choose the count and pacing that makes sense for the request, and err on the side of providing richer guidance rather than leaving gaps.

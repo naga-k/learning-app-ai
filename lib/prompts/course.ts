@@ -3,39 +3,39 @@ import type { LearningPlanWithIds } from '@/lib/curriculum';
 const courseJsonSchema = `
 {
   "overview": {
-    "focus": "string (optional)",
-    "totalDuration": "string (optional)"
+    "focus": "string",
+    "totalDuration": "string"
   },
   "modules": [
     {
-      "moduleId": "string (reuse plan slug when available)",
+      "moduleId": "string",
       "title": "string",
-      "summary": "string (optional)",
+      "summary": "string",
       "submodules": [
         {
-          "id": "string (reuse plan subtopic slug when available)",
+          "id": "string",
           "title": "string",
-          "duration": "string (optional)",
-          "content": "string (full lesson content in markdown format)",
-          "summary": "string (optional, brief one-sentence summary)"
+          "duration": "string",
+          "content": "string",
+          "summary": "string"
         }
       ]
     }
   ],
   "conclusion": {
-    "summary": "string (optional)",
-    "celebrationMessage": "string (optional)",
-    "recommendedNextSteps": ["string", "..."] (optional),
-    "stretchIdeas": ["string", "..."] (optional)
-  } (optional),
+    "summary": "string",
+    "celebrationMessage": "string",
+    "recommendedNextSteps": ["string"],
+    "stretchIdeas": ["string"]
+  },
   "resources": [
     {
       "title": "string",
-      "description": "string (optional)",
-      "url": "string (optional)",
-      "type": "string (optional)"
+      "description": "string",
+      "url": "string",
+      "type": "string"
     }
-  ] (optional)
+  ]
 }`.trim();
 
 type BuildCoursePromptArgs = {
@@ -90,6 +90,7 @@ Requirements:
 8. If the plan or conversation clarified that this sprint is a narrow slice or a high-level overview (because of time or scope), call that out explicitly and stay within that promise.
 9. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, stretch ideas, or reflection prompts aligned to their goals.
 10. Return valid JSON matching the Course schema exactly.
+11. Reuse plan-provided IDs for \`moduleId\` and submodule \`id\` when available; otherwise generate deterministic, slug-like strings.
 
 PACING GUIDANCE -- Adapt depth to expertise level:
 
@@ -106,6 +107,8 @@ Remember: it is better to provide too much helpful context than to leave learner
 
 Course schema:
 ${courseJsonSchema}
+
+Optional fields: "overview.focus", "overview.totalDuration", "modules[].summary", "modules[].submodules[].duration", "modules[].submodules[].summary", "conclusion", "conclusion.summary", "conclusion.celebrationMessage", "conclusion.recommendedNextSteps", "conclusion.stretchIdeas", "resources", "resources[].description", "resources[].url", "resources[].type". Omit them when they add no value. Always include full markdown lesson content in "modules[].submodules[].content".
 
 Final reminder: keep the course deeply personalized, grounded in real sources, and delivered only as valid JSON.`;
 
