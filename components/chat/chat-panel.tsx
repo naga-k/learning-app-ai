@@ -28,14 +28,12 @@ type ChatPanelProps = {
   messages: UIMessage[];
   status: UseChatHelpers<UIMessage>["status"];
   onSendMessage: (text: string) => void;
-  onAppendAssistantMessage: (text: string) => void;
 };
 
 export function ChatPanel({
   messages,
   status,
   onSendMessage,
-  onAppendAssistantMessage,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -63,80 +61,6 @@ export function ChatPanel({
   const isPreliminaryPart = (
     part: Parameters<typeof isToolOrDynamicToolUIPart>[0],
   ): boolean => Boolean((part as { preliminary?: boolean }).preliminary);
-
-  const planMessagesNeedingFollowUp = useMemo(() => {
-    const pending: string[] = [];
-
-    messages.forEach((message, index) => {
-      if (message.role !== "assistant") return;
-      if (!Array.isArray(message.parts)) return;
-
-      const hasPlanPayload = message.parts.some((part) => {
-        if (!isToolOrDynamicToolUIPart(part)) return false;
-        if (isPreliminaryPart(part)) return false;
-        if (part.state !== "output-available") return false;
-
-        const payload = extractToolPayload(part);
-
-        return payload && isPlanToolOutput(payload);
-      });
-
-      if (!hasPlanPayload) return;
-
-      let assistantTextAfterPlan = false;
-
-      for (let cursor = index + 1; cursor < messages.length; cursor += 1) {
-        const nextMessage = messages[cursor];
-
-        if (nextMessage.role === "user") {
-          break;
-        }
-
-        if (nextMessage.role === "assistant") {
-          const hasTextPart = nextMessage.parts.some(
-            (part) => part.type === "text" && Boolean(part.text?.trim().length),
-          );
-
-          if (hasTextPart) {
-            assistantTextAfterPlan = true;
-            break;
-          }
-
-          const nextHasPlanPayload = nextMessage.parts.some((part) => {
-            if (!isToolOrDynamicToolUIPart(part)) return false;
-            if (isPreliminaryPart(part)) return false;
-            if (part.state !== "output-available") return false;
-
-            const payload = extractToolPayload(part);
-
-            return payload && isPlanToolOutput(payload);
-          });
-
-          if (nextHasPlanPayload) {
-            break;
-          }
-        }
-      }
-
-      if (!assistantTextAfterPlan) {
-        pending.push(message.id);
-      }
-    });
-
-    return pending;
-  }, [messages]);
-
-  const handledPlanIdsRef = useRef(new Set<string>());
-
-  useEffect(() => {
-    planMessagesNeedingFollowUp.forEach((planId) => {
-      if (handledPlanIdsRef.current.has(planId)) return;
-      handledPlanIdsRef.current.add(planId);
-      onAppendAssistantMessage(
-        "How does this plan look? Want tweaks before we generate the course?",
-      );
-    });
-  }, [planMessagesNeedingFollowUp, onAppendAssistantMessage]);
 
   const renderableMessages = useMemo(
     () =>
@@ -338,37 +262,7 @@ export function ChatPanel({
                               }
 
                               if (payload && isPlanTool && isPlanToolOutput(payload)) {
-                                return (
-                                  <div
-                                    key={`${message.id}-${index}`}
-                                    className="space-y-3 rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-4 text-slate-100"
-                                  >
-                                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-indigo-200">
-                                      <svg
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        />
-                                      </svg>
-                                      Learning plan generated
-                                      {typeof payload.durationMs === "number" && (
-                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-indigo-100/80">
-                                          {formatDuration(payload.durationMs)}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <Response className="prose-sm prose-invert max-w-none text-slate-100">
-                                      {payload.plan}
-                                    </Response>
-                                  </div>
-                                );
+                                return null;
                               }
 
                               if (payload && isToolErrorOutput(payload)) {
@@ -405,42 +299,8 @@ export function ChatPanel({
                                 );
                               }
 
-                              if (
-                                payload &&
-                                isCourseTool &&
-                                isCourseToolOutput(payload)
-                              ) {
-                                return (
-                                  <div
-                                    key={`${message.id}-${index}`}
-                                    className="space-y-2.5 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100"
-                                  >
-                                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-emerald-200">
-                                      <svg
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M5 13l4 4L19 7"
-                                        />
-                                      </svg>
-                                      Course generated
-                                      {typeof payload.durationMs === "number" && (
-                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-emerald-100/80">
-                                          {formatDuration(payload.durationMs)}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <Response className="prose-sm prose-invert max-w-none text-emerald-50">
-                                      {payload.course}
-                                    </Response>
-                                  </div>
-                                );
+                              if (payload && isCourseTool && isCourseToolOutput(payload)) {
+                                return null;
                               }
 
                               if (payload) {

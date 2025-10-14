@@ -1,9 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import {
-  streamText,
-  generateText,
-  convertToModelMessages,
-} from 'ai';
+import { streamText, generateText, convertToModelMessages, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import {
@@ -308,6 +304,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
       generate_plan: generatePlanTool,
       generate_course: generateCourseTool,
     },
+    stopWhen: stepCountIs(3),
     providerOptions: {
       openai: {
         reasoningEffort: 'low',
