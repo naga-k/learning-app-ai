@@ -47,7 +47,7 @@ export const hasRenderableAssistantContent = (
   message: UIMessage | null,
 ): boolean => {
   if (!message || message.role !== 'assistant') return false;
-  if (message.parts.length === 0) return false;
+  if (!Array.isArray(message.parts) || message.parts.length === 0) return false;
 
   return message.parts.some((part) => {
     if (part.type === 'text') {
