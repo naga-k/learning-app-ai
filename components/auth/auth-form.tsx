@@ -4,8 +4,9 @@ import type { Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSupabase } from '@/components/supabase-provider';
+import { validatePassword } from '@/lib/security/password-validator';
 
-export type AuthMode = 'sign-in' | 'sign-up';
+export type AuthMode = 'sign-in' | 'sign-up' | 'recover';
 
 type AuthFormProps = {
   initialMode?: AuthMode;
@@ -57,30 +58,49 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [activeAction, setActiveAction] = useState<'password' | 'google' | null>(null);
+  const [activeAction, setActiveAction] = useState<'password' | 'google' | 'recovery' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const isPasswordLoading = activeAction === 'password';
   const isGoogleLoading = activeAction === 'google';
+  const isRecoveryLoading = activeAction === 'recovery';
   const isBusy = activeAction !== null;
 
   useEffect(() => {
     onModeChange?.(mode);
   }, [mode, onModeChange]);
 
+  const passwordValidation = useMemo(() => {
+    if (mode !== 'sign-up') return null;
+    return validatePassword(password);
+  }, [mode, password]);
+  const passwordRules = passwordValidation?.rules;
+
   const heading = useMemo(
-    () => (mode === 'sign-in' ? 'Welcome back' : 'Create your account'),
+    () => {
+      if (mode === 'sign-in') return 'Welcome back';
+      if (mode === 'sign-up') return 'Create your account';
+      return 'Reset your password';
+    },
     [mode],
   );
 
   const buttonLabel = useMemo(
-    () => (mode === 'sign-in' ? 'Sign in' : 'Create account'),
+    () => {
+      if (mode === 'sign-in') return 'Sign in';
+      if (mode === 'sign-up') return 'Create account';
+      return 'Send reset link';
+    },
     [mode],
   );
 
   const toggleModeLabel = useMemo(
-    () => (mode === 'sign-in' ? "Don't have an account?" : 'Already have an account?'),
+    () => {
+      if (mode === 'sign-in') return "Don't have an account?";
+      if (mode === 'sign-up') return 'Already have an account?';
+      return 'Remembered your password?';
+    },
     [mode],
   );
 
@@ -89,6 +109,32 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
       event.preventDefault();
       setError(null);
       setStatusMessage(null);
+
+      if (mode === 'recover') {
+        setActiveAction('recovery');
+        try {
+          if (!email) {
+            setError('Please enter your email address.');
+            return;
+          }
+          const redirectTo =
+            typeof window !== 'undefined'
+              ? `${window.location.origin}/auth/update-password`
+              : undefined;
+          const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo,
+          });
+          if (resetError) throw resetError;
+          setStatusMessage('If that email exists, you will receive a reset link shortly.');
+        } catch (resetError) {
+          console.error('[auth] failed to trigger password recovery', resetError);
+          setStatusMessage('If that email exists, you will receive a reset link shortly.');
+        } finally {
+          setActiveAction(null);
+        }
+        return;
+      }
+
       setActiveAction('password');
 
       try {
@@ -110,6 +156,14 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
             setActiveAction(null);
             return;
           }
+
+          const validationResult = validatePassword(password);
+          if (!validationResult.valid) {
+            setError(validationResult.issues[0]);
+            setActiveAction(null);
+            return;
+          }
+
           const emailRedirectTo =
             typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
 
@@ -183,7 +237,9 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
         <p className="text-sm text-slate-400">
           {mode === 'sign-in'
             ? 'Sign in to continue designing personalized learning paths.'
-            : 'Create an account to save your courses and chat sessions.'}
+            : mode === 'sign-up'
+              ? 'Create an account to save your courses and chat sessions.'
+              : "If your email is associated to an account, you'll receive a secure reset link."}
         </p>
       </div>
 
@@ -203,21 +259,45 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-medium text-slate-300">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/50"
-          />
-        </div>
+        {mode !== 'recover' && (
+          <div className="space-y-2">
+            <label htmlFor="password" className="block text-sm font-medium text-slate-300">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              minLength={mode === 'sign-up' ? 12 : 6}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/50"
+            />
+            {mode === 'sign-up' && passwordRules && (
+              <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 text-left">
+                <p className="font-medium text-slate-200">Your password must:</p>
+                <ul className="list-disc space-y-1 pl-5 text-left">
+                  <li className={passwordRules.length ? 'text-emerald-300' : undefined}>
+                    Use at least 12 characters.
+                  </li>
+                  <li className={passwordRules.letter ? 'text-emerald-300' : undefined}>
+                    Include at least one letter.
+                  </li>
+                  <li className={passwordRules.number ? 'text-emerald-300' : undefined}>
+                    Include at least one number.
+                  </li>
+                  <li className={passwordRules.special ? 'text-emerald-300' : undefined}>
+                    Include at least one special character (e.g. !@#$).
+                  </li>
+                  <li className={passwordRules.common ? 'text-emerald-300' : undefined}>
+                    Avoid common or easily guessed phrases.
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {mode === 'sign-up' && (
           <div className="space-y-2">
@@ -227,7 +307,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
             <input
               id="confirm-password"
               type="password"
-              minLength={6}
+              minLength={12}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
@@ -249,52 +329,93 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           </p>
         )}
 
+        {mode === 'sign-in' && (
+          <div className="text-right text-sm">
+            <button
+              type="button"
+              className="font-semibold text-indigo-400 hover:text-indigo-300"
+              onClick={() => {
+                setMode('recover');
+                setError(null);
+                setStatusMessage(null);
+                setPassword('');
+                setConfirmPassword('');
+                setActiveAction(null);
+              }}
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
+
         <div className="space-y-3">
           <button
             type="submit"
             disabled={isBusy}
             className="w-full rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_0_25px_rgba(99,102,241,0.45)] transition hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isPasswordLoading ? 'Please wait...' : buttonLabel}
+            {isPasswordLoading || isRecoveryLoading ? 'Please wait...' : buttonLabel}
           </button>
 
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={isBusy}
-            className="flex w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isGoogleLoading ? (
-              'Connecting to Google...'
-            ) : (
-              <>
-                <GoogleIcon className="h-4 w-4" />
-                Continue with Google
-              </>
-            )}
-          </button>
+          {mode !== 'recover' && (
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isBusy}
+              className="flex w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGoogleLoading ? (
+                'Connecting to Google...'
+              ) : (
+                <>
+                  <GoogleIcon className="h-4 w-4" />
+                  Continue with Google
+                </>
+              )}
+            </button>
+          )}
         </div>
       </form>
 
-      <div className="text-center text-sm text-slate-400">
-        <span>{toggleModeLabel}</span>{' '}
-        <button
-          type="button"
-          className="font-semibold text-indigo-400 hover:text-indigo-300"
-          onClick={() => {
-            setMode((current) => {
-              const nextMode = current === 'sign-in' ? 'sign-up' : 'sign-in';
+      {mode !== 'recover' ? (
+        <div className="text-center text-sm text-slate-400">
+          <span>{toggleModeLabel}</span>{' '}
+          <button
+            type="button"
+            className="font-semibold text-indigo-400 hover:text-indigo-300"
+            onClick={() => {
+              setMode((current) => {
+                const nextMode = current === 'sign-in' ? 'sign-up' : 'sign-in';
+                setError(null);
+                setStatusMessage(null);
+                setActiveAction(null);
+                setConfirmPassword('');
+                return nextMode;
+              });
+            }}
+          >
+            {mode === 'sign-in' ? 'Create one' : 'Sign in'}
+          </button>
+        </div>
+      ) : (
+        <div className="text-center text-sm text-slate-400">
+          <span>{toggleModeLabel}</span>{' '}
+          <button
+            type="button"
+            className="font-semibold text-indigo-400 hover:text-indigo-300"
+            onClick={() => {
+              setMode('sign-in');
               setError(null);
               setStatusMessage(null);
               setActiveAction(null);
+              setPassword('');
               setConfirmPassword('');
-              return nextMode;
-            });
-          }}
-        >
-          {mode === 'sign-in' ? 'Create one' : 'Sign in'}
-        </button>
-      </div>
+            }}
+          >
+            Sign in
+          </button>
+        </div>
+      )}
     </div>
   );
 }
