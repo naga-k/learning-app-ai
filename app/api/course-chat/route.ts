@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { generateText } from 'ai';
+import { streamText } from 'ai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { activeAIProviderName, getModel } from '@/lib/ai/provider';
 
@@ -89,11 +89,14 @@ export async function POST(req: Request) {
   } = parsedBody;
 
   const lessonContext = buildLessonContext(lessonContent, selection);
-  const prompt = [
+  const systemPrompt = [
     'You are a friendly teaching assistant helping a learner understand a specific lesson in a personalized course.',
     'Always ground your answer in the provided module and lesson content.',
-    'If the learner asks something that is not covered, state that it is not in the lesson and suggest how they could explore it further.',
-    '',
+    'If the learner asks about something that is not covered in the provided context, state clearly that it is not in the lesson and suggest how they could explore it further.',
+    'Respond with a concise explanation (2-3 short paragraphs) and include an optional quick tip or next step when it adds value.',
+  ].join(' ');
+
+  const userPrompt = [
     `Module: ${moduleTitle}`,
     moduleSummary ? `Module summary: ${moduleSummary}` : '',
     '',
@@ -104,8 +107,6 @@ export async function POST(req: Request) {
     '',
     'Learner question:',
     question,
-    '',
-    'Respond with a concise explanation (2-3 short paragraphs) and include an optional quick tip or next step if helpful.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -114,15 +115,14 @@ export async function POST(req: Request) {
     activeAIProviderName === 'openai' ? OPENAI_PROVIDER_OPTIONS : undefined;
 
   try {
-    const result = await generateText({
+    const result = streamText({
       model: getModel('chat'),
-      prompt,
+      system: systemPrompt,
+      prompt: userPrompt,
       providerOptions,
     });
 
-    return NextResponse.json({
-      answer: result.text.trim(),
-    });
+    return result.toTextStreamResponse();
   } catch (error) {
     console.error('[course-chat] failed to generate answer', error);
     return NextResponse.json(
