@@ -72,11 +72,12 @@ ${modificationSection}
 ${fullConversationContext}
 
 **YOUR MISSION:**
-Design a quick, high-level learning plan that fits inside a 30 to 180 minute sprint. Keep it laser-focused on what helps THIS learner make immediate progress. Tie everything back to their:
+Design a quick, high-level learning plan that fits inside a 30 to 180 minute sprint. Keep it laser-focused on what helps THIS learner make immediate progress, and include just enough context so each activity has a clear purpose. Tie everything back to their:
 - Goals and motivations
-- Time budget (stick to the 30–180 minute window)
+- Desired outcomes (career moves, business growth, personal wins)
+- Time budget (stay inside the 30-180 minute window)
 - Current familiarity and confidence (echo their own words when useful)
-- Interests, use cases, and constraints
+- Interests, use cases, constraints, preferred tools, and success criteria
 
 **PURPOSE:** Produce a scannable roadmap (not full lessons). The plan should be easy to skim in under a minute and simple to tweak.
 
@@ -84,18 +85,16 @@ JSON schema:
 ${learningPlanJsonSchema}
 
 Requirements:
-1. Keep it concise: 1–2 modules with 1–2 subtopics each is ideal (never exceed 3 modules total).
-2. Allocate total time within 30–180 minutes and note the duration for each module/subtopic.
-3. Write objectives in plain language the learner will immediately understand.
-4. Include deliverables only if they clearly help the learner (otherwise omit them).
-5. Add a note only if there's a quick tip or reminder the learner should keep in mind.
-6. Make it obviously personal—mention the learner's goals, motivations, constraints, and mirror their own phrasing about familiarity instead of generic level labels.
-7. Keep it punchy: limit the overall plan to ~120 words. Use short, telegraphic phrases—no long sentences.
-8. Enforce brevity at every level:
-   - overview.goal ≤ 20 words; each outcome ≤ 12 words.
-   - module objectives ≤ 14 words.
-   - subtopic descriptions = single action phrases ≤ 10 words (no extra sentences).
-   - notes (if any) ≤ 12 words each.
+1. Shape the modules and subtopics around what will unlock the learner fastest--choose the count and pacing that makes sense for the request, and err on the side of providing richer guidance rather than leaving gaps.
+2. Allocate total time within 30-180 minutes and note the duration for each module and subtopic so the sum stays within the agreed window.
+3. When the learner is new, uncertain, or rebuilding fundamentals, surface foundational context before deep dives so they understand the "what" and "why" ahead of any hands-on work.
+4. For more experienced learners, remix primers and application as needed, but still connect every activity to their prior experience, active projects, or stated goals.
+5. Write objectives and subtopic descriptions in plain language the learner will immediately understand. Each subtopic description should be a short action-plus-purpose phrase (for example, "Contrast supervised vs unsupervised to pick the right dataset").
+6. Include deliverables only when they provide useful accountability or proof of progress; omit them otherwise.
+7. Add notes only when a quick reminder, tool setup hint, troubleshooting cue, or reflection question will help.
+8. Keep it scannable: aim for about 120 words overall (stretch when needed for clarity), and use short, skimmable phrasing rather than dense paragraphs.
+9. Make it unmistakably personal--mirror their goals, desired outcomes, constraints, motivations, personal interests, preferred tools, and self-described familiarity instead of generic level labels.
+10. If the learner requested a very broad topic, clearly state whether this sprint delivers a focused slice or a high-level overview so expectations stay realistic.
 
 Return ONLY valid JSON that conforms to this schema. Do not include markdown fences or additional commentary.`;
 };
