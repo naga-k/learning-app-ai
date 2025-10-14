@@ -265,6 +265,7 @@ export function ChatApp() {
                 course={courseState.output.courseStructured}
                 summary={courseState.output.course}
                 onBack={() => setViewMode('chat')}
+                useGlobalNavigation
               />
             </div>
           ) : (

@@ -13,17 +13,20 @@ import { cn, sanitizeUrl } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";
 import { Linkify } from "./linkify";
 import { CourseAssistantPanel } from "@/components/course/course-assistant-panel";
+import { useSidebarContent } from "@/components/dashboard/sidebar-provider";
 
 type CourseWorkspaceProps = {
   course: CourseWithIds;
   summary?: string;
   onBack: () => void;
+  useGlobalNavigation?: boolean;
 };
 
 export function CourseWorkspace({
   course,
   summary,
   onBack,
+  useGlobalNavigation = false,
 }: CourseWorkspaceProps) {
   const lessonContentRef = useRef<HTMLDivElement | null>(null);
   const [activeModuleId, setActiveModuleId] = useState<string>(
@@ -83,30 +86,9 @@ export function CourseWorkspace({
     0,
   );
 
-  if (!activeModule || !activeSubmodule) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 bg-slate-950/40 px-8 text-center">
-        <p className="text-lg font-medium text-slate-100">
-          The generated course is missing lesson details.
-        </p>
-        <p className="max-w-md text-sm text-slate-400">
-          Please head back to the chat and request a fresh course.
-        </p>
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(79,70,229,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-          type="button"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to chat
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full w-full flex-col overflow-hidden text-slate-100 md:flex-row">
-      <aside className="flex w-full shrink-0 flex-col border-b border-white/10 bg-white/[0.05] backdrop-blur-xl md:w-80 md:border-b-0 md:border-r">
+  const navigationContent = useMemo(
+    () => (
+      <div className="flex h-full flex-col">
         <div className="border-white/10 px-5 py-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
             Course Modules
@@ -217,7 +199,53 @@ export function CourseWorkspace({
             </div>
           )}
         </nav>
-      </aside>
+      </div>
+    ),
+    [
+      activeModuleId,
+      activeSubmoduleId,
+      course.modules,
+      hasConclusion,
+      hasOverviewContent,
+      viewMode,
+    ],
+  );
+
+  useSidebarContent(useGlobalNavigation ? navigationContent : undefined);
+
+  if (!activeModule || !activeSubmodule) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-slate-950/40 px-8 text-center">
+        <p className="text-lg font-medium text-slate-100">
+          The generated course is missing lesson details.
+        </p>
+        <p className="max-w-md text-sm text-slate-400">
+          Please head back to the chat and request a fresh course.
+        </p>
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(79,70,229,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          type="button"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to chat
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex h-full w-full flex-col overflow-hidden text-slate-100",
+        useGlobalNavigation ? undefined : "md:flex-row",
+      )}
+    >
+      {!useGlobalNavigation && (
+        <aside className="flex w-full shrink-0 flex-col border-b border-white/10 bg-white/[0.05] backdrop-blur-xl md:w-80 md:border-b-0 md:border-r">
+          {navigationContent}
+        </aside>
+      )}
 
       <section className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
