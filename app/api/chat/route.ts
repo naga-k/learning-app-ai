@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { streamText, generateText, convertToModelMessages } from 'ai';
+import { streamText, generateText, convertToModelMessages, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import {
@@ -16,6 +16,14 @@ import { buildLearningPlanPrompt } from '@/lib/prompts/plan';
 import { buildCoursePrompt } from '@/lib/prompts/course';
 import { systemPrompt } from '@/lib/prompts/system';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import {
+  getChatSession,
+  insertChatMessage,
+  listChatMessages,
+  saveCourseVersion,
+} from '@/lib/db/operations';
+import { randomUUID } from 'crypto';
+import type { UIMessage } from 'ai';
 
 export const runtime = 'nodejs';
 
@@ -38,7 +46,43 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages } = await req.json();
+  const body = await req.json();
+  console.log('[chat] incoming body keys:', Object.keys(body ?? {}));
+  const { message, sessionId } = body;
+
+  if (!sessionId || typeof sessionId !== 'string') {
+    return NextResponse.json(
+      { error: 'sessionId is required' },
+      { status: 400 },
+    );
+  }
+
+  const session = await getChatSession(sessionId, user.id);
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Session not found' },
+      { status: 404 },
+    );
+  }
+
+  if (!message) {
+    return NextResponse.json({ error: 'message is required' }, { status: 400 });
+  }
+
+  const historyRows = await listChatMessages(sessionId, user.id);
+  const historyMessages = historyRows.map((row) => row.content as UIMessage);
+
+  const latestUserMessage = message as UIMessage;
+
+  await insertChatMessage({
+    id: randomUUID(),
+    sessionId,
+    role: 'user',
+    content: latestUserMessage,
+  });
+
+  const messages: UIMessage[] = [...historyMessages, latestUserMessage];
+
   let latestStructuredPlan: LearningPlanWithIds | null = null;
 
   // ------------------------------
@@ -195,6 +239,14 @@ Be comprehensive - this is used to create course content that feels custom-made 
         const structuredCourse = normalizeCourse(courseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);
 
+        await saveCourseVersion({
+          userId: user.id,
+          sessionId,
+          title: structuredCourse.overview?.focus ?? structuredCourse.modules[0]?.title ?? 'Personalised course',
+          summary: courseSummary,
+          structured: structuredCourse,
+        });
+
         const elapsedMs = Date.now() - startTime;
         console.log('[generate_course] Total generation time (ms):', elapsedMs);
 
@@ -240,14 +292,19 @@ Be comprehensive - this is used to create course content that feels custom-made 
   // ------------------------------
   // Main Agent (GPT-5-mini)
   // ------------------------------
+  const convertibleMessages = messages.filter((message) =>
+    message.role === 'system' || message.role === 'user' || message.role === 'assistant',
+  );
+
   const result = streamText({
     model: openai('gpt-5-mini'),
     system: systemPrompt,
-    messages: convertToModelMessages(messages),
+    messages: convertToModelMessages(convertibleMessages),
     tools: {
       generate_plan: generatePlanTool,
       generate_course: generateCourseTool,
     },
+    stopWhen: stepCountIs(3),
     providerOptions: {
       openai: {
         reasoningEffort: 'low',
@@ -256,6 +313,34 @@ Be comprehensive - this is used to create course content that feels custom-made 
       },
     },
   });
+  const generateResponseMessageId = () => randomUUID();
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({
+    generateMessageId: generateResponseMessageId,
+    onFinish: async ({ responseMessage, isAborted }) => {
+      try {
+        if (isAborted) return;
+        if (!responseMessage || responseMessage.role !== 'assistant') return;
+        if (!Array.isArray(responseMessage.parts) || responseMessage.parts.length === 0) return;
+
+        const messageId =
+          responseMessage.id && responseMessage.id.trim().length > 0
+            ? responseMessage.id
+            : generateResponseMessageId();
+        const messageToPersist: UIMessage = {
+          ...responseMessage,
+          id: messageId,
+        };
+
+        await insertChatMessage({
+          id: messageToPersist.id,
+          sessionId,
+          role: 'assistant',
+          content: messageToPersist,
+        });
+      } catch (error) {
+        console.error('[chat] failed to persist assistant message', error);
+      }
+    },
+  });
 }

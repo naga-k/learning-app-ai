@@ -3,7 +3,6 @@ import { cookies } from 'next/headers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
     'Missing Supabase environment variables. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.',
@@ -21,6 +20,7 @@ export const createSupabaseServerClient = async () => {
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll: async () => mapRequestCookies(cookieStore),
+      setAll: async () => {},
     },
   });
 };
@@ -30,6 +30,7 @@ export const createSupabaseRouteClient = async () => {
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll: async () => mapRequestCookies(cookieStore),
+      setAll: async () => {},
     },
   });
 };

@@ -28,14 +28,12 @@ type ChatPanelProps = {
   messages: UIMessage[];
   status: UseChatHelpers<UIMessage>["status"];
   onSendMessage: (text: string) => void;
-  onAppendAssistantMessage: (text: string) => void;
 };
 
 export function ChatPanel({
   messages,
   status,
   onSendMessage,
-  onAppendAssistantMessage,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -64,79 +62,6 @@ export function ChatPanel({
     part: Parameters<typeof isToolOrDynamicToolUIPart>[0],
   ): boolean => Boolean((part as { preliminary?: boolean }).preliminary);
 
-  const planMessagesNeedingFollowUp = useMemo(() => {
-    const pending: string[] = [];
-
-    messages.forEach((message, index) => {
-      if (message.role !== "assistant") return;
-
-      const hasPlanPayload = message.parts.some((part) => {
-        if (!isToolOrDynamicToolUIPart(part)) return false;
-        if (isPreliminaryPart(part)) return false;
-        if (part.state !== "output-available") return false;
-
-        const payload = extractToolPayload(part);
-
-        return payload && isPlanToolOutput(payload);
-      });
-
-      if (!hasPlanPayload) return;
-
-      let assistantTextAfterPlan = false;
-
-      for (let cursor = index + 1; cursor < messages.length; cursor += 1) {
-        const nextMessage = messages[cursor];
-
-        if (nextMessage.role === "user") {
-          break;
-        }
-
-        if (nextMessage.role === "assistant") {
-          const hasTextPart = nextMessage.parts.some(
-            (part) => part.type === "text" && Boolean(part.text?.trim().length),
-          );
-
-          if (hasTextPart) {
-            assistantTextAfterPlan = true;
-            break;
-          }
-
-          const nextHasPlanPayload = nextMessage.parts.some((part) => {
-            if (!isToolOrDynamicToolUIPart(part)) return false;
-            if (isPreliminaryPart(part)) return false;
-            if (part.state !== "output-available") return false;
-
-            const payload = extractToolPayload(part);
-
-            return payload && isPlanToolOutput(payload);
-          });
-
-          if (nextHasPlanPayload) {
-            break;
-          }
-        }
-      }
-
-      if (!assistantTextAfterPlan) {
-        pending.push(message.id);
-      }
-    });
-
-    return pending;
-  }, [messages]);
-
-  const handledPlanIdsRef = useRef(new Set<string>());
-
-  useEffect(() => {
-    planMessagesNeedingFollowUp.forEach((planId) => {
-      if (handledPlanIdsRef.current.has(planId)) return;
-      handledPlanIdsRef.current.add(planId);
-      onAppendAssistantMessage(
-        "How does this plan look? Want tweaks before we generate the course?",
-      );
-    });
-  }, [planMessagesNeedingFollowUp, onAppendAssistantMessage]);
-
   const renderableMessages = useMemo(
     () =>
       messages.filter(
@@ -157,6 +82,7 @@ export function ChatPanel({
   const hasActiveToolStream = useMemo(
     () =>
       messages.some((message) =>
+        Array.isArray(message.parts) &&
         message.parts.some((part) => {
           if (!isToolOrDynamicToolUIPart(part)) return false;
           return (
@@ -234,25 +160,25 @@ export function ChatPanel({
               </ConversationEmptyState>
             ) : (
               <>
-                {renderableMessages.map((message) => {
+                {renderableMessages.map((message, messageIndex) => {
                   const isUser = message.role === "user";
-                  return (
-                    <Message from={message.role} key={message.id}>
-                      <MessageContent
-                        variant="flat"
-                        className={cn(
-                          "max-w-3xl space-y-1 rounded-xl px-3 py-2 text-sm leading-6 transition-colors",
-                          isUser
-                            ? "bg-indigo-500/45 text-white/95"
-                            : "bg-slate-900/45 text-slate-100",
-                        )}
-                      >
-                        {message.parts.map((part, index) => {
-                          const partKey = `${message.id}-${index}`;
-                          if (part.type === "text") {
-                            return (
-                              <Response
-                                key={`${message.id}-${index}`}
+              return (
+                  <Message from={message.role} key={message.id ?? `message-${messageIndex}`}>
+                    <MessageContent
+                      variant="flat"
+                      className={cn(
+                        "max-w-3xl space-y-1 rounded-xl px-3 py-2 text-sm leading-6 transition-colors",
+                        isUser
+                          ? "bg-indigo-500/45 text-white/95"
+                          : "bg-slate-900/45 text-slate-100",
+                      )}
+                    >
+                      {(Array.isArray(message.parts) ? message.parts : []).map((part, index) => {
+                        const partKey = `${message.id}-${index}`;
+                        if (part.type === "text") {
+                          return (
+                            <Response
+                              key={`${message.id}-${index}`}
                                 className="prose-sm prose-invert max-w-none text-slate-100"
                               >
                                 {part.text}
@@ -336,37 +262,7 @@ export function ChatPanel({
                               }
 
                               if (payload && isPlanTool && isPlanToolOutput(payload)) {
-                                return (
-                                  <div
-                                    key={`${message.id}-${index}`}
-                                    className="space-y-3 rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-4 text-slate-100"
-                                  >
-                                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-indigo-200">
-                                      <svg
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        />
-                                      </svg>
-                                      Learning plan generated
-                                      {typeof payload.durationMs === "number" && (
-                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-indigo-100/80">
-                                          {formatDuration(payload.durationMs)}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <Response className="prose-sm prose-invert max-w-none text-slate-100">
-                                      {payload.plan}
-                                    </Response>
-                                  </div>
-                                );
+                                return null;
                               }
 
                               if (payload && isToolErrorOutput(payload)) {
@@ -403,42 +299,8 @@ export function ChatPanel({
                                 );
                               }
 
-                              if (
-                                payload &&
-                                isCourseTool &&
-                                isCourseToolOutput(payload)
-                              ) {
-                                return (
-                                  <div
-                                    key={`${message.id}-${index}`}
-                                    className="space-y-2.5 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100"
-                                  >
-                                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-emerald-200">
-                                      <svg
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M5 13l4 4L19 7"
-                                        />
-                                      </svg>
-                                      Course generated
-                                      {typeof payload.durationMs === "number" && (
-                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-emerald-100/80">
-                                          {formatDuration(payload.durationMs)}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <Response className="prose-sm prose-invert max-w-none text-emerald-50">
-                                      {payload.course}
-                                    </Response>
-                                  </div>
-                                );
+                              if (payload && isCourseTool && isCourseToolOutput(payload)) {
+                                return null;
                               }
 
                               if (payload) {
@@ -482,37 +344,35 @@ export function ChatPanel({
         </Conversation>
       </div>
 
-      <div className="border-t border-white/10 bg-gradient-to-b from-white/0 to-white/[0.05] px-4 py-4 sm:px-6">
+      <div className="border-t border-white/10 bg-transparent px-4 pb-6 pt-4 sm:px-6">
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex w-full max-w-4xl items-end gap-3"
+          className="mx-auto flex w-full max-w-4xl items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl"
         >
-          <div className="relative flex-1">
-            <textarea
-              ref={textareaRef}
-              className="h-12 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
-              value={input}
-              placeholder="Ask for a course, outline a goal, or iterate on the plan..."
-              onChange={(event) => {
-                setInput(event.target.value);
-                resetTextareaHeight(event.target);
-              }}
-              onKeyDown={handleKeyDown}
-              disabled={status === "streaming"}
-              rows={1}
-              style={{
-                height: "auto",
-                overflowY: input.split("\n").length > 3 ? "auto" : "hidden",
-              }}
-              onInput={(event) => {
-                resetTextareaHeight(event.target as HTMLTextAreaElement);
-              }}
-            />
-          </div>
+          <textarea
+            ref={textareaRef}
+            className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-full border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            value={input}
+            placeholder="Ask for a course, outline a goal, or iterate on the plan..."
+            onChange={(event) => {
+              setInput(event.target.value);
+              resetTextareaHeight(event.target);
+            }}
+            onKeyDown={handleKeyDown}
+            disabled={status === "streaming"}
+            rows={1}
+            style={{
+              height: "auto",
+              overflowY: input.split("\n").length > 3 ? "auto" : "hidden",
+            }}
+            onInput={(event) => {
+              resetTextareaHeight(event.target as HTMLTextAreaElement);
+            }}
+          />
           <button
             type="submit"
             disabled={status === "streaming" || !input.trim()}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 px-5 text-sm font-semibold text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {status === "streaming" ? (
               <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
