@@ -3,7 +3,6 @@ import {
   streamText,
   generateText,
   convertToModelMessages,
-  type AssistantModelMessage,
 } from 'ai';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
@@ -317,51 +316,34 @@ Be comprehensive - this is used to create course content that feels custom-made 
       },
     },
   });
-  result.response
-    .then(async ({ messages: responseMessages }) => {
-      const assistantModelMessage = [...responseMessages]
-        .reverse()
-        .find((message): message is AssistantModelMessage => message.role === 'assistant');
+  const generateResponseMessageId = () => randomUUID();
 
-      if (!assistantModelMessage) return;
+  return result.toUIMessageStreamResponse({
+    generateMessageId: generateResponseMessageId,
+    onFinish: async ({ responseMessage, isAborted }) => {
+      try {
+        if (isAborted) return;
+        if (!responseMessage || responseMessage.role !== 'assistant') return;
+        if (!Array.isArray(responseMessage.parts) || responseMessage.parts.length === 0) return;
 
-      const assistantUIMessage = convertAssistantMessageToUIMessage(assistantModelMessage);
-      if (!assistantUIMessage) return;
+        const messageId =
+          responseMessage.id && responseMessage.id.trim().length > 0
+            ? responseMessage.id
+            : generateResponseMessageId();
+        const messageToPersist: UIMessage = {
+          ...responseMessage,
+          id: messageId,
+        };
 
-      await insertChatMessage({
-        id: assistantUIMessage.id,
-        sessionId,
-        role: 'assistant',
-        content: assistantUIMessage,
-      });
-    })
-    .catch((error) => {
-      console.error('[chat] failed to persist assistant message', error);
-    });
-
-  return result.toUIMessageStreamResponse();
-}
-
-function convertAssistantMessageToUIMessage(message: AssistantModelMessage): UIMessage | null {
-  const parts: UIMessage['parts'] = [];
-  const content = message.content;
-
-  if (typeof content === 'string') {
-    if (content.trim().length === 0) return null;
-    parts.push({ type: 'text', text: content });
-  } else {
-    for (const item of content) {
-      if (item.type === 'text') {
-        parts.push({ type: 'text', text: item.text });
+        await insertChatMessage({
+          id: messageToPersist.id,
+          sessionId,
+          role: 'assistant',
+          content: messageToPersist,
+        });
+      } catch (error) {
+        console.error('[chat] failed to persist assistant message', error);
       }
-    }
-  }
-
-  if (parts.length === 0) return null;
-
-  return {
-    id: randomUUID(),
-    role: 'assistant',
-    parts,
-  };
+    },
+  });
 }
