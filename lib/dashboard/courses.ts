@@ -11,6 +11,7 @@ export type DashboardCourse = {
   createdAt: string;
   completed: boolean;
   progress: number;
+  sessionId: string | null;
 };
 
 export async function listDashboardCourses(userId: string): Promise<DashboardCourse[]> {
@@ -25,6 +26,7 @@ export async function listDashboardCourses(userId: string): Promise<DashboardCou
       createdAt: createdAt.toISOString(),
       completed: (row.progress ?? 0) >= 100,
       progress: row.progress ?? 0,
+      sessionId: row.sessionId ?? null,
     };
   });
 }

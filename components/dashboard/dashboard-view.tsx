@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Brain, Send, TrendingUp } from 'lucide-react';
 import { DashboardCourse } from '@/lib/dashboard/courses';
@@ -18,6 +18,16 @@ type DashboardViewProps = {
 export function DashboardView({ courses, sessions }: DashboardViewProps) {
   const router = useRouter();
   const [draftMessage, setDraftMessage] = useState('');
+  const handleOpenCourse = useCallback(
+    (course: DashboardCourse) => {
+      const targetUrl = course.sessionId
+        ? `/chat?session=${course.sessionId}`
+        : `/chat?course=${course.id}`;
+
+      router.push(targetUrl);
+    },
+    [router],
+  );
 
   const stats = useMemo(() => {
     const total = courses.length;
@@ -166,7 +176,7 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
                 </div>
 
                 <Button
-                  onClick={() => router.push(`/chat?course=${course.id}`)}
+                  onClick={() => handleOpenCourse(course)}
                   variant="outline"
                   className="mt-6 w-full border-white/20 bg-white/[0.02] text-slate-100 hover:bg-white/10"
                 >
