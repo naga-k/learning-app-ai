@@ -12,6 +12,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   ReactNode,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar';
 import {
   SidebarPortal,
@@ -32,6 +33,8 @@ export default function AuthenticatedLayout({
   const [isResizing, setIsResizing] = useState(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const pathname = usePathname();
 
   const layoutStyle = useMemo(
     () =>
@@ -86,10 +89,22 @@ export default function AuthenticatedLayout({
     };
   }, [isResizing]);
 
+  useEffect(() => {
+    if (pathname === '/chat') return;
+    const container = contentRef.current;
+    if (!container) return;
+
+    // Defer until after layout to capture the latest content height.
+    requestAnimationFrame(() => {
+      if (!contentRef.current) return;
+      contentRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  }, [pathname]);
+
   return (
     <SidebarProvider>
       <div
-        className="flex min-h-screen bg-slate-950 text-slate-100"
+        className="flex h-screen overflow-hidden bg-slate-950 text-slate-100"
         style={layoutStyle}
       >
         <DashboardSidebar width={sidebarWidth}>
@@ -113,8 +128,14 @@ export default function AuthenticatedLayout({
           <span className="pointer-events-none h-12 w-px rounded-full bg-slate-700" />
         </div>
 
-        <div className="relative flex flex-1 flex-col overflow-y-auto">
-          {children}
+        <div className="relative flex flex-1 flex-col">
+          <div
+            ref={contentRef}
+            id="app-scroll-container"
+            className="flex flex-1 flex-col overflow-y-auto"
+          >
+            {children}
+          </div>
         </div>
       </div>
     </SidebarProvider>

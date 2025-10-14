@@ -34,7 +34,11 @@ export function DashboardSidebar({ children, width }: DashboardSidebarProps) {
       className="flex h-screen flex-col border-r border-slate-800 bg-slate-950 px-6 py-8 text-slate-300"
       style={sidebarStyle}
     >
-      <div className="mb-8 flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => router.push('/dashboard')}
+        className="mb-8 flex items-center gap-3 rounded-xl border border-transparent px-0 py-0 text-left transition hover:border-slate-800 hover:bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:ring-offset-2 focus:ring-offset-slate-950"
+      >
         <div className="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-500">
           <Brain className="size-6 text-white" />
         </div>
@@ -42,7 +46,7 @@ export function DashboardSidebar({ children, width }: DashboardSidebarProps) {
           <p className="text-sm font-semibold text-slate-100">Course Architect</p>
           <p className="text-xs text-slate-400">AI Learning Platform</p>
         </div>
-      </div>
+      </button>
 
       <div className="mb-6 h-px bg-slate-800" />
 
