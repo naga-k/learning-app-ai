@@ -133,6 +133,7 @@ export async function listCoursesForDashboard(userId: string) {
       id: courses.id,
       title: courses.title,
       progress: courses.progress,
+      sessionId: courses.sessionId,
       createdAt: courses.createdAt,
       duration: courses.durationMinutes,
     })
