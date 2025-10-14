@@ -8,18 +8,24 @@ export function AuthPageContent() {
   const [mode, setMode] = useState<AuthMode>("sign-in");
 
   const heroHeading = useMemo(
-    () =>
-      mode === "sign-in"
-        ? "Sign in to Course Architect"
-        : "Create an account for Course Architect",
+    () => {
+      if (mode === "sign-in") return "Sign in to Course Architect";
+      if (mode === "sign-up") return "Create an account for Course Architect";
+      return "Reset your Course Architect password";
+    },
     [mode],
   );
 
   const heroDescription = useMemo(
-    () =>
-      mode === "sign-in"
-        ? "Your personalized learning plans are stored securely. Log in to keep iterating on them."
-        : "Set up your profile to start crafting personalized learning paths tailored to your goals.",
+    () => {
+      if (mode === "sign-in") {
+        return "Your personalized learning plans are stored securely. Log in to keep iterating on them.";
+      }
+      if (mode === "sign-up") {
+        return "Set up your profile to start crafting personalized learning paths tailored to your goals.";
+      }
+      return "Enter the email tied to your account and we’ll send you a secure link to choose a new password.";
+    },
     [mode],
   );
 
