@@ -2,13 +2,14 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, Brain, Send, TrendingUp } from 'lucide-react';
+import { BookOpen, Brain, LogOut, Send, TrendingUp } from 'lucide-react';
 import { DashboardCourse } from '@/lib/dashboard/courses';
 import { DashboardSession } from '@/lib/dashboard/sessions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useSupabase } from '@/components/supabase-provider';
 
 type DashboardViewProps = {
   courses: DashboardCourse[];
@@ -17,7 +18,12 @@ type DashboardViewProps = {
 
 export function DashboardView({ courses, sessions }: DashboardViewProps) {
   const router = useRouter();
+  const { supabase } = useSupabase();
   const [draftMessage, setDraftMessage] = useState('');
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  }, [router, supabase]);
   const handleOpenCourse = useCallback(
     (course: DashboardCourse) => {
       const targetUrl = course.sessionId
@@ -58,14 +64,24 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
     <div className="relative min-h-screen w-full px-4 pb-40 pt-10 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         <header className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <Brain className="h-9 w-9 text-indigo-300" />
-            <div>
-              <h1 className="text-3xl font-semibold text-slate-50">Learning Dashboard</h1>
-              <p className="text-sm text-slate-400">
-                Track every personalised course you&apos;ve generated with Course Architect.
-              </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Brain className="h-9 w-9 text-indigo-300" />
+              <div>
+                <h1 className="text-3xl font-semibold text-slate-50">Learning Dashboard</h1>
+                <p className="text-sm text-slate-400">
+                  Track every personalised course you&apos;ve generated with Course Architect.
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
           </div>
         </header>
 

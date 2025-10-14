@@ -1,10 +1,27 @@
 'use client';
 
+import type { Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { useSupabase } from '@/components/supabase-provider';
 
 type AuthMode = 'sign-in' | 'sign-up';
+
+const syncServerAuth = async (session: Session | null) => {
+  if (!session) return;
+  try {
+    await fetch('/auth/callback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ event: 'SIGNED_IN', session }),
+    });
+  } catch (callbackError) {
+    console.error('[auth] failed to sync session', callbackError);
+  }
+};
 
 export function AuthForm() {
   const { supabase } = useSupabase();
@@ -37,12 +54,16 @@ export function AuthForm() {
 
       try {
         if (mode === 'sign-in') {
-          const { error: signInError } = await supabase.auth.signInWithPassword({
+          const {
+            data: signInData,
+            error: signInError,
+          } = await supabase.auth.signInWithPassword({
             email,
             password,
           });
           if (signInError) throw signInError;
-          router.push('/');
+          await syncServerAuth(signInData?.session ?? null);
+          router.replace('/dashboard');
           router.refresh();
         } else {
           if (password !== confirmPassword) {
@@ -61,7 +82,8 @@ export function AuthForm() {
           });
           if (signUpError) throw signUpError;
           if (data?.session) {
-            router.push('/');
+            await syncServerAuth(data.session);
+            router.replace('/dashboard');
             router.refresh();
           } else {
             setStatusMessage('Check your email to confirm your account.');
