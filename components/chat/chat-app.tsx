@@ -19,19 +19,6 @@ type CourseSnapshot = {
   output: CourseToolOutput;
 };
 
-function createAssistantMessage(text: string) {
-  return {
-    id: `assistant-follow-up-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
-    role: 'assistant' as const,
-    parts: [
-      {
-        type: 'text' as const,
-        text,
-      },
-    ],
-  };
-}
-
 export function ChatApp() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,12 +51,6 @@ export function ChatApp() {
     transport,
   });
   const hasSentInitialPromptRef = useRef(false);
-
-  const appendAssistantMessage = useCallback(
-    (text: string) =>
-      setMessages((current) => [...current, createAssistantMessage(text)]),
-    [setMessages],
-  );
 
   const [courseState, setCourseState] = useState<CourseSnapshot | null>(null);
   const courseRef = useRef<string | null>(null);
@@ -277,7 +258,6 @@ export function ChatApp() {
               messages={messages}
               status={status}
               onSendMessage={sendMessageWithSession}
-              onAppendAssistantMessage={appendAssistantMessage}
             />
           )}
         </div>

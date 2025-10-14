@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import { SUPABASE_SECRET_KEY, SUPABASE_URL } from '@/lib/supabase/server';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
   const cookieStore = await cookies();
   const response = NextResponse.json({ success: true });
 
-  const supabase = createServerClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll: async () =>
         cookieStore.getAll().map(({ name, value }) => ({ name, value })),
