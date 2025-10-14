@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
-import { ArrowLeft, BookOpen, LayoutDashboard, LogOut } from 'lucide-react';
+import { ArrowLeft, BookOpen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -12,7 +12,6 @@ import {
   isCourseToolOutput,
   type CourseToolOutput,
 } from '@/lib/ai/tool-output';
-import { useSupabase } from '@/components/supabase-provider';
 
 type CourseSnapshot = {
   id: string;
@@ -22,7 +21,6 @@ type CourseSnapshot = {
 export function ChatApp() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { supabase } = useSupabase();
   const [viewMode, setViewMode] = useState<'chat' | 'course'>('chat');
   const sessionParam = searchParams.get('session');
   const promptParam = searchParams.get('prompt');
@@ -161,15 +159,6 @@ export function ChatApp() {
     router.replace(`/chat?session=${sessionId}`);
   }, [router, sessionId, promptParam, sendMessageWithSession]);
 
-  const handleSignOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  }, [router, supabase]);
-
-  const handleGoToDashboard = useCallback(() => {
-    router.push('/dashboard');
-  }, [router]);
-
   if (sessionError) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-slate-200">
@@ -201,28 +190,11 @@ export function ChatApp() {
     <>
       <header className="sticky top-0 z-10 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
         <div className="flex w-full items-center justify-between gap-6 px-4 py-6 sm:px-6">
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={handleGoToDashboard}
-              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </button>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold md:text-[2.35rem]">
-                Course Architect
-              </h1>
-              <p className="text-sm text-slate-400 md:text-base">
-                Set your goal, refine the roadmap, and build lessons that fit the way you learn.
-              </p>
-            </div>
-          </div>
+          <div className="flex-1" />
 
-          <div className="flex items-center gap-3">
-            {showCourseToggle && (
-              viewMode === 'chat' ? (
+          {showCourseToggle ? (
+            <div className="flex items-center gap-3">
+              {viewMode === 'chat' ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -242,18 +214,9 @@ export function ChatApp() {
                   <ArrowLeft className="h-4 w-4" />
                   Back to chat
                 </button>
-              )
-            )}
-
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
-          </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </header>
 
