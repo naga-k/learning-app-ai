@@ -72,7 +72,8 @@ export function ChatPanel({
   );
 
   const lastAssistantMessage = useMemo(
-    () => [...messages].reverse().find((msg) => msg.role === "assistant") ?? null,
+    () =>
+      [...messages].reverse().find((msg) => msg.role === "assistant") ?? null,
     [messages],
   );
 
