@@ -298,7 +298,7 @@ export function CourseWorkspace({
 
           <div className="flex-1 overflow-y-auto px-6 py-8">
             {viewMode === "lesson" && (
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <div className="space-y-6">
                 <div
                   ref={lessonContentRef}
                   className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-8 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur"
@@ -307,19 +307,19 @@ export function CourseWorkspace({
                     <h2 className="text-2xl font-semibold text-white">
                       {activeSubmodule.order}. {activeSubmodule.title}
                     </h2>
-                {activeSubmodule.duration && (
-                  <p className="text-sm text-slate-400">
-                    ⏱ Suggested time: {activeSubmodule.duration}
-                  </p>
-                )}
-                {activeSubmodule.summary && (
-                  <p className="text-sm italic text-slate-300">
-                    {activeSubmodule.summary}
-                  </p>
-                )}
-              </div>
+                    {activeSubmodule.duration && (
+                      <p className="text-sm text-slate-400">
+                        ⏱ Suggested time: {activeSubmodule.duration}
+                      </p>
+                    )}
+                    {activeSubmodule.summary && (
+                      <p className="text-sm italic text-slate-300">
+                        {activeSubmodule.summary}
+                      </p>
+                    )}
+                  </div>
 
-                <MarkdownContent content={activeSubmodule.content} />
+                  <MarkdownContent content={activeSubmodule.content} />
                 </div>
 
                 <CourseAssistantPanel
