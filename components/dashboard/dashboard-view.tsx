@@ -97,7 +97,7 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
               <Button
                 onClick={() => router.push('/chat')}
                 variant="outline"
-                className="mt-6 border-white/20 bg-white/[0.02] text-slate-100 hover:bg-white/10"
+                className="mt-6 border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
               >
                 Start building
               </Button>
@@ -126,7 +126,7 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
                   <Button
                     onClick={() => handleOpenCourse(course)}
                     variant="outline"
-                    className="mt-6 w-full border-white/20 bg-white/[0.02] text-slate-100 hover:bg-white/10"
+                    className="mt-6 w-full border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
                   >
                     Open course
                   </Button>
@@ -166,7 +166,7 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
                       <Button
                         onClick={() => router.push(`/chat?session=${session.id}`)}
                         variant="outline"
-                        className="border-white/20 bg-white/[0.02] text-slate-100 hover:bg-white/10"
+                        className="border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
                       >
                         Open
                       </Button>
