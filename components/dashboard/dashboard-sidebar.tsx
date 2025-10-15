@@ -83,7 +83,7 @@ export function DashboardSidebar({ children, width }: DashboardSidebarProps) {
         <Button
           type="button"
           variant="ghost"
-          className="w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm text-slate-400 hover:text-slate-100"
+          className="w-full justify-start gap-3 rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-900/70 hover:!text-slate-100"
           onClick={handleSignOut}
         >
           <LogOut className="size-4" />
