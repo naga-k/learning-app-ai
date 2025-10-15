@@ -215,6 +215,7 @@ export async function listRecentChatSessions(
       hasGeneratedCourse: sql<boolean>`bool_or(${courses.id} IS NOT NULL)`,
     })
     .from(chatSessions)
+    .innerJoin(chatMessages, eq(chatMessages.sessionId, chatSessions.id))
     .leftJoin(courses, eq(courses.sessionId, chatSessions.id))
     .where(whereClause)
     .groupBy(
