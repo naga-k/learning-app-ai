@@ -489,7 +489,6 @@ export function CourseAssistantPanel({
                   placeholder="Ask about this lesson or request a quick tip..."
                   className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-[22px] border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                   onKeyDown={handleInputKeyDown}
-                  disabled={isSending}
                   rows={1}
                   style={{
                     height: "auto",
