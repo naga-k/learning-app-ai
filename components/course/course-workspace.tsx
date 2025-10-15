@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -29,12 +36,16 @@ type CourseWorkspaceProps = {
   course: CourseWithIds;
   summary?: string;
   onBack: () => void;
+  sidebarOffsetTop?: number;
+  headerSlot?: ReactNode;
 };
 
 export function CourseWorkspace({
   course,
   summary,
   onBack,
+  sidebarOffsetTop = 0,
+  headerSlot,
 }: CourseWorkspaceProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -247,6 +258,7 @@ export function CourseWorkspace({
           primaryItems={navigationPrimaryItems}
           secondaryItems={navigationSecondaryItems}
           onNavigateDashboard={handleNavigateDashboard}
+          offsetTop={sidebarOffsetTop}
         />
         <div
           className={cn(
@@ -256,6 +268,7 @@ export function CourseWorkspace({
               : "bg-white/[0.05]",
           )}
         >
+          {headerSlot}
           <div className="border-b border-white/10 px-5 py-5">
             <div>
               <p className="text-sm font-semibold text-slate-100">
@@ -427,7 +440,9 @@ export function CourseWorkspace({
     hasOverviewContent,
     navigationPrimaryItems,
     navigationSecondaryItems,
+    headerSlot,
     selectionSourceRef,
+    sidebarOffsetTop,
     sidePanelView,
     viewMode,
   ]);
@@ -455,7 +470,7 @@ export function CourseWorkspace({
 
   return (
     <div className="flex h-full w-full overflow-hidden text-slate-100">
-      <aside className="flex h-full w-72 shrink-0 flex-col border-r border-white/10 bg-slate-950/70 md:w-[18.5rem]">
+      <aside className="flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 md:w-[18.5rem]">
         {navigationContent}
       </aside>
 

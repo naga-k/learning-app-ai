@@ -233,8 +233,8 @@ export function DashboardView({
   };
 
   return (
-    <div className="relative min-h-screen">
-      <div className="px-4 pb-40 pt-10 sm:px-6 lg:px-8">
+    <div className="flex h-full flex-col">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-10 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
           <header className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-4">

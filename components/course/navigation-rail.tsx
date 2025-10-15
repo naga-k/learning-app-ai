@@ -17,15 +17,25 @@ type NavigationRailProps = {
   primaryItems: NavigationRailItem[];
   secondaryItems: NavigationRailItem[];
   onNavigateDashboard: () => void;
+  offsetTop?: number;
 };
 
 export function NavigationRail({
   primaryItems,
   secondaryItems,
   onNavigateDashboard,
+  offsetTop = 0,
 }: NavigationRailProps) {
+  const stickyStyle = {
+    top: offsetTop,
+    height: `calc(100vh - ${offsetTop}px)`,
+  } as const;
+
   return (
-    <div className="flex h-full w-20 flex-col justify-between border-r border-white/10 bg-white/[0.04] py-6">
+    <div
+      className="sticky z-20 flex w-20 flex-col justify-between border-r border-white/10 bg-white/[0.04] py-6"
+      style={stickyStyle}
+    >
       <div className="flex flex-col items-center gap-6">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 shadow-[0_18px_35px_rgba(79,70,229,0.35)]">
           <Brain className="h-6 w-6 text-white" />
