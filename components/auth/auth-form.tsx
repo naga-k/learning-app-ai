@@ -60,13 +60,16 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [activeAction, setActiveAction] = useState<'password' | 'google' | 'recovery' | null>(null);
+  const [activeAction, setActiveAction] = useState<
+    'password' | 'google' | 'recovery' | 'magic-link' | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const isPasswordLoading = activeAction === 'password';
   const isGoogleLoading = activeAction === 'google';
   const isRecoveryLoading = activeAction === 'recovery';
+  const isMagicLinkLoading = activeAction === 'magic-link';
   const isBusy = activeAction !== null;
 
   useEffect(() => {
@@ -105,6 +108,44 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
     },
     [mode],
   );
+
+  const handleMagicLinkSignIn = useCallback(async () => {
+    setError(null);
+    setStatusMessage(null);
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+
+    setActiveAction('magic-link');
+
+    try {
+      const redirectTo =
+        typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+
+      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+        email: trimmedEmail,
+        options: {
+          emailRedirectTo: redirectTo,
+          shouldCreateUser: true,
+        },
+      });
+
+      if (magicLinkError) throw magicLinkError;
+      setStatusMessage('Check your email for a magic link to finish signing in.');
+    } catch (magicLinkError) {
+      console.error('[auth] failed to send magic link', magicLinkError);
+      setError(
+        magicLinkError instanceof Error
+          ? magicLinkError.message
+          : 'Unable to send magic link. Try again.',
+      );
+    } finally {
+      setActiveAction(null);
+    }
+  }, [email, supabase]);
 
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -363,6 +404,21 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           >
             {isPasswordLoading || isRecoveryLoading ? 'Please wait...' : buttonLabel}
           </button>
+
+          {mode !== 'recover' && (
+            <button
+              type="button"
+              onClick={handleMagicLinkSignIn}
+              disabled={isBusy}
+              className="w-full rounded-full border border-indigo-400/20 bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-200 transition hover:border-indigo-400/60 hover:bg-indigo-500/20 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isMagicLinkLoading
+                ? 'Sending magic link...'
+                : mode === 'sign-in'
+                  ? 'Email me a magic link'
+                  : 'Send magic link to create account'}
+            </button>
+          )}
 
           {mode !== 'recover' && GOOGLE_AUTH_ENABLED && (
             <button
