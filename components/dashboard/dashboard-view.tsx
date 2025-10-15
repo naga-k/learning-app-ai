@@ -336,33 +336,33 @@ export function DashboardView({
                     >
                       <div className="mb-3">
                         <div>
-                          <h3 className="line-clamp-2 min-h-[3rem] break-words text-base font-semibold leading-6 text-slate-50">
+                          <h3 className="line-clamp-2 min-h-[3rem] break-words text-sm sm:text-base font-semibold leading-6 text-slate-50">
                             {course.topic}
                           </h3>
                           <div className="mt-2 min-h-[3.75rem]">
                             {course.description ? (
-                              <p className="line-clamp-3 text-sm leading-5 text-slate-300">
+                              <p className="line-clamp-3 text-xs sm:text-sm leading-5 text-slate-300">
                                 {course.description}
                               </p>
                             ) : null}
                           </div>
                           <div className="mt-3 border-t border-white/10 pt-2">
-                            <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-300">
+                            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[0.65rem] sm:text-xs text-slate-300">
                               {modulesLabel ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2.5 py-1 font-medium text-slate-200">
-                                  <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 sm:px-2.5 py-1 font-medium text-slate-200">
+                                  <BookOpen className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                                   {modulesLabel}
                                 </span>
                               ) : null}
                               {durationLabel ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2.5 py-1 font-medium text-slate-200">
-                                <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 sm:px-2.5 py-1 font-medium text-slate-200">
+                                <ClockIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                                   {durationLabel}
                                 </span>
                               ) : null}
-                              <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2.5 py-1 font-medium text-slate-200">
-                                <CalendarIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                                Created {createdLabel}
+                              <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 sm:px-2.5 py-1 font-medium text-slate-200">
+                                <CalendarIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                                <span className="hidden xs:inline">Created </span>{createdLabel}
                               </span>
                             </div>
                           </div>
@@ -456,14 +456,14 @@ export function DashboardView({
                         key={session.id}
                         className="border-white/10 bg-white/[0.04] p-4 text-slate-100 transition hover:border-white/20 hover:bg-white/[0.06]"
                       >
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2 sm:gap-3">
                           <div className="flex min-w-0 flex-1 flex-col gap-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-base font-medium text-slate-50">
+                              <h3 className="truncate text-sm sm:text-base font-medium text-slate-50">
                                 {session.title}
                               </h3>
                               {showGeneratedBadge ? (
-                                <Badge className="border-emerald-400/40 bg-emerald-500/15 text-emerald-200">
+                                <Badge className="border-emerald-400/40 bg-emerald-500/15 text-emerald-200 text-xs">
                                   Generated
                                 </Badge>
                               ) : null}
@@ -475,7 +475,7 @@ export function DashboardView({
                           <Button
                             onClick={() => router.push(`/chat?session=${session.id}`)}
                             variant="outline"
-                            className="border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
+                            className="border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100 shrink-0 text-xs sm:text-sm px-3 sm:px-4"
                           >
                             Open
                           </Button>
@@ -532,12 +532,11 @@ export function DashboardView({
       </div>
 
       <div
-        className="pointer-events-none fixed bottom-0 right-0 px-4 pb-6 pt-10 sm:px-6 lg:px-8"
-        style={{ left: 'max(var(--sidebar-width, 256px), 0px)' }}
+        className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pb-6 sm:pt-8 lg:left-[var(--sidebar-width,256px)] lg:px-8"
       >
         <div className="pointer-events-auto">
-          <div className="mx-auto max-w-3xl rounded-full border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl">
-            <div className="flex items-center gap-2">
+          <div className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
               <input
                 value={draftMessage}
                 onChange={(event) => setDraftMessage(event.target.value)}
@@ -548,13 +547,13 @@ export function DashboardView({
                   }
                 }}
                 placeholder="What should we learn next?"
-                className="flex-1 rounded-full border border-white/10 bg-white/[0.02] px-5 py-4 text-sm text-slate-100 outline-none placeholder:text-slate-400"
+                className="w-full flex-1 rounded-full border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-400 sm:py-4"
               />
               <Button
                 onClick={handleSubmit}
                 disabled={!draftMessage.trim()}
                 size="icon"
-                className="h-12 w-12 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)]"
+                className="h-11 w-full rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] sm:h-12 sm:w-12"
               >
                 <Send className="h-5 w-5" />
               </Button>

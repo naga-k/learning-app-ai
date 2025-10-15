@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
-import { ArrowLeft, BookOpen, LogOut } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronDown, List, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -36,6 +36,7 @@ export function ChatApp() {
   const creatingSessionRef = useRef<Promise<string> | null>(null);
   const pendingInitialMessageRef = useRef<string | null>(null);
   const { supabase } = useSupabase();
+  const [mobileMenuExpanded, setMobileMenuExpanded] = useState(false);
 
   const transport = useMemo(() => {
     if (!sessionId) return undefined;
@@ -297,7 +298,17 @@ export function ChatApp() {
   }
 
   const headerBar = (
-    <div className="sticky top-0 z-30 flex w-full items-center justify-end gap-3 border-b border-white/5 bg-slate-950/80 px-4 py-6 backdrop-blur-xl sm:px-6">
+    <div className="sticky top-0 z-30 flex w-full items-center justify-between gap-3 border-b border-white/5 bg-slate-950/80 px-4 py-6 backdrop-blur-xl sm:px-6">
+      {viewMode === 'course' ? (
+        <button
+          type="button"
+          onClick={() => setMobileMenuExpanded((prev) => !prev)}
+          className="lg:hidden inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+        >
+          <List className="h-4 w-4" />
+          Menu
+        </button>
+      ) : <div />}
       {showCourseToggle ? (
         viewMode === 'chat' ? (
           <button
@@ -330,6 +341,8 @@ export function ChatApp() {
           summary={courseSummary}
           onBack={() => setViewMode('chat')}
           headerSlot={headerBar}
+          mobileMenuExpanded={mobileMenuExpanded}
+          setMobileMenuExpanded={setMobileMenuExpanded}
         />
       </div>
     );

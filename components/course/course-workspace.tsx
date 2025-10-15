@@ -16,10 +16,12 @@ import {
   ChevronDown,
   ChevronRight,
   Flag,
+  LayoutDashboard,
   List,
   LogOut as LogOutIcon,
   MessageCircle,
   Settings,
+  X,
 } from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
 import { cn, sanitizeUrl } from "@/lib/utils";
@@ -38,6 +40,8 @@ type CourseWorkspaceProps = {
   onBack: () => void;
   sidebarOffsetTop?: number;
   headerSlot?: ReactNode;
+  mobileMenuExpanded?: boolean;
+  setMobileMenuExpanded?: (expanded: boolean | ((prev: boolean) => boolean)) => void;
 };
 
 export function CourseWorkspace({
@@ -46,6 +50,8 @@ export function CourseWorkspace({
   onBack,
   sidebarOffsetTop = 0,
   headerSlot,
+  mobileMenuExpanded: externalMobileMenuExpanded,
+  setMobileMenuExpanded: externalSetMobileMenuExpanded,
 }: CourseWorkspaceProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -75,6 +81,17 @@ export function CourseWorkspace({
   const [sidePanelView, setSidePanelView] = useState<
     "modules" | "assistant" | "settings"
   >("modules");
+  const [internalMobileMenuExpanded, setInternalMobileMenuExpanded] = useState(false);
+  const [mobileAccordionView, setMobileAccordionView] = useState<
+    "modules" | "assistant"
+  >("modules");
+  const [sidebarWidth, setSidebarWidth] = useState(480); // Default width in pixels
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Use external state if provided, otherwise use internal state
+  const mobileAccordionExpanded = externalMobileMenuExpanded ?? internalMobileMenuExpanded;
+  const setMobileAccordionExpanded = externalSetMobileMenuExpanded ?? setInternalMobileMenuExpanded;
+
   const handleActivateAssistant = useCallback(
     () => setSidePanelView("assistant"),
     [],
@@ -86,6 +103,41 @@ export function CourseWorkspace({
     await supabase.auth.signOut();
     router.push("/login");
   }, [router, supabase]);
+
+  const handleMouseDown = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newWidth = e.clientX;
+      // Constrain between min (288px = 18rem) and max (800px)
+      if (newWidth >= 288 && newWidth <= 800) {
+        setSidebarWidth(newWidth);
+      }
+    },
+    [isResizing],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
     const firstModule = course.modules[0];
@@ -477,14 +529,35 @@ export function CourseWorkspace({
       style={{ height: panelHeight }}
     >
       <aside
-        className="flex h-full shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70"
+        className="hidden lg:flex h-full shrink-0 flex-col border-r border-white/10 bg-slate-950/70 relative"
         style={{
-          flex: "0 0 calc((100% - 5rem) / 3 + 5rem)",
+          width: `${sidebarWidth}px`,
           minWidth: "18rem",
+          maxWidth: "800px",
           height: panelHeight,
         }}
       >
-        {navigationContent}
+        <div className="flex-1 overflow-hidden">
+          {navigationContent}
+        </div>
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 transition-colors group z-50"
+          onMouseDown={handleMouseDown}
+          style={{
+            backgroundColor: isResizing ? 'rgba(99, 102, 241, 0.5)' : 'transparent',
+          }}
+        >
+          <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/90 border border-white/20 rounded-md px-1 py-2 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+              <circle cx="9" cy="12" r="1" />
+              <circle cx="9" cy="5" r="1" />
+              <circle cx="9" cy="19" r="1" />
+              <circle cx="15" cy="12" r="1" />
+              <circle cx="15" cy="5" r="1" />
+              <circle cx="15" cy="19" r="1" />
+            </svg>
+          </div>
+        </div>
       </aside>
 
       <section
@@ -492,6 +565,202 @@ export function CourseWorkspace({
         style={{ height: panelHeight }}
       >
         {headerSlot}
+
+        {headerSlot ? (
+          <>
+            {mobileAccordionExpanded && (
+              <div
+                className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 lg:hidden"
+                onClick={() => setMobileAccordionExpanded(false)}
+              />
+            )}
+            <div className={cn(
+              "fixed left-0 top-0 bottom-0 w-[min(85vw,400px)] z-50 bg-slate-950/98 backdrop-blur-xl border-r border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-out lg:hidden flex flex-col",
+              mobileAccordionExpanded ? "translate-x-0" : "-translate-x-full"
+            )}>
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-6">
+                <h2 className="text-lg font-semibold text-slate-100">Course Menu</h2>
+                <button
+                  type="button"
+                  onClick={() => setMobileAccordionExpanded(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-slate-100 transition hover:border-white/20 hover:bg-white/15"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close menu</span>
+                </button>
+              </div>
+
+              <div className="border-b border-white/10 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileAccordionExpanded(false);
+                    handleNavigateDashboard();
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/10"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileAccordionView("modules")}
+                  className={cn(
+                    "flex-1 rounded-full border px-3 py-2 text-sm font-semibold transition",
+                    mobileAccordionView === "modules"
+                      ? "border-white/20 bg-white/10 text-slate-100"
+                      : "border-white/10 bg-transparent text-slate-300 hover:bg-white/5",
+                  )}
+                >
+                  Modules
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileAccordionView("assistant")}
+                  className={cn(
+                    "flex-1 rounded-full border px-3 py-2 text-sm font-semibold transition",
+                    mobileAccordionView === "assistant"
+                      ? "border-white/20 bg-white/10 text-slate-100"
+                      : "border-white/10 bg-transparent text-slate-300 hover:bg-white/5",
+                  )}
+                >
+                  Assistant
+                </button>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4">
+                {mobileAccordionView === "modules" ? (
+                  <nav className="flex h-auto min-h-0 flex-col">
+                    {hasOverviewContent && (
+                      <div className="mb-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setViewMode("overview");
+                            setMobileAccordionExpanded(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition",
+                            viewMode === "overview"
+                              ? "border-white/20 bg-white/10 text-slate-100 shadow-[0_0_30px_rgba(129,140,248,0.35)]"
+                              : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5",
+                          )}
+                        >
+                          <BookOpen className="h-4 w-4 flex-shrink-0" />
+                          Course overview
+                        </button>
+                      </div>
+                    )}
+
+                    {course.modules.map((module) => {
+                      const moduleSelected = module.moduleId === activeModuleId;
+                      const isActiveModule = viewMode === "lesson" && moduleSelected;
+
+                      return (
+                        <div key={module.moduleId} className="mb-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveModuleId(module.moduleId);
+                              setActiveSubmoduleId(
+                                module.submodules[0]?.id ?? activeSubmoduleId,
+                              );
+                              setViewMode("lesson");
+                              setMobileAccordionExpanded(false);
+                            }}
+                            className={cn(
+                              "flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition",
+                              isActiveModule
+                                ? "border-indigo-400/30 bg-indigo-500/20 text-indigo-100 shadow-[0_0_35px_rgba(79,70,229,0.35)]"
+                                : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5",
+                            )}
+                          >
+                            <div>
+                              <p className="text-sm font-semibold">
+                                Module {module.order}: {module.title}
+                              </p>
+                            </div>
+                            {isActiveModule ? (
+                              <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                            )}
+                          </button>
+
+                          {isActiveModule && (
+                            <ul className="mt-3 space-y-1 border-l border-white/10 pl-3">
+                              {module.submodules.map((submodule) => {
+                                const submoduleActive =
+                                  submodule.id === activeSubmoduleId;
+                                return (
+                                  <li key={submodule.id}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveSubmoduleId(submodule.id);
+                                        setViewMode("lesson");
+                                        setMobileAccordionExpanded(false);
+                                      }}
+                                      className={cn(
+                                        "w-full rounded-xl px-2 py-2 text-left text-sm transition",
+                                        submoduleActive
+                                          ? "bg-indigo-500/20 font-medium text-indigo-100 shadow-[0_0_25px_rgba(79,70,229,0.35)]"
+                                          : "text-slate-400 hover:bg-white/5",
+                                      )}
+                                    >
+                                      {submodule.order}. {submodule.title}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {hasConclusion && (
+                      <div className="mt-6 border-t border-white/10 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setViewMode("conclusion");
+                            setMobileAccordionExpanded(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition",
+                            viewMode === "conclusion"
+                              ? "border-emerald-300/40 bg-emerald-500/20 text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+                              : "border-transparent text-emerald-200 hover:border-emerald-200/30 hover:bg-emerald-500/10",
+                          )}
+                        >
+                          <Flag className="h-4 w-4 flex-shrink-0" />
+                          Course wrap-up
+                        </button>
+                      </div>
+                    )}
+                  </nav>
+                ) : activeModule && activeSubmodule ? (
+                  <CourseAssistantPanel
+                    moduleTitle={activeModule.title}
+                    moduleSummary={activeModule.summary}
+                    lessonTitle={activeSubmodule.title}
+                    lessonSummary={activeSubmodule.summary}
+                    lessonContent={activeSubmodule.content}
+                    selectionSourceRef={selectionSourceRef}
+                    isActive={mobileAccordionExpanded && mobileAccordionView === "assistant"}
+                    onActivate={handleActivateAssistant}
+                    className="h-full"
+                  />
+                ) : null}
+              </div>
+            </div>
+          </>
+        ) : null}
+
         <div
           ref={lessonContentRef}
           className="flex flex-1 min-h-0 flex-col overflow-y-auto"
