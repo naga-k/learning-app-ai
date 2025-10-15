@@ -21,6 +21,7 @@ import {
   isCourseToolOutput,
   isPlanToolOutput,
   isToolErrorOutput,
+  type PlanToolOutput,
 } from "@/lib/ai/tool-output";
 import { cn } from "@/lib/utils";
 
@@ -174,164 +175,213 @@ export function ChatPanel({
               <>
                 {renderableMessages.map((message, messageIndex) => {
                   const isUser = message.role === "user";
-              return (
-                  <Message from={message.role} key={message.id ?? `message-${messageIndex}`}>
-                    <MessageContent
-                      variant="flat"
-                      className={cn(
-                        "max-w-3xl space-y-1 rounded-xl px-3 py-2 text-sm leading-6 transition-colors",
-                        isUser
-                          ? "bg-indigo-500/45 text-white/95"
-                          : "bg-slate-900/45 text-slate-100",
-                      )}
-                    >
-                      {(Array.isArray(message.parts) ? message.parts : []).map((part, index) => {
-                        const partKey = `${message.id}-${index}`;
-                        if (part.type === "text") {
+                  let planToolPayload: PlanToolOutput | null = null;
+
+                  const partNodes = (Array.isArray(message.parts) ? message.parts : []).map(
+                    (part, index) => {
+                      const partKey = `${message.id}-${index}`;
+
+                      if (part.type === "text") {
+                        return (
+                          <Response
+                            key={`${message.id}-${index}`}
+                            className="w-full prose-sm prose-invert max-w-none text-slate-100"
+                          >
+                            {part.text}
+                          </Response>
+                        );
+                      }
+
+                      if (isToolOrDynamicToolUIPart(part)) {
+                        const toolName = getToolOrDynamicToolName(part);
+                        const isCourseTool = toolName === "generate_course";
+                        const isPlanTool = toolName === "generate_plan";
+                        const streamingMessage = isCourseTool
+                          ? "Synthesizing your immersive course..."
+                          : isPlanTool
+                            ? "Designing your learning blueprint..."
+                            : "Working on your request...";
+                        const isStreamingState =
+                          part.state === "input-streaming" ||
+                          part.state === "input-available" ||
+                          (part.state === "output-available" && isPreliminaryPart(part));
+
+                        if (isStreamingState) {
+                          const startInfo = toolStartTimesRef.current.get(partKey);
+                          if (!startInfo) {
+                            toolStartTimesRef.current.set(partKey, {
+                              localStart: Date.now(),
+                            });
+                          }
+                          const activeInfo = toolStartTimesRef.current.get(partKey)!;
+                          const baseStart =
+                            typeof activeInfo.serverStart === "number"
+                              ? activeInfo.serverStart
+                              : activeInfo.localStart;
+                          const elapsedLabel = formatDuration(Date.now() - baseStart);
                           return (
-                            <Response
+                            <div
                               key={`${message.id}-${index}`}
-                                className="prose-sm prose-invert max-w-none text-slate-100"
-                              >
-                                {part.text}
-                              </Response>
-                            );
+                              aria-live="polite"
+                              className="mt-2 flex items-center gap-2 text-sm text-slate-300"
+                            >
+                              <Loader size={16} />
+                              <span className="animate-pulse">{streamingMessage}</span>
+                              {elapsedLabel && (
+                                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                  {elapsedLabel}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        if (part.state === "output-error") {
+                          return (
+                            <div
+                              key={`${message.id}-${index}`}
+                              className="mt-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
+                            >
+                              {part.errorText ?? "Something went wrong while running the tool."}
+                            </div>
+                          );
+                        }
+
+                        if (part.state === "output-available") {
+                          const payload = extractToolPayload(part);
+
+                          if (
+                            payload &&
+                            typeof (payload as { startedAt?: number }).startedAt === "number"
+                          ) {
+                            const existing = toolStartTimesRef.current.get(partKey);
+                            const serverStart = (payload as { startedAt: number }).startedAt;
+                            if (existing) {
+                              toolStartTimesRef.current.set(partKey, {
+                                ...existing,
+                                serverStart,
+                              });
+                            } else {
+                              toolStartTimesRef.current.set(partKey, {
+                                localStart: serverStart,
+                                serverStart,
+                              });
+                            }
                           }
 
-                          if (isToolOrDynamicToolUIPart(part)) {
-                            const toolName = getToolOrDynamicToolName(part);
-                            const isCourseTool = toolName === "generate_course";
-                            const isPlanTool = toolName === "generate_plan";
-                            const streamingMessage = isCourseTool
-                              ? "Synthesizing your immersive course..."
-                              : isPlanTool
-                                ? "Designing your learning blueprint..."
-                                : "Working on your request...";
-                            const isStreamingState =
-                              part.state === "input-streaming" ||
-                              part.state === "input-available" ||
-                              (part.state === "output-available" && isPreliminaryPart(part));
+                          if (payload && isPlanTool && isPlanToolOutput(payload)) {
+                            planToolPayload = payload;
+                            return null;
+                          }
 
-                            if (isStreamingState) {
-                              const startInfo = toolStartTimesRef.current.get(partKey);
-                              if (!startInfo) {
-                                toolStartTimesRef.current.set(partKey, {
-                                  localStart: Date.now(),
-                                });
-                              }
-                              const activeInfo = toolStartTimesRef.current.get(partKey)!;
-                              const baseStart =
-                                typeof activeInfo.serverStart === "number"
-                                  ? activeInfo.serverStart
-                                  : activeInfo.localStart;
-                              const elapsedLabel = formatDuration(Date.now() - baseStart);
-                              return (
-                                <div
-                                  key={`${message.id}-${index}`}
-                                  aria-live="polite"
-                                  className="mt-2 flex items-center gap-2 text-sm text-slate-300"
-                                >
-                                  <Loader size={16} />
-                                  <span className="animate-pulse">{streamingMessage}</span>
-                                  {elapsedLabel && (
-                                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                      {elapsedLabel}
+                          if (payload && isToolErrorOutput(payload)) {
+                            return (
+                              <div
+                                key={`${message.id}-${index}`}
+                                className="space-y-2.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100"
+                              >
+                                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-200">
+                                  <svg
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    />
+                                  </svg>
+                                  Something went wrong
+                                  {typeof payload.durationMs === "number" && (
+                                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-rose-100/80">
+                                      {formatDuration(payload.durationMs)}
                                     </span>
                                   )}
                                 </div>
-                              );
-                            }
-
-                            if (part.state === "output-error") {
-                              return (
-                                <div
-                                  key={`${message.id}-${index}`}
-                                  className="mt-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
-                                >
-                                  {part.errorText ??
-                                    "Something went wrong while running the tool."}
-                                </div>
-                              );
-                            }
-
-                            if (part.state === "output-available") {
-                              const payload = extractToolPayload(part);
-
-                              if (payload && typeof (payload as { startedAt?: number }).startedAt === "number") {
-                                const existing = toolStartTimesRef.current.get(partKey);
-                                const serverStart = (payload as { startedAt: number }).startedAt;
-                                if (existing) {
-                                  toolStartTimesRef.current.set(partKey, {
-                                    ...existing,
-                                    serverStart,
-                                  });
-                                } else {
-                                  toolStartTimesRef.current.set(partKey, {
-                                    localStart: serverStart,
-                                    serverStart,
-                                  });
-                                }
-                              }
-
-                              if (payload && isPlanTool && isPlanToolOutput(payload)) {
-                                return null;
-                              }
-
-                              if (payload && isToolErrorOutput(payload)) {
-                                return (
-                                  <div
-                                    key={`${message.id}-${index}`}
-                                    className="space-y-2.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100"
-                                  >
-                                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-200">
-                                      <svg
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        />
-                                      </svg>
-                                      Something went wrong
-                                      {typeof payload.durationMs === "number" && (
-                                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-rose-100/80">
-                                          {formatDuration(payload.durationMs)}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-sm text-rose-100/90">
-                                      {payload.errorMessage}
-                                    </p>
-                                  </div>
-                                );
-                              }
-
-                              if (payload && isCourseTool && isCourseToolOutput(payload)) {
-                                return null;
-                              }
-
-                              if (payload) {
-                                return (
-                                  <Response
-                                    key={`${message.id}-${index}`}
-                                    className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100"
-                                  >
-                                    {typeof payload === "string"
-                                      ? payload
-                                      : `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``}
-                                  </Response>
-                                );
-                              }
-                            }
+                                <p className="text-sm text-rose-100/90">
+                                  {payload.errorMessage}
+                                </p>
+                              </div>
+                            );
                           }
 
-                          return null;
+                          if (payload && isCourseTool && isCourseToolOutput(payload)) {
+                            return null;
+                          }
+
+                          if (payload) {
+                            return (
+                              <Response
+                                key={`${message.id}-${index}`}
+                                className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100"
+                              >
+                                {typeof payload === "string"
+                                  ? payload
+                                  : `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``}
+                              </Response>
+                            );
+                          }
+                        }
+                      }
+
+                      return null;
+                    },
+                  );
+
+                  const planOutput = planToolPayload as PlanToolOutput | null;
+
+                  const renderedPlan =
+                    planOutput && planOutput.plan ? (
+                      <Response
+                        key="plan-content"
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100"
+                      >
+                        {planOutput.plan}
+                      </Response>
+                    ) : null;
+
+                  const planActionChips =
+                    planOutput?.ctaSuggestions && planOutput.ctaSuggestions.length > 0 ? (
+                      <div className="mt-3 flex w-full flex-wrap items-center gap-2">
+                        {planOutput.ctaSuggestions.map((cta) => {
+                          const messageText = cta.message?.trim() ?? "";
+                          return (
+                            <button
+                              key={cta.label}
+                              type="button"
+                              onClick={() => {
+                                if (status === "streaming") return;
+                                if (!messageText) return;
+                                onSendMessage(messageText);
+                              }}
+                              disabled={status === "streaming" || !messageText}
+                              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {cta.label}
+                            </button>
+                          );
                         })}
+                      </div>
+                    ) : null;
+
+                  return (
+                    <Message from={message.role} key={message.id ?? `message-${messageIndex}`}>
+                      <MessageContent
+                        variant="flat"
+                        className={cn(
+                          "max-w-3xl space-y-1 rounded-xl px-3 py-2 text-sm leading-6 transition-colors",
+                          isUser
+                            ? "bg-indigo-500/45 text-white/95"
+                            : "bg-slate-900/45 text-slate-100",
+                          "flex-col items-stretch",
+                        )}
+                      >
+                        {partNodes}
+                        {renderedPlan}
+                        {planActionChips}
                       </MessageContent>
                     </Message>
                   );

@@ -216,42 +216,52 @@ export const normalizeCourse = (
 export const formatLearningPlanText = (plan: LearningPlanWithIds): string => {
   const lines: string[] = [];
 
-  lines.push("Quick plan overview:");
-  lines.push(`• Goal: ${plan.overview.goal}`);
-  lines.push(`• Total time: ${plan.overview.totalDuration}`);
-
+  lines.push("### Learning Plan");
+  lines.push(
+    '_Quick roadmap snapshot. Say "Generate the course" whenever you\'re ready for the full lessons._',
+  );
+  lines.push("");
+  lines.push("**Overview**");
+  lines.push(`- Goal: ${plan.overview.goal}`);
+  lines.push(`- Duration: ${plan.overview.totalDuration}`);
   const outcomes = plan.overview.outcomes ?? [];
   if (outcomes.length === 1) {
-    lines.push(`• Outcome: ${outcomes[0]}`);
+    lines.push(`- Outcome: ${outcomes[0]}`);
   } else if (outcomes.length > 1) {
-    lines.push("• Outcomes:");
-    outcomes.forEach((outcome) => {
-      lines.push(`  - ${outcome}`);
-    });
+    lines.push(`- Outcomes: ${outcomes.join(", ")}`);
   }
 
   if (plan.notes && plan.notes.length > 0) {
-    lines.push("• Notes:");
-    plan.notes.forEach((note) => {
-      lines.push(`  - ${note}`);
-    });
+    lines.push(`- Notes: ${plan.notes.join(" | ")}`);
   }
 
   lines.push("");
 
+  lines.push("**Modules**");
   plan.modules.forEach((module) => {
-    lines.push(`Module ${module.order} — ${module.title} (${module.duration})`);
-    lines.push(`  Objective: ${module.objective}`);
-    module.subtopics.forEach((subtopic) => {
-      lines.push(
-        `  - ${subtopic.title} (${subtopic.duration}): ${subtopic.description}`,
-      );
-    });
+    const topics = module.subtopics.map((subtopic) => subtopic.title).filter(Boolean);
+    const topTopics = topics.slice(0, 3);
+    const remainingTopics = topics.length - topTopics.length;
+    const topicSummary =
+      topTopics.length > 0
+        ? `${topTopics.join(", ")}${remainingTopics > 0 ? `, +${remainingTopics} more` : ""}`
+        : null;
+
+    lines.push(
+      `${module.order}. **${module.title}** (${module.duration}) — ${module.objective}`,
+    );
+    if (topicSummary) {
+      lines.push(`   - Focus: ${topicSummary}`);
+    }
     if (module.deliverable) {
-      lines.push(`  Deliverable: ${module.deliverable}`);
+      lines.push(`   - Deliverable: ${module.deliverable}`);
     }
     lines.push("");
   });
+
+  lines.push(
+    'Ready for the deep-dive course? Ask me to generate the course whenever you\'re set.',
+  );
 
   return lines.join("\n").trim();
 };
