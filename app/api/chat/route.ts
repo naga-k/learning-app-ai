@@ -15,12 +15,7 @@ import { buildLearningPlanPrompt } from '@/lib/prompts/plan';
 import { buildCoursePrompt } from '@/lib/prompts/course';
 import { systemPrompt } from '@/lib/prompts/system';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import {
-  getChatSession,
-  insertChatMessage,
-  listChatMessages,
-  saveCourseVersion,
-} from '@/lib/db/operations';
+import { getChatSession, insertChatMessage, listChatMessages, saveCourseVersion } from '@/lib/db/operations';
 import { randomUUID } from 'crypto';
 import type { UIMessage } from 'ai';
 import {
@@ -30,6 +25,7 @@ import {
   getModelId,
   supportsOpenAIWebSearch,
 } from '@/lib/ai/provider';
+import { generateChatTitle } from '@/lib/chat/title';
 
 export const runtime = 'nodejs';
 
@@ -438,6 +434,14 @@ Be comprehensive - this is used to create course content that feels custom-made 
           sessionId,
           role: 'assistant',
           content: messageToPersist,
+        });
+
+        void generateChatTitle({
+          sessionId,
+          userId: user.id,
+          messages: [...messages, messageToPersist],
+        }).catch((error) => {
+          console.error('[chat] failed to generate chat title', error);
         });
       } catch (error) {
         console.error('[chat] failed to persist assistant message', error);

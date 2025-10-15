@@ -25,7 +25,7 @@ export async function createChatSession({
 }): Promise<{ id: string }> {
   const [session] = await db
     .insert(chatSessions)
-    .values({ userId, title: title ?? null })
+    .values({ userId, title: title ?? 'Untitled session' })
     .returning({ id: chatSessions.id });
 
   return session;
@@ -75,22 +75,21 @@ export async function insertChatMessage(params: {
     })
     .onConflictDoNothing({ target: chatMessages.id });
 
-  const updateData: { updatedAt: Date; title?: string | null } = {
-    updatedAt: new Date(),
-  };
-
-  if (params.role === "user") {
-    const message = params.content as { parts?: Array<{ type: string; text?: string }> };
-    const textPart = message?.parts?.find((part) => part.type === "text");
-    if (textPart?.text) {
-      updateData.title = textPart.text.slice(0, 120);
-    }
-  }
-
   await db
     .update(chatSessions)
-    .set(updateData)
+    .set({ updatedAt: new Date() })
     .where(eq(chatSessions.id, params.sessionId));
+}
+
+export async function updateChatSessionTitle(params: {
+  sessionId: string;
+  userId: string;
+  title: string;
+}) {
+  await db
+    .update(chatSessions)
+    .set({ title: params.title, updatedAt: new Date() })
+    .where(and(eq(chatSessions.id, params.sessionId), eq(chatSessions.userId, params.userId)));
 }
 
 export async function saveCourseVersion(params: {

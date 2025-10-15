@@ -1,4 +1,4 @@
-export const AI_MODEL_USE_CASES = ['chat', 'plan', 'course'] as const;
+export const AI_MODEL_USE_CASES = ['chat', 'plan', 'course', 'title'] as const;
 
 export type AIModelUseCase = (typeof AI_MODEL_USE_CASES)[number];
 
@@ -9,11 +9,13 @@ export const AI_MODEL_CONFIG = {
     chat: 'gpt-5-mini',
     plan: 'gpt-5-mini',
     course: 'gpt-5-mini',
+    title: 'gpt-4o-mini',
   },
   cerebras: {
     chat: 'gpt-oss-120b',
     plan: 'gpt-oss-120b',
     course: 'gpt-oss-120b',
+    title: 'gpt-oss-120b',
   },
 } as const satisfies Record<string, AIModelConfig>;
 
