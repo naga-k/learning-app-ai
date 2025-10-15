@@ -249,9 +249,19 @@ Be verbose and detailed - this context is used to create a truly personalized le
         return {
           plan: planText,
           structuredPlan,
-          summary: `Created a personalized learning plan tailored to your specific goals and context. Ask the learner if they want tweaks before generating the course.`,
+          summary: `Created a personalized learning plan tailored to your specific goals and context. Remind them this is the roadmap—once it feels right they can say "Generate the course" for full lessons.`,
           startedAt: startTime,
           durationMs: elapsedMs,
+          ctaSuggestions: [
+            {
+              label: 'Generate course',
+              message: 'Generate the course',
+            },
+            {
+              label: 'Edit the plan',
+              message: 'Can we edit the plan?',
+            },
+          ],
         };
       } catch (error) {
         console.error('[generate_plan] failed after ms:', Date.now() - startTime, error);

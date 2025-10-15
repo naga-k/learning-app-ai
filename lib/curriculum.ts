@@ -216,6 +216,12 @@ export const normalizeCourse = (
 export const formatLearningPlanText = (plan: LearningPlanWithIds): string => {
   const lines: string[] = [];
 
+  lines.push("Heads up: this is your quick learning PLAN (roadmap only).");
+  lines.push(
+    'When it feels right, just say "Generate the course" and I\'ll craft the full lessons for you.',
+  );
+  lines.push("---");
+
   lines.push("Quick plan overview:");
   lines.push(`• Goal: ${plan.overview.goal}`);
   lines.push(`• Total time: ${plan.overview.totalDuration}`);
@@ -252,6 +258,10 @@ export const formatLearningPlanText = (plan: LearningPlanWithIds): string => {
     }
     lines.push("");
   });
+
+  lines.push(
+    'Ready for the deep-dive course? Ask me to generate the course whenever you\'re set.',
+  );
 
   return lines.join("\n").trim();
 };
