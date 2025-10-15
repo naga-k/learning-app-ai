@@ -291,7 +291,7 @@ export function ChatApp() {
   if (initializingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
-        Preparing your chat workspace...
+        Preparing your workspace...
       </div>
     );
   }
@@ -324,7 +324,7 @@ export function ChatApp() {
 
   if (showCourseWorkspace && courseStructured) {
     return (
-      <div className="flex h-full w-full overflow-x-hidden text-slate-100">
+      <div className="flex h-screen w-full overflow-x-hidden text-slate-100">
         <CourseWorkspace
           course={courseStructured}
           summary={courseSummary}
@@ -336,18 +336,18 @@ export function ChatApp() {
   }
 
   return (
-    <div className="flex h-full w-full overflow-x-hidden text-slate-100">
+    <div className="flex h-screen w-full overflow-hidden text-slate-100">
       <NavigationRail
         primaryItems={chatPrimaryItems}
         secondaryItems={chatSecondaryItems}
         onNavigateDashboard={handleNavigateDashboard}
       />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {headerBar}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <div
             ref={scrollContainerRef}
-            className="flex h-full flex-col overflow-y-auto px-4 pb-10 pt-6 sm:px-6 lg:pb-12"
+            className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pb-10 pt-6 sm:px-6 lg:pb-12"
           >
             <div className="flex min-h-[60vh] flex-1 overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
               <ChatPanel
