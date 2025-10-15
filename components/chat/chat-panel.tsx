@@ -29,12 +29,14 @@ type ChatPanelProps = {
   messages: UIMessage[];
   status: UseChatHelpers<UIMessage>["status"];
   onSendMessage: (text: string) => void;
+  isLocked?: boolean;
 };
 
 export function ChatPanel({
   messages,
   status,
   onSendMessage,
+  isLocked = false,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -127,7 +129,7 @@ export function ChatPanel({
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isLocked) return;
     onSendMessage(input);
     setInput("");
     if (textareaRef.current) {
@@ -140,11 +142,20 @@ export function ChatPanel({
   ) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      if (isLocked) return;
       if (input.trim() && status !== "streaming") {
         handleSubmit(event as unknown as React.FormEvent<HTMLFormElement>);
       }
     }
   };
+
+  useEffect(() => {
+    if (!isLocked) return;
+    setInput("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  }, [isLocked]);
 
   return (
     <div className="relative flex min-h-[60vh] flex-1 flex-col overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
@@ -394,6 +405,12 @@ export function ChatPanel({
       </div>
 
       <div className="border-t border-white/10 bg-transparent px-4 pb-6 pt-4 sm:px-6">
+        {isLocked ? (
+          <div className="mx-auto mb-3 w-full max-w-4xl rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            This conversation already produced a course. Sending new messages is disabled to
+            keep the plan in sync.
+          </div>
+        ) : null}
         <form
           onSubmit={handleSubmit}
           className="mx-auto flex w-full max-w-4xl items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl"
@@ -402,13 +419,17 @@ export function ChatPanel({
             ref={textareaRef}
             className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-full border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
             value={input}
-            placeholder="Ask for a course, outline a goal, or iterate on the plan..."
+            placeholder={
+              isLocked
+                ? "A course has already been generated for this chat."
+                : "Ask for a course, outline a goal, or iterate on the plan..."
+            }
             onChange={(event) => {
               setInput(event.target.value);
               resetTextareaHeight(event.target);
             }}
             onKeyDown={handleKeyDown}
-            disabled={status === "streaming"}
+            disabled={status === "streaming" || isLocked}
             rows={1}
             style={{
               height: "auto",
@@ -420,7 +441,7 @@ export function ChatPanel({
           />
           <button
             type="submit"
-            disabled={status === "streaming" || !input.trim()}
+            disabled={status === "streaming" || !input.trim() || isLocked}
             className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {status === "streaming" ? (

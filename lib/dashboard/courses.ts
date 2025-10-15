@@ -1,6 +1,10 @@
 "use server";
 
-import { listCoursesForDashboard } from "@/lib/db/operations";
+import { DASHBOARD_COURSES_PAGE_SIZE } from "@/lib/dashboard/config";
+import {
+  countCoursesForUser,
+  listCoursesForDashboard,
+} from "@/lib/db/operations";
 
 type DashboardCourseRow = Awaited<ReturnType<typeof listCoursesForDashboard>>[number];
 
@@ -11,16 +15,72 @@ export type DashboardCourse = {
   sessionId: string | null;
 };
 
-export async function listDashboardCourses(userId: string): Promise<DashboardCourse[]> {
-  const rows = await listCoursesForDashboard(userId);
+export type DashboardCourseCursor = {
+  updatedAt: string;
+  id: string;
+};
 
-  return rows.map((row: DashboardCourseRow) => {
-    const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt);
-    return {
+export type DashboardCoursePage = {
+  courses: DashboardCourse[];
+  nextCursor: DashboardCourseCursor | null;
+  totalCount: number;
+};
+
+const toDashboardCourse = (
+  row: DashboardCourseRow,
+): { course: DashboardCourse; updatedAt: Date } => {
+  const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt);
+  const updatedAt = row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt);
+
+  return {
+    course: {
       id: row.id,
       topic: row.title,
       createdAt: createdAt.toISOString(),
       sessionId: row.sessionId ?? null,
-    };
+    },
+    updatedAt,
+  };
+};
+
+export async function listDashboardCourses(
+  userId: string,
+  options: {
+    limit?: number;
+    cursor?: DashboardCourseCursor | null;
+  } = {},
+): Promise<DashboardCoursePage> {
+  const limit = Math.max(1, Math.min(options.limit ?? DASHBOARD_COURSES_PAGE_SIZE, 50));
+  const cursor = options.cursor ?? null;
+
+  const rows = await listCoursesForDashboard(userId, {
+    limit: limit + 1,
+    cursor: cursor
+      ? {
+          updatedAt: cursor.updatedAt,
+          id: cursor.id,
+        }
+      : null,
   });
+
+  const processed = rows.map(toDashboardCourse);
+  const sliced = processed.slice(0, limit);
+  const courses = sliced.map((entry) => entry.course);
+
+  const hasMore = processed.length > sliced.length;
+  const nextCursor =
+    hasMore && sliced.length > 0
+      ? {
+          updatedAt: sliced[sliced.length - 1].updatedAt.toISOString(),
+          id: sliced[sliced.length - 1].course.id,
+        }
+      : null;
+
+  const totalCount = await countCoursesForUser(userId);
+
+  return {
+    courses,
+    nextCursor,
+    totalCount,
+  };
 }
