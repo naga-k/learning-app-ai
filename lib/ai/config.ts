@@ -6,7 +6,7 @@ export type AIModelConfig = Record<AIModelUseCase, string>;
 
 export const AI_MODEL_CONFIG = {
   openai: {
-    chat: 'gpt-5-mini',
+    chat: 'gpt-5',
     plan: 'gpt-5-mini',
     course: 'gpt-5-mini',
     title: 'gpt-5-nano',
