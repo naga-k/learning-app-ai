@@ -294,10 +294,17 @@ export function DashboardView({
                   >
                     <div className="mb-4">
                       <div>
-                        <h3 className="text-base font-semibold text-slate-50">
+                        <h3 className="line-clamp-2 min-h-[3rem] break-words text-base font-semibold leading-6 text-slate-50">
                           {course.topic}
                         </h3>
-                        <p className="text-xs text-slate-500">
+                        <div className="mt-2 min-h-[3.75rem]">
+                          {course.description ? (
+                            <p className="line-clamp-3 text-sm leading-5 text-slate-300">
+                              {course.description}
+                            </p>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
                           {new Date(course.createdAt).toLocaleDateString(undefined, {
                             month: 'short',
                             day: 'numeric',

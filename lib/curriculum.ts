@@ -71,6 +71,8 @@ const CourseConclusionSchema = z
 export const CourseSchema = z.object({
   overview: z
     .object({
+      title: z.string().optional(),
+      description: z.string().optional(),
       focus: z.string().optional(),
       totalDuration: z.string().optional(),
     })

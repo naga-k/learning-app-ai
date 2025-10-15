@@ -340,10 +340,16 @@ Be comprehensive - this is used to create course content that feels custom-made 
         const structuredCourse = normalizeCourse(courseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);
 
+        const courseTitle =
+          structuredCourse.overview?.title?.trim() ??
+          structuredCourse.overview?.focus?.trim() ??
+          structuredCourse.modules[0]?.title ??
+          'Personalised course';
+
         await saveCourseVersion({
           userId: user.id,
           sessionId,
-          title: structuredCourse.overview?.focus ?? structuredCourse.modules[0]?.title ?? 'Personalised course',
+          title: courseTitle,
           summary: courseSummary,
           structured: structuredCourse,
         });
