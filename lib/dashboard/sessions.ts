@@ -7,6 +7,7 @@ export type DashboardSession = {
   title: string | null;
   updatedAt: string;
   createdAt: string;
+  hasGeneratedCourse: boolean;
 };
 
 export async function listDashboardSessions(userId: string): Promise<DashboardSession[]> {
@@ -21,6 +22,7 @@ export async function listDashboardSessions(userId: string): Promise<DashboardSe
       title: row.title ?? "Untitled session",
       updatedAt: updatedAt.toISOString(),
       createdAt: createdAt.toISOString(),
+      hasGeneratedCourse: Boolean(row.hasGeneratedCourse),
     };
   });
 }

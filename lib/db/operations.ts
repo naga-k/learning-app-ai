@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "./client";
 import {
   chatMessages,
@@ -148,9 +148,17 @@ export async function listRecentChatSessions(userId: string, limit = 5) {
       title: chatSessions.title,
       updatedAt: chatSessions.updatedAt,
       createdAt: chatSessions.createdAt,
+      hasGeneratedCourse: sql<boolean>`bool_or(${courses.id} IS NOT NULL)`,
     })
     .from(chatSessions)
+    .leftJoin(courses, eq(courses.sessionId, chatSessions.id))
     .where(eq(chatSessions.userId, userId))
+    .groupBy(
+      chatSessions.id,
+      chatSessions.title,
+      chatSessions.updatedAt,
+      chatSessions.createdAt,
+    )
     .orderBy(desc(chatSessions.updatedAt))
     .limit(limit);
 

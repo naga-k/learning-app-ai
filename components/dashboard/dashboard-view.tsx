@@ -7,6 +7,7 @@ import { DashboardCourse } from '@/lib/dashboard/courses';
 import { DashboardSession } from '@/lib/dashboard/sessions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 type DashboardViewProps = {
   courses: DashboardCourse[];
@@ -16,6 +17,22 @@ type DashboardViewProps = {
 export function DashboardView({ courses, sessions }: DashboardViewProps) {
   const router = useRouter();
   const [draftMessage, setDraftMessage] = useState('');
+  const [showAllSessions, setShowAllSessions] = useState(false);
+
+  const { activeSessions, generatedSessions } = useMemo(() => {
+    const active: DashboardSession[] = [];
+    const generated: DashboardSession[] = [];
+
+    sessions.forEach((session) => {
+      if (session.hasGeneratedCourse) {
+        generated.push(session);
+      } else {
+        active.push(session);
+      }
+    });
+
+    return { activeSessions: active, generatedSessions: generated };
+  }, [sessions]);
 
   const handleOpenCourse = useCallback(
     (course: DashboardCourse) => {
@@ -34,6 +51,13 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
     }),
     [courses],
   );
+
+  const sessionsToDisplay = showAllSessions ? sessions : activeSessions;
+
+  const emptySessionsMessage =
+    sessions.length === 0
+      ? 'No conversations yet. Start chatting to see sessions here.'
+      : 'All recent chats have generated courses. Use View generated to revisit them.';
 
   const handleSubmit = () => {
     const trimmed = draftMessage.trim();
@@ -136,43 +160,65 @@ export function DashboardView({ courses, sessions }: DashboardViewProps) {
           )}
 
           <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-50">Recent chats</h2>
-              <p className="text-sm text-slate-400">
-                Jump back into a conversation to keep refining your plan.
-              </p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-50">Recent chats</h2>
+                <p className="text-sm text-slate-400">
+                  Jump back into a conversation to keep refining your plan.
+                </p>
+              </div>
+              {generatedSessions.length > 0 ? (
+                <Button
+                  variant="outline"
+                  className="h-10 border-white/20 bg-white/[0.02] px-4 text-sm font-medium text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
+                  onClick={() => setShowAllSessions((current) => !current)}
+                >
+                  {showAllSessions ? 'Hide generated' : 'View generated'}
+                </Button>
+              ) : null}
             </div>
 
-            {sessions.length === 0 ? (
+            {sessionsToDisplay.length === 0 ? (
               <Card className="border-white/10 bg-white/[0.04] p-8 text-center text-slate-300">
-                No conversations yet. Start chatting to see sessions here.
+                {emptySessionsMessage}
               </Card>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                {sessions.map((session) => (
-                  <Card
-                    key={session.id}
-                    className="border-white/10 bg-white/[0.04] p-4 text-slate-100 transition hover:border-white/20 hover:bg-white/[0.06]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-medium text-slate-50">
-                          {session.title}
-                        </h3>
-                        <p className="text-xs text-slate-500">
-                          Updated {new Date(session.updatedAt).toLocaleString()}
-                        </p>
+                {sessionsToDisplay.map((session) => {
+                  const showGeneratedBadge = showAllSessions && session.hasGeneratedCourse;
+
+                  return (
+                    <Card
+                      key={session.id}
+                      className="border-white/10 bg-white/[0.04] p-4 text-slate-100 transition hover:border-white/20 hover:bg-white/[0.06]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-base font-medium text-slate-50">
+                              {session.title}
+                            </h3>
+                            {showGeneratedBadge ? (
+                              <Badge className="border-emerald-400/40 bg-emerald-500/15 text-emerald-200">
+                                Generated
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Updated {new Date(session.updatedAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => router.push(`/chat?session=${session.id}`)}
+                          variant="outline"
+                          className="border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
+                        >
+                          Open
+                        </Button>
                       </div>
-                      <Button
-                        onClick={() => router.push(`/chat?session=${session.id}`)}
-                        variant="outline"
-                        className="border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
-                      >
-                        Open
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </section>

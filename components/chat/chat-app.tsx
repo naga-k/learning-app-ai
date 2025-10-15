@@ -92,7 +92,8 @@ export function ChatApp() {
     setViewMode('course');
   }, [latestCourse]);
 
-  const showCourseToggle = Boolean(courseState?.output.courseStructured);
+  const chatLocked = Boolean(courseState?.output.courseStructured);
+  const showCourseToggle = chatLocked;
 
   useEffect(() => {
     scrollContainerRef.current = document.getElementById(
@@ -168,10 +169,10 @@ export function ChatApp() {
 
   const sendMessageWithSession = useCallback(
     (text: string) => {
-      if (!sessionId) return;
+      if (!sessionId || chatLocked) return;
       sendMessage({ text });
     },
-    [sendMessage, sessionId],
+    [sendMessage, sessionId, chatLocked],
   );
 
   useEffect(() => {
@@ -261,6 +262,7 @@ export function ChatApp() {
               messages={messages}
               status={status}
               onSendMessage={sendMessageWithSession}
+              isLocked={chatLocked}
             />
           )}
         </div>
