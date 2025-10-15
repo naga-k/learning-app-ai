@@ -9,13 +9,13 @@ export const AI_MODEL_CONFIG = {
     chat: 'gpt-5-mini',
     plan: 'gpt-5-mini',
     course: 'gpt-5-mini',
-    title: 'gpt-4o-mini',
+    title: 'gpt-5-nano',
   },
   cerebras: {
     chat: 'gpt-oss-120b',
     plan: 'gpt-oss-120b',
     course: 'gpt-oss-120b',
-    title: 'gpt-oss-120b',
+    title: 'gpt-oss-20b',
   },
 } as const satisfies Record<string, AIModelConfig>;
 

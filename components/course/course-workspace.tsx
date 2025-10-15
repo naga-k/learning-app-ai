@@ -298,9 +298,9 @@ export function CourseWorkspace({
             )}
           </div>
 
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
             {sidePanelView === "modules" && (
-              <nav className="flex h-full flex-col px-3 py-4">
+              <nav className="flex h-full min-h-0 flex-col overflow-y-auto px-3 py-4">
                 {hasOverviewContent && (
                   <div className="mb-4">
                     <button
@@ -492,7 +492,11 @@ export function CourseWorkspace({
         style={{ height: panelHeight }}
       >
         {headerSlot}
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
+        <div
+          ref={lessonContentRef}
+          className="flex flex-1 min-h-0 flex-col overflow-y-auto"
+        >
+          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
           <div className="space-y-3">
             {viewMode === "overview" && (
               <>
@@ -555,7 +559,7 @@ export function CourseWorkspace({
           )}
         </header>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="flex-1 px-6 py-4">
             {viewMode === "lesson" && (
               <div className="space-y-6">
                 <div id="course-content-top" />
@@ -584,10 +588,7 @@ export function CourseWorkspace({
                   <span className="hidden sm:block" />
                 </div>
 
-                <div
-                  ref={lessonContentRef}
-                  className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-8 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur"
-                >
+                <div className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-8 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
                   <div className="mb-6 flex flex-col gap-3 border-b border-white/10 pb-6">
                     <h2 className="text-2xl font-semibold text-white">
                       {activeSubmodule.order}. {activeSubmodule.title}
@@ -796,6 +797,7 @@ export function CourseWorkspace({
               )}
             </div>
           )}
+          </div>
         </div>
       </section>
     </div>
