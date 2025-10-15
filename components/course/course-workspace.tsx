@@ -6,51 +6,35 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  Brain,
   ChevronDown,
   ChevronRight,
   Flag,
-  LayoutDashboard,
   List,
   LogOut as LogOutIcon,
   MessageCircle,
   Settings,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
 import { cn, sanitizeUrl } from "@/lib/utils";
 import { MarkdownContent, MarkdownInline } from "./markdown-content";
 import { Linkify } from "./linkify";
 import { CourseAssistantPanel } from "@/components/course/course-assistant-panel";
-import { useSidebarContent } from "@/components/dashboard/sidebar-provider";
 import { useSupabase } from "@/components/supabase-provider";
+import {
+  NavigationRail,
+  type NavigationRailItem,
+} from "@/components/course/navigation-rail";
 
 type CourseWorkspaceProps = {
   course: CourseWithIds;
   summary?: string;
   onBack: () => void;
-  useGlobalNavigation?: boolean;
-};
-
-type PrimaryNavigationItem = {
-  key: "modules" | "assistant";
-  label: string;
-  icon: LucideIcon;
-};
-
-type SecondaryNavigationItem = {
-  key: "settings" | "sign-out";
-  label: string;
-  icon: LucideIcon;
-  onClick?: () => void;
-  disabled?: boolean;
 };
 
 export function CourseWorkspace({
   course,
   summary,
   onBack,
-  useGlobalNavigation = false,
 }: CourseWorkspaceProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -217,13 +201,28 @@ export function CourseWorkspace({
         ? conclusionContentRef
         : lessonContentRef;
 
-  const navigationContent = useMemo(() => {
-    const primaryItems: PrimaryNavigationItem[] = [
-      { key: "modules", label: "Modules", icon: List },
-      { key: "assistant", label: "Assistant", icon: MessageCircle },
-    ];
+  const navigationPrimaryItems = useMemo<NavigationRailItem[]>(
+    () => [
+      {
+        key: "modules",
+        label: "Modules",
+        icon: List,
+        onClick: () => setSidePanelView("modules"),
+        active: sidePanelView === "modules",
+      },
+      {
+        key: "assistant",
+        label: "Assistant",
+        icon: MessageCircle,
+        onClick: () => setSidePanelView("assistant"),
+        active: sidePanelView === "assistant",
+      },
+    ],
+    [sidePanelView],
+  );
 
-    const secondaryItems: SecondaryNavigationItem[] = [
+  const navigationSecondaryItems = useMemo<NavigationRailItem[]>(
+    () => [
       {
         key: "settings",
         label: "Settings",
@@ -236,72 +235,19 @@ export function CourseWorkspace({
         label: "Sign out",
         icon: LogOutIcon,
         onClick: handleSignOut,
-        disabled: false,
       },
-    ];
+    ],
+    [handleSignOut],
+  );
 
+  const navigationContent = useMemo(() => {
     return (
       <div className="flex h-full w-full">
-        <div className="flex h-full w-20 flex-col justify-between border-r border-white/10 bg-white/[0.04] py-6">
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 shadow-[0_18px_35px_rgba(79,70,229,0.35)]">
-              <Brain className="h-6 w-6 text-white" />
-              <span className="sr-only">Course Architect</span>
-            </div>
-          <div className="flex flex-col items-center gap-4">
-            <button
-              type="button"
-              onClick={handleNavigateDashboard}
-              className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium text-slate-400 transition hover:text-slate-100"
-            >
-              <LayoutDashboard className="h-5 w-5" />
-              <span className="text-[11px] tracking-tight">Dashboard</span>
-            </button>
-              {primaryItems.map(({ key, label, icon: Icon }) => {
-                const isItemActive = sidePanelView === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSidePanelView(key)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition",
-                      isItemActive
-                        ? "bg-white/15 text-white"
-                        : "text-slate-400 hover:text-slate-100",
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-[11px] tracking-tight">
-                    {label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()}
-                  </span>
-                </button>
-              );
-            })}
-            </div>
-          </div>
-          <div className="flex flex-col items-center gap-4">
-            {secondaryItems.map(({ key, label, icon: Icon, onClick, disabled }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={onClick}
-                disabled={disabled}
-                className={cn(
-                  "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition hover:text-slate-100",
-                  disabled
-                    ? "cursor-not-allowed text-slate-500 opacity-40 hover:text-slate-500"
-                    : "text-slate-500",
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-[11px] tracking-tight">
-                  {label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <NavigationRail
+          primaryItems={navigationPrimaryItems}
+          secondaryItems={navigationSecondaryItems}
+          onNavigateDashboard={handleNavigateDashboard}
+        />
         <div
           className={cn(
             "flex flex-1 flex-col overflow-hidden backdrop-blur-xl",
@@ -477,15 +423,14 @@ export function CourseWorkspace({
     course.modules,
     handleActivateAssistant,
     handleNavigateDashboard,
-    handleSignOut,
     hasConclusion,
     hasOverviewContent,
+    navigationPrimaryItems,
+    navigationSecondaryItems,
     selectionSourceRef,
     sidePanelView,
     viewMode,
   ]);
-
-  useSidebarContent(useGlobalNavigation ? navigationContent : undefined);
 
   if (!activeModule || !activeSubmodule) {
     return (
@@ -509,17 +454,10 @@ export function CourseWorkspace({
   }
 
   return (
-    <div
-      className={cn(
-        "flex h-full w-full overflow-hidden text-slate-100",
-        useGlobalNavigation ? "flex-col" : "flex-row",
-      )}
-    >
-      {!useGlobalNavigation && (
-        <aside className="flex h-full w-72 shrink-0 flex-col border-r border-white/10 bg-slate-950/70 md:w-[18.5rem]">
-          {navigationContent}
-        </aside>
-      )}
+    <div className="flex h-full w-full overflow-hidden text-slate-100">
+      <aside className="flex h-full w-72 shrink-0 flex-col border-r border-white/10 bg-slate-950/70 md:w-[18.5rem]">
+        {navigationContent}
+      </aside>
 
       <section className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">

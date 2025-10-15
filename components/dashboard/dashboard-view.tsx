@@ -14,7 +14,6 @@ import type {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useSidebarContent } from '@/components/dashboard/sidebar-provider';
 import { useSupabase } from '@/components/supabase-provider';
 
 type DashboardViewProps = {
@@ -224,8 +223,6 @@ export function DashboardView({
     },
     [hasMoreSessions, loadMoreSessions, loadingMoreSessions],
   );
-
-  useSidebarContent(null, { width: 0 });
 
   const handleSubmit = () => {
     const trimmed = draftMessage.trim();

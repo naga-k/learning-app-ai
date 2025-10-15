@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft, BookOpen, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -12,6 +12,11 @@ import {
   isCourseToolOutput,
   type CourseToolOutput,
 } from '@/lib/ai/tool-output';
+import { useSupabase } from '@/components/supabase-provider';
+import {
+  NavigationRail,
+  type NavigationRailItem,
+} from '@/components/course/navigation-rail';
 
 type CourseSnapshot = {
   id: string;
@@ -30,6 +35,7 @@ export function ChatApp() {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const creatingSessionRef = useRef<Promise<string> | null>(null);
   const pendingInitialMessageRef = useRef<string | null>(null);
+  const { supabase } = useSupabase();
 
   const transport = useMemo(() => {
     if (!sessionId) return undefined;
@@ -96,6 +102,50 @@ export function ChatApp() {
 
   const chatLocked = Boolean(courseState?.output.courseStructured);
   const showCourseToggle = chatLocked;
+  const showCourseWorkspace =
+    viewMode === 'course' && Boolean(courseState?.output.courseStructured);
+  const mainPaddingClasses = 'px-0';
+
+  const handleNavigateDashboard = useCallback(() => {
+    router.push('/dashboard');
+  }, [router]);
+
+  const openCourseWorkspace = useCallback(() => {
+    setViewMode('course');
+  }, [setViewMode]);
+
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  }, [router, supabase]);
+
+  const chatPrimaryItems = useMemo<NavigationRailItem[]>(() => {
+    if (!chatLocked) {
+      return [];
+    }
+
+    return [
+      {
+        key: 'course',
+        label: 'Course',
+        icon: BookOpen,
+        onClick: openCourseWorkspace,
+        active: showCourseWorkspace,
+      },
+    ];
+  }, [chatLocked, openCourseWorkspace, showCourseWorkspace]);
+
+  const chatSecondaryItems = useMemo<NavigationRailItem[]>(
+    () => [
+      {
+        key: 'sign-out',
+        label: 'Sign out',
+        icon: LogOut,
+        onClick: handleSignOut,
+      },
+    ],
+    [handleSignOut],
+  );
 
   const ensureSessionId = useCallback(async () => {
     if (sessionId) return sessionId;
@@ -289,24 +339,32 @@ export function ChatApp() {
         </div>
       </header>
 
-      <main className="flex flex-1 px-4 pb-10 pt-6 sm:px-6 lg:pb-12">
+      <main className={`flex flex-1 pb-10 pt-6 lg:pb-12 ${mainPaddingClasses}`}>
         <div className="flex w-full flex-1">
-          {viewMode === 'course' && courseState?.output.courseStructured ? (
-            <div className="flex min-h-[60vh] w-full flex-1 overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
-              <CourseWorkspace
-                course={courseState.output.courseStructured}
-                summary={courseState.output.course}
-                onBack={() => setViewMode('chat')}
-                useGlobalNavigation
-              />
-            </div>
-          ) : (
-            <ChatPanel
-              messages={messages}
-              status={status}
-              onSendMessage={sendMessageWithSession}
-              isLocked={chatLocked}
+          {showCourseWorkspace ? (
+            <CourseWorkspace
+              course={courseState.output.courseStructured}
+              summary={courseState.output.course}
+              onBack={() => setViewMode('chat')}
             />
+          ) : (
+            <div className="flex h-full w-full overflow-hidden text-slate-100">
+              <NavigationRail
+                primaryItems={chatPrimaryItems}
+                secondaryItems={chatSecondaryItems}
+                onNavigateDashboard={handleNavigateDashboard}
+              />
+              <div className="flex flex-1 px-4 sm:px-6">
+                <div className="flex min-h-[60vh] w-full flex-1 overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
+                  <ChatPanel
+                    messages={messages}
+                    status={status}
+                    onSendMessage={sendMessageWithSession}
+                    isLocked={chatLocked}
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </main>
