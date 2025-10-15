@@ -251,6 +251,11 @@ export function CourseWorkspace({
     [handleSignOut],
   );
 
+  const panelHeight = useMemo(
+    () => `calc(100vh - ${sidebarOffsetTop}px)`,
+    [sidebarOffsetTop],
+  );
+
   const navigationContent = useMemo(() => {
     return (
       <div className="flex h-full w-full">
@@ -295,7 +300,7 @@ export function CourseWorkspace({
 
           <div className="flex-1 overflow-hidden">
             {sidePanelView === "modules" && (
-              <nav className="flex h-full flex-col overflow-y-auto px-3 py-4">
+              <nav className="flex h-full flex-col px-3 py-4">
                 {hasOverviewContent && (
                   <div className="mb-4">
                     <button
@@ -467,12 +472,25 @@ export function CourseWorkspace({
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden text-slate-100">
-      <aside className="flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70 md:w-[18.5rem]">
+    <div
+      className="flex h-full w-full overflow-x-hidden text-slate-100"
+      style={{ height: panelHeight }}
+    >
+      <aside
+        className="flex h-full shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70"
+        style={{
+          flex: "0 0 calc((100% - 5rem) / 3 + 5rem)",
+          minWidth: "18rem",
+          height: panelHeight,
+        }}
+      >
         {navigationContent}
       </aside>
 
-      <section className="flex flex-1 flex-col overflow-hidden bg-transparent">
+      <section
+        className="flex flex-1 flex-col overflow-hidden bg-transparent"
+        style={{ height: panelHeight }}
+      >
         {headerSlot}
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
           <div className="space-y-3">

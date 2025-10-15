@@ -11,7 +11,7 @@ export default function AuthenticatedLayout({
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       <div
         id="app-scroll-container"
-        className="flex flex-1 flex-col overflow-hidden"
+        className="flex flex-1 flex-col overflow-x-hidden"
       >
         {children}
       </div>

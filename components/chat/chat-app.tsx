@@ -100,10 +100,12 @@ export function ChatApp() {
     setViewMode('course');
   }, [latestCourse]);
 
-  const chatLocked = Boolean(courseState?.output.courseStructured);
+  const courseStructured = courseState?.output.courseStructured;
+  const courseSummary = courseState?.output.course;
+  const chatLocked = Boolean(courseStructured);
   const showCourseToggle = chatLocked;
   const showCourseWorkspace =
-    viewMode === 'course' && Boolean(courseState?.output.courseStructured);
+    viewMode === 'course' && Boolean(courseStructured);
 
   const handleNavigateDashboard = useCallback(() => {
     router.push('/dashboard');
@@ -320,12 +322,12 @@ export function ChatApp() {
     </div>
   );
 
-  if (showCourseWorkspace) {
+  if (showCourseWorkspace && courseStructured) {
     return (
-      <div className="flex h-full w-full overflow-hidden text-slate-100">
+      <div className="flex h-full w-full overflow-x-hidden text-slate-100">
         <CourseWorkspace
-          course={courseState.output.courseStructured}
-          summary={courseState.output.course}
+          course={courseStructured}
+          summary={courseSummary}
           onBack={() => setViewMode('chat')}
           headerSlot={headerBar}
         />
@@ -334,7 +336,7 @@ export function ChatApp() {
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden text-slate-100">
+    <div className="flex h-full w-full overflow-x-hidden text-slate-100">
       <NavigationRail
         primaryItems={chatPrimaryItems}
         secondaryItems={chatSecondaryItems}
