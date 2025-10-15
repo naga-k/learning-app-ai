@@ -331,20 +331,22 @@ export function ChatPanel({
                     },
                   );
 
+                  const planOutput = planToolPayload as PlanToolOutput | null;
+
                   const renderedPlan =
-                    planToolPayload?.plan ? (
+                    planOutput && planOutput.plan ? (
                       <Response
                         key="plan-content"
                         className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100"
                       >
-                        {planToolPayload.plan}
+                        {planOutput.plan}
                       </Response>
                     ) : null;
 
                   const planActionChips =
-                    planToolPayload?.ctaSuggestions && planToolPayload.ctaSuggestions.length > 0 ? (
+                    planOutput?.ctaSuggestions && planOutput.ctaSuggestions.length > 0 ? (
                       <div className="mt-3 flex w-full flex-wrap items-center gap-2">
-                        {planToolPayload.ctaSuggestions.map((cta) => {
+                        {planOutput.ctaSuggestions.map((cta) => {
                           const messageText = cta.message?.trim() ?? "";
                           return (
                             <button
