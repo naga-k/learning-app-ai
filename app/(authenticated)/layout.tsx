@@ -14,16 +14,13 @@ import type {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar';
-import {
-  SidebarPortal,
-  SidebarProvider,
-  useSidebarState,
-} from '@/components/dashboard/sidebar-provider';
+import { SidebarPortal, SidebarProvider, useSidebarState } from '@/components/dashboard/sidebar-provider';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_SIDEBAR_WIDTH = 420;
 const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 640;
+const DASHBOARD_SIDEBAR_WIDTH = MIN_SIDEBAR_WIDTH;
 
 export default function AuthenticatedLayout({
   children,
@@ -42,13 +39,15 @@ function AuthenticatedLayoutFrame({
 }: {
   children: ReactNode;
 }) {
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const pathname = usePathname();
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    pathname === '/dashboard' ? DASHBOARD_SIDEBAR_WIDTH : DEFAULT_SIDEBAR_WIDTH,
+  );
   const [isResizing, setIsResizing] = useState(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const pathname = usePathname();
-
+  const previousNonDashboardWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
   const { widthOverride } = useSidebarState();
 
   const effectiveSidebarWidth = widthOverride ?? sidebarWidth;
@@ -63,9 +62,7 @@ function AuthenticatedLayoutFrame({
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (widthOverride !== null) {
-        return;
-      }
+      if (widthOverride !== null) return;
       event.preventDefault();
       startXRef.current = event.clientX;
       startWidthRef.current = effectiveSidebarWidth;
@@ -110,6 +107,32 @@ function AuthenticatedLayoutFrame({
   }, [isResizing]);
 
   useEffect(() => {
+    if (widthOverride !== null) {
+      return;
+    }
+
+    if (pathname === '/dashboard') {
+      setSidebarWidth((current) =>
+        current === DASHBOARD_SIDEBAR_WIDTH ? current : DASHBOARD_SIDEBAR_WIDTH,
+      );
+      return;
+    }
+
+    const targetWidth = previousNonDashboardWidthRef.current ?? DEFAULT_SIDEBAR_WIDTH;
+    setSidebarWidth((current) => (current === targetWidth ? current : targetWidth));
+  }, [pathname, widthOverride]);
+
+  useEffect(() => {
+    if (widthOverride !== null) {
+      return;
+    }
+
+    if (pathname !== '/dashboard') {
+      previousNonDashboardWidthRef.current = sidebarWidth;
+    }
+  }, [pathname, sidebarWidth, widthOverride]);
+
+  useEffect(() => {
     if (pathname === '/chat') return;
     const container = contentRef.current;
     if (!container) return;
@@ -133,7 +156,7 @@ function AuthenticatedLayoutFrame({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-valuenow={Math.round(sidebarWidth)}
+        aria-valuenow={Math.round(effectiveSidebarWidth)}
         aria-valuemin={MIN_SIDEBAR_WIDTH}
         aria-valuemax={MAX_SIDEBAR_WIDTH}
         onPointerDown={handlePointerDown}

@@ -28,6 +28,8 @@ export function ChatApp() {
   const [initializingSession, setInitializingSession] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const creatingSessionRef = useRef<Promise<string> | null>(null);
+  const pendingInitialMessageRef = useRef<string | null>(null);
 
   const transport = useMemo(() => {
     if (!sessionId) return undefined;
@@ -95,6 +97,36 @@ export function ChatApp() {
   const chatLocked = Boolean(courseState?.output.courseStructured);
   const showCourseToggle = chatLocked;
 
+  const ensureSessionId = useCallback(async () => {
+    if (sessionId) return sessionId;
+    if (creatingSessionRef.current) return creatingSessionRef.current;
+
+    const promise = (async () => {
+      const response = await fetch('/api/chat/session', { method: 'POST' });
+      if (!response.ok) {
+        throw new Error('We were unable to start a new chat. Please try again.');
+      }
+
+      const data = await response.json();
+      setSessionError(null);
+      setSessionId(data.sessionId);
+      router.replace(`/chat?session=${data.sessionId}`);
+      return data.sessionId;
+    })();
+
+    creatingSessionRef.current = promise;
+
+    try {
+      const id = await promise;
+      return id;
+    } catch (error) {
+      setSessionError('We were unable to start a new chat. Please try again.');
+      throw error;
+    } finally {
+      creatingSessionRef.current = null;
+    }
+  }, [router, sessionId]);
+
   useEffect(() => {
     scrollContainerRef.current = document.getElementById(
       'app-scroll-container',
@@ -123,7 +155,7 @@ export function ChatApp() {
     let cancelled = false;
 
     async function ensureSession() {
-      const existingSessionId = searchParams.get('session');
+      const existingSessionId = sessionParam;
 
       if (existingSessionId) {
         const response = await fetch(`/api/chat/session?sessionId=${existingSessionId}`);
@@ -145,18 +177,6 @@ export function ChatApp() {
         return;
       }
 
-      const response = await fetch('/api/chat/session', { method: 'POST' });
-      if (!response.ok) {
-        setSessionError('We were unable to start a new chat. Please try again.');
-        setInitializingSession(false);
-        return;
-      }
-
-      const data = await response.json();
-      if (cancelled) return;
-
-      setSessionId(data.sessionId);
-      router.replace(`/chat?session=${data.sessionId}${promptParam ? `&prompt=${encodeURIComponent(promptParam)}` : ''}`);
       setInitializingSession(false);
     }
 
@@ -165,25 +185,48 @@ export function ChatApp() {
     return () => {
       cancelled = true;
     };
-  }, [router, searchParams, setMessages, promptParam]);
+  }, [sessionParam, setMessages]);
 
   const sendMessageWithSession = useCallback(
     (text: string) => {
-      if (!sessionId || chatLocked) return;
+      if (chatLocked) return;
+      if (!sessionId) {
+        pendingInitialMessageRef.current = text;
+        ensureSessionId().catch(() => {
+          pendingInitialMessageRef.current = null;
+        });
+        return;
+      }
       sendMessage({ text });
     },
-    [sendMessage, sessionId, chatLocked],
+    [chatLocked, ensureSessionId, sendMessage, sessionId],
   );
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (sessionId) return;
     if (hasSentInitialPromptRef.current) return;
     if (!promptParam || promptParam.trim().length === 0) return;
+    if (chatLocked) return;
 
     hasSentInitialPromptRef.current = true;
-    sendMessageWithSession(promptParam);
-    router.replace(`/chat?session=${sessionId}`);
-  }, [router, sessionId, promptParam, sendMessageWithSession]);
+    pendingInitialMessageRef.current = promptParam;
+    ensureSessionId().catch(() => {
+      hasSentInitialPromptRef.current = false;
+      pendingInitialMessageRef.current = null;
+    });
+  }, [chatLocked, ensureSessionId, promptParam, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const pending = pendingInitialMessageRef.current;
+    if (!pending) return;
+    pendingInitialMessageRef.current = null;
+
+    setTimeout(() => {
+      if (chatLocked) return;
+      sendMessage({ text: pending });
+    }, 0);
+  }, [chatLocked, sendMessage, sessionId]);
 
   if (sessionError) {
     return (
@@ -204,7 +247,7 @@ export function ChatApp() {
     );
   }
 
-  if (initializingSession || !sessionId) {
+  if (initializingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
         Preparing your chat workspace...

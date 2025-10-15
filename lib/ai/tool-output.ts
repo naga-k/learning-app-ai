@@ -10,6 +10,10 @@ export type PlanToolOutput = {
   summary?: string;
   startedAt?: number;
   durationMs?: number;
+  ctaSuggestions?: {
+    label: string;
+    message: string;
+  }[];
 };
 
 export type CourseToolOutput = {

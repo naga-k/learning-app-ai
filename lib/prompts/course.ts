@@ -3,7 +3,8 @@ import type { LearningPlanWithIds } from '@/lib/curriculum';
 const courseJsonSchema = `
 {
   "overview": {
-    "focus": "string (optional)",
+    "title": "string (optional, 3-6 words capturing the course title)",
+    "description": "string (optional, short 1-2 sentence overview)",
     "totalDuration": "string (optional)"
   },
   "modules": [
