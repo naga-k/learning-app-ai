@@ -151,7 +151,6 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           if (signInError) throw signInError;
           await syncServerAuth(signInData?.session ?? null);
           router.replace('/dashboard');
-          router.refresh();
         } else {
           if (password !== confirmPassword) {
             setError('Passwords do not match.');
@@ -180,7 +179,6 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           if (data?.session) {
             await syncServerAuth(data.session);
             router.replace('/dashboard');
-            router.refresh();
           } else {
             setStatusMessage('Check your email to confirm your account.');
           }
