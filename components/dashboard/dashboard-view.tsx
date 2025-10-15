@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, type UIEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, Brain, Send } from 'lucide-react';
+import { BookOpen, Brain, LogOut, Send } from 'lucide-react';
 import type {
   DashboardCourse,
   DashboardCourseCursor,
@@ -14,6 +14,8 @@ import type {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useSidebarContent } from '@/components/dashboard/sidebar-provider';
+import { useSupabase } from '@/components/supabase-provider';
 
 type DashboardViewProps = {
   initialCourses: DashboardCourse[];
@@ -35,6 +37,7 @@ export function DashboardView({
   sessionPageSize,
 }: DashboardViewProps) {
   const router = useRouter();
+  const { supabase } = useSupabase();
   const [draftMessage, setDraftMessage] = useState('');
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [allCourses, setAllCourses] = useState<DashboardCourse[]>(() => [...initialCourses]);
@@ -50,6 +53,11 @@ export function DashboardView({
   );
   const [loadingMoreSessions, setLoadingMoreSessions] = useState(false);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
+
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  }, [router, supabase]);
 
   const handleOpenCourse = useCallback(
     (course: DashboardCourse) => {
@@ -217,6 +225,8 @@ export function DashboardView({
     [hasMoreSessions, loadMoreSessions, loadingMoreSessions],
   );
 
+  useSidebarContent(null, { width: 0 });
+
   const handleSubmit = () => {
     const trimmed = draftMessage.trim();
     if (!trimmed) return;
@@ -229,17 +239,33 @@ export function DashboardView({
     <div className="relative min-h-screen">
       <div className="px-4 pb-40 pt-10 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-          <header className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <header className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <Brain className="h-9 w-9 text-indigo-300" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 text-white shadow-[0_18px_35px_rgba(79,70,229,0.35)]">
+                  <Brain className="h-6 w-6" />
+                </div>
                 <div>
-                  <h1 className="text-3xl font-semibold text-slate-50">Learning Dashboard</h1>
-                  <p className="text-sm text-slate-400">
-                    Track every personalised course you&apos;ve generated with Course Architect.
-                  </p>
+                  <p className="text-sm font-semibold text-slate-100">Course Architect</p>
+                  <p className="text-xs text-slate-500">AI Learning Platform</p>
                 </div>
               </div>
+              <Button
+                type="button"
+                onClick={handleSignOut}
+                variant="ghost"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/10 hover:text-white"
+              >
+                <LogOut className="h-4 w-4" />
+                Log out
+              </Button>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3">
+              <h1 className="text-3xl font-semibold text-slate-50">Learning Dashboard</h1>
+              <p className="text-sm text-slate-400">
+                Track every personalised course you&apos;ve generated with Course Architect.
+              </p>
             </div>
           </header>
 

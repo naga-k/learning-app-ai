@@ -12,6 +12,9 @@ type CourseAssistantPanelProps = {
   lessonSummary?: string | null;
   lessonContent: string;
   selectionSourceRef: { current: HTMLElement | null };
+  isActive: boolean;
+  onActivate: () => void;
+  className?: string;
 };
 
 type ChatRole = "user" | "assistant";
@@ -35,6 +38,9 @@ export function CourseAssistantPanel({
   lessonSummary,
   lessonContent,
   selectionSourceRef,
+  isActive,
+  onActivate,
+  className,
 }: CourseAssistantPanelProps) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -46,7 +52,6 @@ export function CourseAssistantPanel({
   const abortRef = useRef<AbortController | null>(null);
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
@@ -138,28 +143,18 @@ export function CourseAssistantPanel({
   }, []);
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
     if (scrollAnchorRef.current) {
       scrollAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [messages, isSending]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    if (textareaRef.current) {
+      adjustTextareaHeight(textareaRef.current);
+      textareaRef.current.focus({ preventScroll: true });
+    }
+  }, [isActive]);
 
   const createMessageId = (role: ChatRole) =>
     `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -201,7 +196,7 @@ export function CourseAssistantPanel({
     setCapturedSelection(selectionPreview.text);
     setIncludeSelection(true);
     setSelectionPreview(null);
-    setIsOpen(true);
+    onActivate();
 
     const activeSelection = window.getSelection();
     if (activeSelection) {
@@ -275,7 +270,6 @@ export function CourseAssistantPanel({
     };
 
     try {
-
       const response = await fetch("/api/course-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -373,257 +367,182 @@ export function CourseAssistantPanel({
       document.body,
     );
 
-  const floatingTriggerPortal = createPortal(
-    <div className="pointer-events-none fixed bottom-5 right-5 z-[9997] sm:bottom-8 sm:right-8">
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="pointer-events-auto relative inline-flex items-center gap-2 rounded-full border border-white/15 bg-indigo-500/90 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_45px_rgba(15,23,42,0.55)] transition hover:-translate-y-0.5 hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        aria-expanded={isOpen}
-        aria-controls="course-assistant-drawer"
-      >
-        <MessageCircle className="h-4 w-4" />
-        <span className="hidden sm:inline">Lesson assistant</span>
-      </button>
-    </div>,
-    document.body,
-  );
-
-  const drawerPortal = createPortal(
-    <div
-      className={cn(
-        "fixed inset-0 z-[9998] flex justify-end transition",
-        isOpen ? "pointer-events-auto" : "pointer-events-none",
-      )}
-    >
-      <div
-        className={cn(
-          "absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-200",
-          isOpen ? "opacity-30" : "opacity-0",
-        )}
-        onClick={() => setIsOpen(false)}
-      />
-      <aside
-        id="course-assistant-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="course-assistant-title"
-        className={cn(
-          "relative flex h-full w-full max-w-lg transform-gpu transition-transform duration-300 ease-out",
-          isOpen ? "translate-x-0" : "translate-x-full",
-        )}
-      >
-        <div className="flex h-full w-full flex-col border-l border-white/10 bg-slate-950/80 shadow-[0_0_60px_-25px_rgba(15,23,42,0.85)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
-            <div className="flex items-center gap-3 text-slate-200">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-200">
-                <MessageCircle className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold" id="course-assistant-title">
-                  Course Assistant
-                </p>
-                <p className="text-xs text-slate-400">
-                  Ask questions about this lesson. Highlight text for instant context.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleClearConversation}
-                disabled={!canClearConversation}
-                className="inline-flex items-center justify-center rounded-full border border-transparent bg-white/[0.05] p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Clear assistant conversation"
-                title="Clear conversation"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="inline-flex items-center justify-center rounded-full border border-transparent bg-white/[0.05] p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                aria-label="Close assistant"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 text-sm text-slate-100">
-              {messages.length === 0 && (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-slate-300">
-                  Ask for clarifications, summaries, or tips on this lesson. Highlight a passage
-                  and capture it to give the assistant more context.
-                </div>
-              )}
-
-              {messages.map((message) => {
-                const isUser = message.role === "user";
-                return (
-                  <div
-                    key={message.id}
-                    className={cn("flex", isUser ? "justify-end" : "justify-start")}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-3 shadow-sm",
-                        isUser
-                          ? "bg-indigo-500/60 text-white"
-                          : "bg-white/[0.06] text-slate-100",
-                      )}
-                    >
-                      {isUser && message.selectionPreview && (
-                        <p className="mb-1 text-[11px] font-medium text-indigo-100/80">
-                          {`"${message.selectionPreview}"`}
-                        </p>
-                      )}
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                        {message.content}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {isSending && !hasAssistantReply && (
-                <div className="mr-auto inline-flex items-center gap-3 rounded-2xl bg-white/[0.06] px-4 py-3 text-xs text-slate-200">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Thinking...
-                </div>
-              )}
-              <div ref={scrollAnchorRef} />
-            </div>
-
-            <form
-              ref={formRef}
-              onSubmit={handleSubmit}
-              className="border-t border-white/10 bg-transparent px-4 pb-5 pt-4 sm:px-6"
-            >
-              <div className="space-y-3">
-                {capturedSelection && (
-                  <div className="mx-auto max-w-3xl rounded-2xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-50">
-                    <div className="flex items-start gap-2">
-                      <Sparkles className="mt-[2px] h-4 w-4 flex-shrink-0 text-indigo-200" />
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-200">
-                            Highlight captured
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <label className="flex items-center gap-1 text-[10px] font-medium text-indigo-100">
-                              <input
-                                type="checkbox"
-                                className="h-3 w-3 rounded border-indigo-300 bg-indigo-500/40 text-indigo-300 focus:ring-indigo-400"
-                                checked={includeSelection}
-                                onChange={(event) => setIncludeSelection(event.target.checked)}
-                                disabled={isSending}
-                              />
-                              Include in context
-                            </label>
-                            <button
-                              type="button"
-                              className="flex items-center gap-1 rounded-full bg-indigo-500/20 px-2 py-[2px] text-[10px] font-semibold text-indigo-100 transition hover:bg-indigo-500/30 disabled:opacity-60"
-                              onClick={clearCapturedSelection}
-                              disabled={isSending}
-                            >
-                              <X className="h-3 w-3" />
-                              Clear
-                            </button>
-                          </div>
-                        </div>
-                        <p className="whitespace-pre-wrap leading-snug text-indigo-100/90">
-                          {capturedSelection}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[28px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_45px_rgba(15,23,42,0.55)] backdrop-blur-xl">
-                  <textarea
-                    ref={textareaRef}
-                    value={question}
-                    onChange={(event) => {
-                      setQuestion(event.target.value);
-                      adjustTextareaHeight(event.target);
-                    }}
-                    onInput={(event) => {
-                      adjustTextareaHeight(event.target as HTMLTextAreaElement);
-                    }}
-                    placeholder="Ask about this lesson or request a quick tip..."
-                    className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-[22px] border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-60"
-                    onKeyDown={handleInputKeyDown}
-                    disabled={isSending}
-                    rows={1}
-                    style={{
-                      height: "auto",
-                      overflowY: question.split("\n").length > 4 ? "auto" : "hidden",
-                    }}
-                  />
-
-                  <button
-                    type="submit"
-                    aria-label="Send question to course assistant"
-                    disabled={isSending || (!hasQuestion && !hasSelection)}
-                    className={cn(
-                      "inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60",
-                    )}
-                  >
-                    {isSending ? (
-                      <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-
-          {error && (
-            <div className="border-t border-rose-500/40 bg-rose-500/10 px-5 py-3 text-xs text-rose-100">
-              {error}
-            </div>
-          )}
-        </div>
-      </aside>
-    </div>,
-    document.body,
+  const panelClasses = cn(
+    "flex h-full flex-col border-l border-white/10 bg-slate-950/70 text-slate-100",
+    !isActive && "hidden",
+    className,
   );
 
   return (
     <>
       {highlightButtonPortal}
-      {floatingTriggerPortal}
-      {drawerPortal}
+      <div className={panelClasses}>
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+          <div className="flex items-center gap-3 text-slate-200">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-200">
+              <MessageCircle className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Course Assistant</p>
+              <p className="text-xs text-slate-400">
+                Ask questions about this lesson. Highlight text for instant context.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearConversation}
+            disabled={!canClearConversation}
+            className="inline-flex items-center justify-center rounded-full border border-transparent bg-white/[0.05] p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Clear assistant conversation"
+            title="Clear conversation"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 text-sm text-slate-100">
+            {messages.length === 0 && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-slate-300">
+                Ask for clarifications, summaries, or tips on this lesson. Highlight a passage and
+                capture it to give the assistant more context.
+              </div>
+            )}
+
+            {messages.map((message) => {
+              const isUser = message.role === "user";
+              return (
+                <div key={message.id} className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-4 py-3 shadow-sm",
+                      isUser ? "bg-indigo-500/60 text-white" : "bg-white/[0.06] text-slate-100",
+                    )}
+                  >
+                    {isUser && message.selectionPreview && (
+                      <p className="mb-1 text-[11px] font-medium text-indigo-100/80">
+                        {`"${message.selectionPreview}"`}
+                      </p>
+                    )}
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                  </div>
+                </div>
+              );
+            })}
+
+            {isSending && !hasAssistantReply && (
+              <div className="mr-auto inline-flex items-center gap-3 rounded-2xl bg-white/[0.06] px-4 py-3 text-xs text-slate-200">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Thinking...
+              </div>
+            )}
+            <div ref={scrollAnchorRef} />
+          </div>
+
+          <form
+            ref={formRef}
+            onSubmit={handleSubmit}
+            className="border-t border-white/10 bg-transparent px-4 pb-5 pt-4 sm:px-6"
+          >
+            <div className="space-y-3">
+              {capturedSelection && (
+                <div className="mx-auto max-w-3xl rounded-2xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-50">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="mt-[2px] h-4 w-4 flex-shrink-0 text-indigo-200" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-200">
+                          Highlight captured
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-full border border-transparent bg-indigo-500/30 px-2 py-1 text-[11px] font-semibold text-indigo-50 transition hover:bg-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={clearCapturedSelection}
+                            disabled={isSending}
+                          >
+                            <X className="h-3 w-3" />
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <p className="whitespace-pre-wrap leading-snug text-indigo-100/90">
+                        {capturedSelection}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[28px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_45px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+                <textarea
+                  ref={textareaRef}
+                  value={question}
+                  onChange={(event) => {
+                    setQuestion(event.target.value);
+                    adjustTextareaHeight(event.target);
+                  }}
+                  onInput={(event) => {
+                    adjustTextareaHeight(event.target as HTMLTextAreaElement);
+                  }}
+                  placeholder="Ask about this lesson or request a quick tip..."
+                  className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-[22px] border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  onKeyDown={handleInputKeyDown}
+                  disabled={isSending}
+                  rows={1}
+                  style={{
+                    height: "auto",
+                    overflowY: question.split("\n").length > 4 ? "auto" : "hidden",
+                  }}
+                />
+
+                <button
+                  type="submit"
+                  aria-label="Send question to course assistant"
+                  disabled={isSending || (!hasQuestion && !hasSelection)}
+                  className={cn(
+                    "inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60",
+                  )}
+                >
+                  {isSending ? (
+                    <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {error && (
+          <div className="border-t border-rose-500/40 bg-rose-500/10 px-5 py-3 text-xs text-rose-100">
+            {error}
+          </div>
+        )}
+      </div>
     </>
   );
 }

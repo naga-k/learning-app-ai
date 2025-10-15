@@ -17,14 +17,27 @@ import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar';
 import {
   SidebarPortal,
   SidebarProvider,
+  useSidebarState,
 } from '@/components/dashboard/sidebar-provider';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_SIDEBAR_WIDTH = 420;
-const MIN_SIDEBAR_WIDTH = 208;
-const MAX_SIDEBAR_WIDTH = 420;
+const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 640;
 
 export default function AuthenticatedLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <SidebarProvider>
+      <AuthenticatedLayoutFrame>{children}</AuthenticatedLayoutFrame>
+    </SidebarProvider>
+  );
+}
+
+function AuthenticatedLayoutFrame({
   children,
 }: {
   children: ReactNode;
@@ -36,22 +49,29 @@ export default function AuthenticatedLayout({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
 
+  const { widthOverride } = useSidebarState();
+
+  const effectiveSidebarWidth = widthOverride ?? sidebarWidth;
+
   const layoutStyle = useMemo(
     () =>
       ({
-        '--sidebar-width': `${sidebarWidth}px`,
+        '--sidebar-width': `${effectiveSidebarWidth}px`,
       }) as CSSProperties,
-    [sidebarWidth],
+    [effectiveSidebarWidth],
   );
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (widthOverride !== null) {
+        return;
+      }
       event.preventDefault();
       startXRef.current = event.clientX;
-      startWidthRef.current = sidebarWidth;
+      startWidthRef.current = effectiveSidebarWidth;
       setIsResizing(true);
     },
-    [sidebarWidth],
+    [effectiveSidebarWidth, widthOverride],
   );
 
   useEffect(() => {
@@ -102,42 +122,40 @@ export default function AuthenticatedLayout({
   }, [pathname]);
 
   return (
-    <SidebarProvider>
+    <div
+      className="flex h-screen overflow-hidden bg-slate-950 text-slate-100"
+      style={layoutStyle}
+    >
+      <DashboardSidebar width={effectiveSidebarWidth}>
+        <SidebarPortal />
+      </DashboardSidebar>
+
       <div
-        className="flex h-screen overflow-hidden bg-slate-950 text-slate-100"
-        style={layoutStyle}
+        role="separator"
+        aria-orientation="vertical"
+        aria-valuenow={Math.round(sidebarWidth)}
+        aria-valuemin={MIN_SIDEBAR_WIDTH}
+        aria-valuemax={MAX_SIDEBAR_WIDTH}
+        onPointerDown={handlePointerDown}
+        className={cn(
+          'relative z-10 hidden h-screen w-1 cursor-col-resize md:flex md:items-center md:justify-center',
+          isResizing
+            ? 'bg-indigo-500/40'
+            : 'bg-transparent hover:bg-slate-700/40',
+        )}
       >
-        <DashboardSidebar width={sidebarWidth}>
-          <SidebarPortal />
-        </DashboardSidebar>
+        <span className="pointer-events-none h-12 w-px rounded-full bg-slate-700" />
+      </div>
 
+      <div className="relative flex flex-1 flex-col">
         <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-valuenow={Math.round(sidebarWidth)}
-          aria-valuemin={MIN_SIDEBAR_WIDTH}
-          aria-valuemax={MAX_SIDEBAR_WIDTH}
-          onPointerDown={handlePointerDown}
-          className={cn(
-            'relative z-10 hidden h-screen w-1 cursor-col-resize md:flex md:items-center md:justify-center',
-            isResizing
-              ? 'bg-indigo-500/40'
-              : 'bg-transparent hover:bg-slate-700/40',
-          )}
+          ref={contentRef}
+          id="app-scroll-container"
+          className="flex flex-1 flex-col overflow-y-auto"
         >
-          <span className="pointer-events-none h-12 w-px rounded-full bg-slate-700" />
-        </div>
-
-        <div className="relative flex flex-1 flex-col">
-          <div
-            ref={contentRef}
-            id="app-scroll-container"
-            className="flex flex-1 flex-col overflow-y-auto"
-          >
-            {children}
-          </div>
+          {children}
         </div>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }
