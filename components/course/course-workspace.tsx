@@ -40,7 +40,14 @@ export function CourseWorkspace({
   >(() => {
     const summaryExists = Boolean(summary?.trim());
     const resourcesExist = (course.resources?.length ?? 0) > 0;
-    return summaryExists || resourcesExist ? "overview" : "lesson";
+    const overviewDetailsExist =
+      Boolean(course.overview?.title?.trim()) ||
+      Boolean(course.overview?.description?.trim()) ||
+      Boolean(course.overview?.focus?.trim()) ||
+      Boolean(course.overview?.totalDuration?.trim());
+    return summaryExists || resourcesExist || overviewDetailsExist
+      ? "overview"
+      : "lesson";
   });
 
   useEffect(() => {
@@ -51,12 +58,31 @@ export function CourseWorkspace({
     setActiveSubmoduleId(firstModule.submodules[0]?.id ?? "");
     const summaryExists = Boolean(summary?.trim());
     const resourcesExist = (course.resources?.length ?? 0) > 0;
-    setViewMode(summaryExists || resourcesExist ? "overview" : "lesson");
+    const overviewDetailsExist =
+      Boolean(course.overview?.title?.trim()) ||
+      Boolean(course.overview?.description?.trim()) ||
+      Boolean(course.overview?.focus?.trim()) ||
+      Boolean(course.overview?.totalDuration?.trim());
+    setViewMode(
+      summaryExists || resourcesExist || overviewDetailsExist
+        ? "overview"
+        : "lesson",
+    );
   }, [course, summary]);
 
   const hasCourseSummary = Boolean(summary?.trim());
   const hasResources = (course.resources?.length ?? 0) > 0;
-  const hasOverviewContent = hasCourseSummary || hasResources;
+  const overviewTitle =
+    course.overview?.title?.trim() ??
+    course.overview?.focus?.trim() ??
+    "";
+  const overviewDescription = course.overview?.description?.trim() ?? "";
+  const hasOverviewDetails =
+    Boolean(overviewTitle) ||
+    Boolean(overviewDescription) ||
+    Boolean(course.overview?.totalDuration?.trim());
+  const hasOverviewContent =
+    hasCourseSummary || hasResources || hasOverviewDetails;
   const conclusion = course.conclusion;
   const hasConclusion =
     Boolean(conclusion?.summary?.trim()) ||
@@ -256,8 +282,13 @@ export function CourseWorkspace({
                   Course Overview
                 </p>
                 <h1 className="text-2xl font-semibold text-white md:text-[2rem]">
-                  {course.overview?.focus ?? "Your personalized learning path"}
+                  {overviewTitle || "Your personalized learning path"}
                 </h1>
+                {overviewDescription && (
+                  <p className="text-sm text-slate-400">
+                    <Linkify text={overviewDescription} />
+                  </p>
+                )}
                 {course.overview?.totalDuration && (
                   <p className="text-sm text-slate-400">
                     Estimated total time: {course.overview.totalDuration}
@@ -346,13 +377,23 @@ export function CourseWorkspace({
 
               {course.overview && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {course.overview.focus && (
+                  {overviewTitle && (
                     <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
                       <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
-                        Primary Focus
+                        Course Title
                       </h3>
                       <p className="mt-3 whitespace-pre-line">
-                        <Linkify text={course.overview.focus ?? ""} />
+                        <Linkify text={overviewTitle} />
+                      </p>
+                    </div>
+                  )}
+                  {overviewDescription && (
+                    <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
+                        Course Summary
+                      </h3>
+                      <p className="mt-3 whitespace-pre-line">
+                        <Linkify text={overviewDescription} />
                       </p>
                     </div>
                   )}

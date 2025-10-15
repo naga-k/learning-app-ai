@@ -11,6 +11,7 @@ type DashboardCourseRow = Awaited<ReturnType<typeof listCoursesForDashboard>>[nu
 export type DashboardCourse = {
   id: string;
   topic: string;
+  description: string | null;
   createdAt: string;
   sessionId: string | null;
 };
@@ -31,11 +32,28 @@ const toDashboardCourse = (
 ): { course: DashboardCourse; updatedAt: Date } => {
   const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt);
   const updatedAt = row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt);
+  const description = (() => {
+    if (row.structured && typeof row.structured === "object") {
+      const overview = (row.structured as { overview?: unknown }).overview;
+      if (overview && typeof overview === "object" && "description" in overview) {
+        const overviewDescription = (overview as { description?: unknown }).description;
+        if (typeof overviewDescription === "string") {
+          const trimmed = overviewDescription.trim();
+          if (trimmed.length > 0) return trimmed;
+        }
+      }
+    }
+    if (typeof row.summary === "string" && row.summary.trim().length > 0) {
+      return row.summary.trim();
+    }
+    return null;
+  })();
 
   return {
     course: {
       id: row.id,
       topic: row.title,
+      description,
       createdAt: createdAt.toISOString(),
       sessionId: row.sessionId ?? null,
     },
