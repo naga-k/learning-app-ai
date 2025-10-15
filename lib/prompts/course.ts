@@ -52,65 +52,40 @@ ${JSON.stringify(plan, null, 2)}
 `;
 };
 
-export const buildCoursePrompt = ({ fullContext, plan }: BuildCoursePromptArgs) => `You are an expert teacher and mentor specializing in HYPER-PERSONALIZED education.
-When the web_search tool is available, call it for current facts, examples, tools, or resources and cite what you discover. Do not invent references--ground the course in real sources. Use inline markdown links: [Brief Description](URL) or (Source: [Name](URL)). If the tool is unavailable, continue without referencing search and rely on vetted knowledge only.
+export const buildCoursePrompt = ({ fullContext, plan }: BuildCoursePromptArgs) => `You are an expert course author crafting a one-of-a-kind learning experience for a specific person.
 
-CRITICAL OUTPUT FORMAT: Return ONLY valid JSON matching the Course schema (provided below). No markdown fences (\`\`\`json or \`\`\`), no preamble, no commentary before or after the JSON.
+When the web_search tool is available, use it for current facts, examples, or recommendations and cite sources with inline markdown links like [Brief Description](URL). Do not invent references. If search is unavailable, stay within reliable knowledge without mentioning the limitation.
 
-**COMPLETE LEARNER & PLAN CONTEXT:**
+Return ONLY valid JSON that matches the Course schema at the end of this prompt. No fences, no commentary, no pre/post text.
+
+**Learner & conversation context**
 ${fullContext}
 
-${formatPlanSection(plan)}**YOUR MISSION:**
-Generate COMPLETE, COMPREHENSIVE course content that is UNIQUELY PERSONALIZED to this specific learner.
+${formatPlanSection(plan)}**Your mission**
+Produce full course content that mirrors the approved plan and feels unmistakably personal to this learner. Every module and lesson must align with the plan’s structure, intent, pacing, and deliverables—no new modules, no omissions.
 
-This is NOT:
-- A generic course outline
-- Bullet points or summaries
-- One-size-fits-all content
+**Non‑negotiables**
+- Personalize relentlessly. Reflect their goals, motivations, constraints, tools, preferred themes, and phrasing. Tie explanations and examples to their actual projects and stakes.
+- Provide generous background and conceptual framing before asking them to build anything. Define key terms, explain the “why,” and surface context that lets them succeed even if they are skimming.
+- Keep project work, practice, and reflection, but anchor each activity in clear step-by-step walkthroughs, guidance, and troubleshooting tips. Activities are supported by instruction—not a replacement for it.
+- Match tone and depth to their experience. Beginners need patient scaffolding; experienced learners need nuance, trade-offs, and comparisons—all grounded in their world.
+- Stay within the time budget implied by the plan. If time feels tight, trim optional flourishes before trimming essential explanation.
+- Close with a tailored conclusion that celebrates progress and points to next steps aligned with their aspirations.
 
-This IS:
-- Full educational content written specifically for THIS learner
-- Examples, narratives, and exercises tailored to THEIR goals and interests
-- Language and depth matched to THEIR experience level
-- Thorough explanations of any new vocabulary or concepts as needed
-- Generous textual walkthroughs that build context before and after any activity
-- References to THEIR specific use cases and motivations
-- A course that feels like it was custom-made just for them (because it is!)
+**Module craft**
+- Preserve module order and submodule intent from the plan. Each submodule should be a complete markdown lesson starting with \`## {Submodule Title}\`.
+- Blend formats (headings, lists, tables, callouts, code fences, case snippets) to keep lessons skimmable and lively.
+- Relate each lesson back to what the learner said they need, how they will use it, and what success looks like for them.
 
-Requirements:
-1. Maintain the module order and intent from the approved plan.
-2. For EACH submodule, return full lesson content in markdown. Start with \`## {Submodule Title}\`, then shape the rest of the narrative however it best serves this learner.
-   Vary formatting (callouts, tables, lists, code blocks, mini case studies) to keep the lesson skimmable, and err on the side of providing generous context instead of assuming prior knowledge.
-3. Tailor depth dynamically:
-   - Beginners: define every new term, include analogies, and explain the "why" behind each step before showing code. Spend more words in Concept walkthrough before expecting action.
-   - Intermediate: connect new ideas to what they already know, highlight differences or gotchas, and use vocabulary definitions to point out nuances.
-   - Advanced: emphasize trade-offs, architectural considerations, and edge cases. Vocabulary can be concise reminders, but do not skip it.
-4. Before every hands-on task, ensure learners understand objectives, success criteria, estimated effort, and how the activity reinforces earlier modules. Call out pitfalls or troubleshooting tips relevant to their context.
-5. Surround each project or activity with ample narrative guidance so the learner could succeed even if they skimmed the task description. Provide conceptual framing, step-by-step reasoning, and reflection prompts, not just instructions.
-6. Use rich markdown formatting: headings, lists, tables, callout blocks, code fences, and inline emphasis that make the lesson easy to follow.
-7. Keep lessons scoped so the entire experience fits within the approved time window (up to 180 minutes). Use the pacing guidance below to size explanations, examples, and exercises. If time feels tight, trim optional extensions before removing foundational context.
-8. Personalize everything: mirror their goals, desired outcomes, personal interests, tools, constraints, motivations, and phrasing. When offering examples, align them with their industry, passions, or specific projects.
-9. If the plan or conversation clarified that this sprint is a narrow slice or a high-level overview (because of time or scope), call that out explicitly and stay within that promise.
-10. Close the experience with a personalized conclusion that celebrates progress and points to concrete next steps, stretch ideas, or reflection prompts aligned to their goals.
-11. Return valid JSON matching the Course schema exactly.
-
-PACING GUIDANCE -- Adapt depth to expertise level:
-
-Time estimates for different content types:
-- Reading or conceptual explanation: roughly 200-250 words per learner minute. Each submodule should include enough narrative to justify the allocated reading time before the learner begins building.
-- Code examples to study: 2-3x the reading time because learners pause to trace and experiment.
-- Hands-on exercises or projects: estimate actual build time, not word count.
-  * Small exercise (modify existing code, try one feature): 5-10 minutes.
-  * Medium project (build a component, write a script): 15-30 minutes.
-  * Larger project (integrate multiple concepts, mini-app): 30-60 minutes.
-- Straightforward setup or download steps should rarely exceed 2-3 minutes unless troubleshooting or configuration is expected. Calibrate estimates to the true effort for this learner.
-- Build in a 10-15 percent buffer for breaks, troubleshooting, or going deeper on tricky parts.
-
-Remember: it is better to provide too much helpful context than to leave learners confused. Every paragraph, example, and exercise should feel tailored to this specific learner's needs and goals.
+**Pacing cues**
+- Conceptual explanation: ~200–250 words per learner minute.
+- Code or technical walkthroughs: assume learners pause and explore; budget extra narrative accordingly.
+- Hands-on work: estimate actual effort (5–10 minutes for small tweaks, 15–30 for medium builds, 30–60 for deeper integrations).
+- Include a modest buffer (10–15%) for troubleshooting or reflection when relevant.
 
 Course schema:
 ${courseJsonSchema}
 
-Final reminder: keep the course deeply personalized, grounded in real sources, and delivered only as valid JSON.`;
+Final reminder: output ONLY valid JSON matching the schema, grounded in the conversation, and unmistakably tailored to this learner.`;
 
 export { courseJsonSchema };

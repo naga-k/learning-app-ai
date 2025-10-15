@@ -1,4 +1,11 @@
-import { streamText, generateText, convertToModelMessages, stepCountIs } from 'ai';
+import {
+  streamText,
+  generateText,
+  convertToModelMessages,
+  stepCountIs,
+  getToolOrDynamicToolName,
+  isToolOrDynamicToolUIPart,
+} from 'ai';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import {
@@ -13,7 +20,12 @@ import {
 import { extractJsonFromText } from '@/lib/ai/json';
 import { buildLearningPlanPrompt } from '@/lib/prompts/plan';
 import { buildCoursePrompt } from '@/lib/prompts/course';
-import { systemPrompt } from '@/lib/prompts/system';
+import {
+  planningAndDeliveryPrimer,
+  discoveryPhasePrimer,
+  personalizationPrimer,
+  systemPrompt,
+} from '@/lib/prompts/system';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { getChatSession, insertChatMessage, listChatMessages, saveCourseVersion } from '@/lib/db/operations';
 import { randomUUID } from 'crypto';
@@ -121,6 +133,35 @@ const generateJsonWithRetry = async <T>({
 
 // Allow streaming responses up to 30 seconds
 
+const createInstructionMessage = (id: string, text: string): UIMessage => ({
+  id,
+  role: 'assistant',
+  parts: [
+    {
+      type: 'text',
+      text,
+    },
+  ],
+});
+
+const hasToolOutput = (messages: UIMessage[], toolName: string): boolean =>
+  messages.some((message) => {
+    if (!message || message.role !== 'assistant') return false;
+    if (!Array.isArray(message.parts)) return false;
+
+    return message.parts.some((part) => {
+      if (!isToolOrDynamicToolUIPart(part)) return false;
+      if (getToolOrDynamicToolName(part) !== toolName) return false;
+
+      const { state, preliminary } = part as {
+        state?: string;
+        preliminary?: boolean;
+      };
+
+      return state === 'output-available' && preliminary !== true;
+    });
+  });
+
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -170,6 +211,22 @@ export async function POST(req: Request) {
   });
 
   const messages: UIMessage[] = [...historyMessages, latestUserMessage];
+
+  const planGenerated = hasToolOutput(messages, 'generate_plan');
+  const courseGenerated = hasToolOutput(messages, 'generate_course');
+
+  const instructionMessages: UIMessage[] = [
+    createInstructionMessage('primer-planning', planningAndDeliveryPrimer),
+  ];
+
+  if (!planGenerated && !courseGenerated) {
+    instructionMessages.push(
+      createInstructionMessage('primer-discovery', discoveryPhasePrimer),
+    );
+    instructionMessages.push(
+      createInstructionMessage('primer-personalization', personalizationPrimer),
+    );
+  }
 
   let latestStructuredPlan: LearningPlanWithIds | null = null;
 
@@ -245,7 +302,7 @@ Be verbose and detailed - this context is used to create a truly personalized le
         return {
           plan: planText,
           structuredPlan,
-          summary: `Created a personalized learning plan tailored to your specific goals and context. Remind them this is the roadmap—once it feels right they can say "Generate the course" for full lessons.`,
+          summary: `Plan ready—tell me if you want any tweaks or say "Generate the course."`,
           startedAt: startTime,
           durationMs: elapsedMs,
           ctaSuggestions: [
@@ -312,26 +369,26 @@ Be comprehensive - this is used to create course content that feels custom-made 
 
       if (!parsedPlan && latestStructuredPlan) parsedPlan = latestStructuredPlan;
 
-      const coursePrompt = buildCoursePrompt({
-        fullContext,
-        plan: parsedPlan,
-      });
-
       const startTime = Date.now();
 
-        try {
-          console.log('[generate_course] Calling generateText (reasoningEffort=low)...');
-          const courseObject = await generateJsonWithRetry({
-            prompt: coursePrompt,
-            model: getModel('course'),
-            tools: webSearchTools,
-            providerOptions: courseProviderOptions,
-            parse: (text) => {
-              const courseJsonText = extractJsonFromText(text);
-              const parsedCourse = JSON.parse(courseJsonText);
-              return CourseSchema.parse(parsedCourse);
-            },
-          });
+      try {
+        const coursePrompt = buildCoursePrompt({
+          fullContext,
+          plan: parsedPlan,
+        });
+
+        console.log('[generate_course] Calling generateText (reasoningEffort=low)...');
+        const courseObject = await generateJsonWithRetry({
+          prompt: coursePrompt,
+          model: getModel('course'),
+          tools: webSearchTools,
+          providerOptions: courseProviderOptions,
+          parse: (text) => {
+            const courseJsonText = extractJsonFromText(text);
+            const parsedCourse = JSON.parse(courseJsonText);
+            return CourseSchema.parse(parsedCourse);
+          },
+        });
 
         const structuredCourse = normalizeCourse(courseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);
@@ -395,9 +452,12 @@ Be comprehensive - this is used to create course content that feels custom-made 
   // ------------------------------
   // Main Agent (Primary Model)
   // ------------------------------
-  const convertibleMessages = messages.filter((message) =>
-    message.role === 'system' || message.role === 'user' || message.role === 'assistant',
-  );
+  const convertibleMessages = [
+    ...instructionMessages,
+    ...messages.filter((message) =>
+      message.role === 'system' || message.role === 'user' || message.role === 'assistant',
+    ),
+  ];
 
   const result = streamText({
     model: getModel('chat'),
