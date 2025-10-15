@@ -29,12 +29,41 @@ export default function AuthenticatedLayout({
 }: {
   children: ReactNode;
 }) {
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const pathname = usePathname();
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    pathname === '/dashboard' ? MIN_SIDEBAR_WIDTH : DEFAULT_SIDEBAR_WIDTH,
+  );
   const [isResizing, setIsResizing] = useState(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const pathname = usePathname();
+  const previousNonDashboardWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
+
+  useEffect(() => {
+    if (pathname === '/dashboard') {
+      setSidebarWidth((current) => {
+        if (current === MIN_SIDEBAR_WIDTH) {
+          return current;
+        }
+        return MIN_SIDEBAR_WIDTH;
+      });
+      return;
+    }
+
+    const targetWidth = previousNonDashboardWidthRef.current ?? DEFAULT_SIDEBAR_WIDTH;
+    setSidebarWidth((current) => {
+      if (current === targetWidth) {
+        return current;
+      }
+      return targetWidth;
+    });
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname !== '/dashboard') {
+      previousNonDashboardWidthRef.current = sidebarWidth;
+    }
+  }, [pathname, sidebarWidth]);
 
   const layoutStyle = useMemo(
     () =>
