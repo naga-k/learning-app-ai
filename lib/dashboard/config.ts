@@ -1,0 +1,2 @@
+export const DASHBOARD_SESSIONS_PAGE_SIZE = 12;
+export const DASHBOARD_COURSES_PAGE_SIZE = 9;

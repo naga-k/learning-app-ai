@@ -3,6 +3,10 @@ import { DashboardView } from '@/components/dashboard/dashboard-view';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { listDashboardCourses } from '@/lib/dashboard/courses';
 import { listDashboardSessions } from '@/lib/dashboard/sessions';
+import {
+  DASHBOARD_COURSES_PAGE_SIZE,
+  DASHBOARD_SESSIONS_PAGE_SIZE,
+} from '@/lib/dashboard/config';
 
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
@@ -14,10 +18,20 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  const [courses, sessions] = await Promise.all([
+  const [coursePage, sessionPage] = await Promise.all([
     listDashboardCourses(user.id),
     listDashboardSessions(user.id),
   ]);
 
-  return <DashboardView courses={courses} sessions={sessions} />;
+  return (
+    <DashboardView
+      initialCourses={coursePage.courses}
+      initialCourseNextCursor={coursePage.nextCursor}
+      initialCourseTotalCount={coursePage.totalCount}
+      coursePageSize={DASHBOARD_COURSES_PAGE_SIZE}
+      initialSessions={sessionPage.sessions}
+      initialNextCursor={sessionPage.nextCursor}
+      sessionPageSize={DASHBOARD_SESSIONS_PAGE_SIZE}
+    />
+  );
 }

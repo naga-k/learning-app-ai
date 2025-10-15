@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, lt, or, sql } from "drizzle-orm";
 import { db } from "./client";
 import {
   chatMessages,
@@ -126,22 +126,83 @@ export async function saveCourseVersion(params: {
   return { courseId: course.id, versionId: version.id };
 }
 
-export async function listCoursesForDashboard(userId: string) {
+type CourseCursor = {
+  updatedAt: Date | string;
+  id: string;
+};
+
+export async function listCoursesForDashboard(
+  userId: string,
+  options: { limit?: number; cursor?: CourseCursor | null } = {},
+) {
+  const limit = Math.max(1, Math.min(options.limit ?? 9, 100));
+  const cursor = options.cursor ?? null;
+
+  const baseCondition = eq(courses.userId, userId);
+  const whereClause = cursor
+    ? (() => {
+        const cursorDate =
+          cursor.updatedAt instanceof Date ? cursor.updatedAt : new Date(cursor.updatedAt);
+        const cursorCondition = or(
+          lt(courses.updatedAt, cursorDate),
+          and(eq(courses.updatedAt, cursorDate), lt(courses.id, cursor.id)),
+        );
+
+        return and(baseCondition, cursorCondition) ?? baseCondition;
+      })()
+    : baseCondition;
+
   const rows = await db
     .select({
       id: courses.id,
       title: courses.title,
       sessionId: courses.sessionId,
       createdAt: courses.createdAt,
+      updatedAt: courses.updatedAt,
     })
     .from(courses)
-    .where(eq(courses.userId, userId))
-    .orderBy(desc(courses.updatedAt));
+    .where(whereClause)
+    .orderBy(desc(courses.updatedAt), desc(courses.id))
+    .limit(limit);
 
   return rows;
 }
 
-export async function listRecentChatSessions(userId: string, limit = 5) {
+export async function countCoursesForUser(userId: string) {
+  const [{ value }] = await db
+    .select({ value: count() })
+    .from(courses)
+    .where(eq(courses.userId, userId));
+
+  return Number(value ?? 0);
+}
+
+type SessionCursor = {
+  updatedAt: Date | string;
+  id: string;
+};
+
+export async function listRecentChatSessions(
+  userId: string,
+  options: { limit?: number; cursor?: SessionCursor | null } = {},
+) {
+  const limit = Math.max(1, Math.min(options.limit ?? 5, 100));
+  const cursor = options.cursor ?? null;
+
+  const baseCondition = eq(chatSessions.userId, userId);
+  const whereClause = cursor
+    ? (() => {
+        const cursorDate =
+          cursor.updatedAt instanceof Date ? cursor.updatedAt : new Date(cursor.updatedAt);
+        const cursorCondition = or(
+          lt(chatSessions.updatedAt, cursorDate),
+          and(eq(chatSessions.updatedAt, cursorDate), lt(chatSessions.id, cursor.id)),
+        );
+
+        return and(baseCondition, cursorCondition) ?? baseCondition;
+      })()
+    : baseCondition;
+
   const sessions = await db
     .select({
       id: chatSessions.id,
@@ -152,14 +213,14 @@ export async function listRecentChatSessions(userId: string, limit = 5) {
     })
     .from(chatSessions)
     .leftJoin(courses, eq(courses.sessionId, chatSessions.id))
-    .where(eq(chatSessions.userId, userId))
+    .where(whereClause)
     .groupBy(
       chatSessions.id,
       chatSessions.title,
       chatSessions.updatedAt,
       chatSessions.createdAt,
     )
-    .orderBy(desc(chatSessions.updatedAt))
+    .orderBy(desc(chatSessions.updatedAt), desc(chatSessions.id))
     .limit(limit);
 
   return sessions;
