@@ -431,7 +431,7 @@ export function ChatPanel({
               resetTextareaHeight(event.target);
             }}
             onKeyDown={handleKeyDown}
-            disabled={status === "streaming" || isLocked}
+            disabled={isLocked}
             rows={1}
             style={{
               height: "auto",
