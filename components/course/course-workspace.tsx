@@ -268,7 +268,6 @@ export function CourseWorkspace({
               : "bg-white/[0.05]",
           )}
         >
-          {headerSlot}
           <div className="border-b border-white/10 px-5 py-5">
             <div>
               <p className="text-sm font-semibold text-slate-100">
@@ -440,7 +439,6 @@ export function CourseWorkspace({
     hasOverviewContent,
     navigationPrimaryItems,
     navigationSecondaryItems,
-    headerSlot,
     selectionSourceRef,
     sidebarOffsetTop,
     sidePanelView,
@@ -475,6 +473,7 @@ export function CourseWorkspace({
       </aside>
 
       <section className="flex flex-1 flex-col overflow-hidden bg-transparent">
+        {headerSlot}
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
           <div className="space-y-3">
             {viewMode === "overview" && (
@@ -526,6 +525,16 @@ export function CourseWorkspace({
               </>
             )}
           </div>
+          {headerSlot ? null : (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to chat
+            </button>
+          )}
         </header>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
