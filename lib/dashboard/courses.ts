@@ -11,8 +11,11 @@ type DashboardCourseRow = Awaited<ReturnType<typeof listCoursesForDashboard>>[nu
 export type DashboardCourse = {
   id: string;
   topic: string;
+  description: string | null;
   createdAt: string;
   sessionId: string | null;
+  modulesCount: number | null;
+  totalDuration: string | null;
 };
 
 export type DashboardCourseCursor = {
@@ -31,13 +34,53 @@ const toDashboardCourse = (
 ): { course: DashboardCourse; updatedAt: Date } => {
   const createdAt = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt);
   const updatedAt = row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt);
+  const structured = row.structured && typeof row.structured === "object" ? row.structured : null;
+
+  const description = (() => {
+    if (structured) {
+      const overview = (structured as { overview?: unknown }).overview;
+      if (overview && typeof overview === "object" && "description" in overview) {
+        const overviewDescription = (overview as { description?: unknown }).description;
+        if (typeof overviewDescription === "string") {
+          const trimmed = overviewDescription.trim();
+          if (trimmed.length > 0) return trimmed;
+        }
+      }
+    }
+    if (typeof row.summary === "string" && row.summary.trim().length > 0) {
+      return row.summary.trim();
+    }
+    return null;
+  })();
+
+  const modulesCount = (() => {
+    if (!structured) return null;
+    const modules = (structured as { modules?: unknown }).modules;
+    if (Array.isArray(modules)) {
+      return modules.length;
+    }
+    return null;
+  })();
+
+  const totalDuration = (() => {
+    if (!structured) return null;
+    const overview = (structured as { overview?: unknown }).overview;
+    if (!overview || typeof overview !== "object") return null;
+    const overviewDuration = (overview as { totalDuration?: unknown }).totalDuration;
+    if (typeof overviewDuration !== "string") return null;
+    const trimmed = overviewDuration.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  })();
 
   return {
     course: {
       id: row.id,
       topic: row.title,
+      description,
       createdAt: createdAt.toISOString(),
       sessionId: row.sessionId ?? null,
+      modulesCount,
+      totalDuration,
     },
     updatedAt,
   };

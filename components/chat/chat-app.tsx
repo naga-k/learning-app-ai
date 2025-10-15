@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft, BookOpen, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -12,6 +12,11 @@ import {
   isCourseToolOutput,
   type CourseToolOutput,
 } from '@/lib/ai/tool-output';
+import { useSupabase } from '@/components/supabase-provider';
+import {
+  NavigationRail,
+  type NavigationRailItem,
+} from '@/components/course/navigation-rail';
 
 type CourseSnapshot = {
   id: string;
@@ -28,6 +33,9 @@ export function ChatApp() {
   const [initializingSession, setInitializingSession] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const creatingSessionRef = useRef<Promise<string> | null>(null);
+  const pendingInitialMessageRef = useRef<string | null>(null);
+  const { supabase } = useSupabase();
 
   const transport = useMemo(() => {
     if (!sessionId) return undefined;
@@ -92,30 +100,95 @@ export function ChatApp() {
     setViewMode('course');
   }, [latestCourse]);
 
-  const chatLocked = Boolean(courseState?.output.courseStructured);
+  const courseStructured = courseState?.output.courseStructured;
+  const courseSummary = courseState?.output.course;
+  const chatLocked = Boolean(courseStructured);
   const showCourseToggle = chatLocked;
+  const showCourseWorkspace =
+    viewMode === 'course' && Boolean(courseStructured);
+
+  const handleNavigateDashboard = useCallback(() => {
+    router.push('/dashboard');
+  }, [router]);
+
+  const openCourseWorkspace = useCallback(() => {
+    setViewMode('course');
+  }, [setViewMode]);
+
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  }, [router, supabase]);
+
+  const chatPrimaryItems = useMemo<NavigationRailItem[]>(() => {
+    if (!chatLocked) {
+      return [];
+    }
+
+    return [
+      {
+        key: 'course',
+        label: 'Course',
+        icon: BookOpen,
+        onClick: openCourseWorkspace,
+        active: showCourseWorkspace,
+      },
+    ];
+  }, [chatLocked, openCourseWorkspace, showCourseWorkspace]);
+
+  const chatSecondaryItems = useMemo<NavigationRailItem[]>(
+    () => [
+      {
+        key: 'sign-out',
+        label: 'Sign out',
+        icon: LogOut,
+        onClick: handleSignOut,
+      },
+    ],
+    [handleSignOut],
+  );
+
+  const ensureSessionId = useCallback(async () => {
+    if (sessionId) return sessionId;
+    if (creatingSessionRef.current) return creatingSessionRef.current;
+
+    const promise = (async () => {
+      const response = await fetch('/api/chat/session', { method: 'POST' });
+      if (!response.ok) {
+        throw new Error('We were unable to start a new chat. Please try again.');
+      }
+
+      const data = await response.json();
+      setSessionError(null);
+      setSessionId(data.sessionId);
+      router.replace(`/chat?session=${data.sessionId}`);
+      return data.sessionId;
+    })();
+
+    creatingSessionRef.current = promise;
+
+    try {
+      const id = await promise;
+      return id;
+    } catch (error) {
+      setSessionError('We were unable to start a new chat. Please try again.');
+      throw error;
+    } finally {
+      creatingSessionRef.current = null;
+    }
+  }, [router, sessionId]);
 
   useEffect(() => {
-    scrollContainerRef.current = document.getElementById(
-      'app-scroll-container',
-    ) as HTMLDivElement | null;
-  }, []);
-
-  useEffect(() => {
+    if (viewMode !== 'chat') return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
     requestAnimationFrame(() => {
       if (!scrollContainerRef.current) return;
-      if (viewMode === 'chat') {
-        scrollContainerRef.current.scrollTo({
-          top: scrollContainerRef.current.scrollHeight,
-          behavior: 'auto',
-        });
-        return;
-      }
-
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: 'auto',
+      });
     });
   }, [messages.length, viewMode]);
 
@@ -123,7 +196,7 @@ export function ChatApp() {
     let cancelled = false;
 
     async function ensureSession() {
-      const existingSessionId = searchParams.get('session');
+      const existingSessionId = sessionParam;
 
       if (existingSessionId) {
         const response = await fetch(`/api/chat/session?sessionId=${existingSessionId}`);
@@ -145,18 +218,6 @@ export function ChatApp() {
         return;
       }
 
-      const response = await fetch('/api/chat/session', { method: 'POST' });
-      if (!response.ok) {
-        setSessionError('We were unable to start a new chat. Please try again.');
-        setInitializingSession(false);
-        return;
-      }
-
-      const data = await response.json();
-      if (cancelled) return;
-
-      setSessionId(data.sessionId);
-      router.replace(`/chat?session=${data.sessionId}${promptParam ? `&prompt=${encodeURIComponent(promptParam)}` : ''}`);
       setInitializingSession(false);
     }
 
@@ -165,25 +226,48 @@ export function ChatApp() {
     return () => {
       cancelled = true;
     };
-  }, [router, searchParams, setMessages, promptParam]);
+  }, [sessionParam, setMessages]);
 
   const sendMessageWithSession = useCallback(
     (text: string) => {
-      if (!sessionId || chatLocked) return;
+      if (chatLocked) return;
+      if (!sessionId) {
+        pendingInitialMessageRef.current = text;
+        ensureSessionId().catch(() => {
+          pendingInitialMessageRef.current = null;
+        });
+        return;
+      }
       sendMessage({ text });
     },
-    [sendMessage, sessionId, chatLocked],
+    [chatLocked, ensureSessionId, sendMessage, sessionId],
   );
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (sessionId) return;
     if (hasSentInitialPromptRef.current) return;
     if (!promptParam || promptParam.trim().length === 0) return;
+    if (chatLocked) return;
 
     hasSentInitialPromptRef.current = true;
-    sendMessageWithSession(promptParam);
-    router.replace(`/chat?session=${sessionId}`);
-  }, [router, sessionId, promptParam, sendMessageWithSession]);
+    pendingInitialMessageRef.current = promptParam;
+    ensureSessionId().catch(() => {
+      hasSentInitialPromptRef.current = false;
+      pendingInitialMessageRef.current = null;
+    });
+  }, [chatLocked, ensureSessionId, promptParam, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const pending = pendingInitialMessageRef.current;
+    if (!pending) return;
+    pendingInitialMessageRef.current = null;
+
+    setTimeout(() => {
+      if (chatLocked) return;
+      sendMessage({ text: pending });
+    }, 0);
+  }, [chatLocked, sendMessage, sessionId]);
 
   if (sessionError) {
     return (
@@ -204,7 +288,7 @@ export function ChatApp() {
     );
   }
 
-  if (initializingSession || !sessionId) {
+  if (initializingSession) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
         Preparing your chat workspace...
@@ -212,61 +296,70 @@ export function ChatApp() {
     );
   }
 
+  const headerBar = (
+    <div className="sticky top-0 z-30 flex w-full items-center justify-end gap-3 border-b border-white/5 bg-slate-950/80 px-4 py-6 backdrop-blur-xl sm:px-6">
+      {showCourseToggle ? (
+        viewMode === 'chat' ? (
+          <button
+            type="button"
+            onClick={() => setViewMode('course')}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          >
+            <BookOpen className="h-4 w-4" />
+            Open course workspace
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewMode('chat')}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to chat
+          </button>
+        )
+      ) : null}
+    </div>
+  );
+
+  if (showCourseWorkspace && courseStructured) {
+    return (
+      <div className="flex h-full w-full overflow-x-hidden text-slate-100">
+        <CourseWorkspace
+          course={courseStructured}
+          summary={courseSummary}
+          onBack={() => setViewMode('chat')}
+          headerSlot={headerBar}
+        />
+      </div>
+    );
+  }
+
   return (
-    <>
-      <header className="sticky top-0 z-10 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
-        <div className="flex w-full items-center justify-between gap-6 px-4 py-6 sm:px-6">
-          <div className="flex-1" />
-
-          {showCourseToggle ? (
-            <div className="flex items-center gap-3">
-              {viewMode === 'chat' ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setViewMode((mode) => (mode === 'course' ? 'chat' : 'course'))
-                  }
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-                >
-                  <BookOpen className="h-4 w-4" />
-                  Open course workspace
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setViewMode('chat')}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to chat
-                </button>
-              )}
-            </div>
-          ) : null}
-        </div>
-      </header>
-
-      <main className="flex flex-1 px-4 pb-10 pt-6 sm:px-6 lg:pb-12">
-        <div className="flex w-full flex-1">
-          {viewMode === 'course' && courseState?.output.courseStructured ? (
-            <div className="flex min-h-[60vh] w-full flex-1 overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
-              <CourseWorkspace
-                course={courseState.output.courseStructured}
-                summary={courseState.output.course}
-                onBack={() => setViewMode('chat')}
-                useGlobalNavigation
+    <div className="flex h-full w-full overflow-x-hidden text-slate-100">
+      <NavigationRail
+        primaryItems={chatPrimaryItems}
+        secondaryItems={chatSecondaryItems}
+        onNavigateDashboard={handleNavigateDashboard}
+      />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {headerBar}
+        <div className="flex-1 overflow-hidden">
+          <div
+            ref={scrollContainerRef}
+            className="flex h-full flex-col overflow-y-auto px-4 pb-10 pt-6 sm:px-6 lg:pb-12"
+          >
+            <div className="flex min-h-[60vh] flex-1 overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
+              <ChatPanel
+                messages={messages}
+                status={status}
+                onSendMessage={sendMessageWithSession}
+                isLocked={chatLocked}
               />
             </div>
-          ) : (
-            <ChatPanel
-              messages={messages}
-              status={status}
-              onSendMessage={sendMessageWithSession}
-              isLocked={chatLocked}
-            />
-          )}
+          </div>
         </div>
-      </main>
-    </>
+      </div>
+    </div>
   );
 }

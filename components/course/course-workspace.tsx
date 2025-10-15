@@ -1,18 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  Brain,
   ChevronDown,
   ChevronRight,
   Flag,
-  LayoutDashboard,
   List,
-  LogOut,
+  LogOut as LogOutIcon,
   MessageCircle,
   Settings,
 } from "lucide-react";
@@ -21,21 +26,26 @@ import { cn, sanitizeUrl } from "@/lib/utils";
 import { MarkdownContent, MarkdownInline } from "./markdown-content";
 import { Linkify } from "./linkify";
 import { CourseAssistantPanel } from "@/components/course/course-assistant-panel";
-import { useSidebarContent } from "@/components/dashboard/sidebar-provider";
 import { useSupabase } from "@/components/supabase-provider";
+import {
+  NavigationRail,
+  type NavigationRailItem,
+} from "@/components/course/navigation-rail";
 
 type CourseWorkspaceProps = {
   course: CourseWithIds;
   summary?: string;
   onBack: () => void;
-  useGlobalNavigation?: boolean;
+  sidebarOffsetTop?: number;
+  headerSlot?: ReactNode;
 };
 
 export function CourseWorkspace({
   course,
   summary,
   onBack,
-  useGlobalNavigation = false,
+  sidebarOffsetTop = 0,
+  headerSlot,
 }: CourseWorkspaceProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -53,7 +63,14 @@ export function CourseWorkspace({
   >(() => {
     const summaryExists = Boolean(summary?.trim());
     const resourcesExist = (course.resources?.length ?? 0) > 0;
-    return summaryExists || resourcesExist ? "overview" : "lesson";
+    const overviewDetailsExist =
+      Boolean(course.overview?.title?.trim()) ||
+      Boolean(course.overview?.description?.trim()) ||
+      Boolean(course.overview?.focus?.trim()) ||
+      Boolean(course.overview?.totalDuration?.trim());
+    return summaryExists || resourcesExist || overviewDetailsExist
+      ? "overview"
+      : "lesson";
   });
   const [sidePanelView, setSidePanelView] = useState<
     "modules" | "assistant" | "settings"
@@ -79,12 +96,21 @@ export function CourseWorkspace({
     const summaryExists = Boolean(summary?.trim());
     const resourcesExist = (course.resources?.length ?? 0) > 0;
     setViewMode(summaryExists || resourcesExist ? "overview" : "lesson");
-    setSidePanelView("modules");
   }, [course, summary]);
 
   const hasCourseSummary = Boolean(summary?.trim());
   const hasResources = (course.resources?.length ?? 0) > 0;
-  const hasOverviewContent = hasCourseSummary || hasResources;
+  const overviewTitle =
+    course.overview?.title?.trim() ??
+    course.overview?.focus?.trim() ??
+    "";
+  const overviewDescription = course.overview?.description?.trim() ?? "";
+  const hasOverviewDetails =
+    Boolean(overviewTitle) ||
+    Boolean(overviewDescription) ||
+    Boolean(course.overview?.totalDuration?.trim());
+  const hasOverviewContent =
+    hasCourseSummary || hasResources || hasOverviewDetails;
   const conclusion = course.conclusion;
   const hasConclusion =
     Boolean(conclusion?.summary?.trim()) ||
@@ -186,13 +212,28 @@ export function CourseWorkspace({
         ? conclusionContentRef
         : lessonContentRef;
 
-  const navigationContent = useMemo(() => {
-    const primaryItems = [
-      { key: "modules", label: "Modules", icon: List },
-      { key: "assistant", label: "Assistant", icon: MessageCircle },
-    ] as const;
+  const navigationPrimaryItems = useMemo<NavigationRailItem[]>(
+    () => [
+      {
+        key: "modules",
+        label: "Modules",
+        icon: List,
+        onClick: () => setSidePanelView("modules"),
+        active: sidePanelView === "modules",
+      },
+      {
+        key: "assistant",
+        label: "Assistant",
+        icon: MessageCircle,
+        onClick: () => setSidePanelView("assistant"),
+        active: sidePanelView === "assistant",
+      },
+    ],
+    [sidePanelView],
+  );
 
-    const secondaryItems = [
+  const navigationSecondaryItems = useMemo<NavigationRailItem[]>(
+    () => [
       {
         key: "settings",
         label: "Settings",
@@ -203,73 +244,27 @@ export function CourseWorkspace({
       {
         key: "sign-out",
         label: "Sign out",
-        icon: LogOut,
+        icon: LogOutIcon,
         onClick: handleSignOut,
       },
-    ] as const;
+    ],
+    [handleSignOut],
+  );
 
+  const panelHeight = useMemo(
+    () => `calc(100vh - ${sidebarOffsetTop}px)`,
+    [sidebarOffsetTop],
+  );
+
+  const navigationContent = useMemo(() => {
     return (
       <div className="flex h-full w-full">
-        <div className="flex h-full w-20 flex-col justify-between border-r border-white/10 bg-white/[0.04] py-6">
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 shadow-[0_18px_35px_rgba(79,70,229,0.35)]">
-              <Brain className="h-6 w-6 text-white" />
-              <span className="sr-only">Course Architect</span>
-            </div>
-          <div className="flex flex-col items-center gap-4">
-            <button
-              type="button"
-              onClick={handleNavigateDashboard}
-              className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium text-slate-400 transition hover:text-slate-100"
-            >
-              <LayoutDashboard className="h-5 w-5" />
-              <span className="text-[11px] tracking-tight">Dashboard</span>
-            </button>
-              {primaryItems.map(({ key, label, icon: Icon }) => {
-                const isItemActive = sidePanelView === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSidePanelView(key)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition",
-                      isItemActive
-                        ? "bg-white/15 text-white"
-                        : "text-slate-400 hover:text-slate-100",
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-[11px] tracking-tight">
-                    {label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()}
-                  </span>
-                </button>
-              );
-            })}
-            </div>
-          </div>
-          <div className="flex flex-col items-center gap-4">
-            {secondaryItems.map(({ key, label, icon: Icon, onClick, disabled }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={onClick}
-                disabled={disabled}
-                className={cn(
-                  "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition hover:text-slate-100",
-                  disabled
-                    ? "cursor-not-allowed text-slate-500 opacity-40 hover:text-slate-500"
-                    : "text-slate-500",
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-[11px] tracking-tight">
-                  {label.charAt(0).toUpperCase() + label.slice(1).toLowerCase()}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <NavigationRail
+          primaryItems={navigationPrimaryItems}
+          secondaryItems={navigationSecondaryItems}
+          onNavigateDashboard={handleNavigateDashboard}
+          offsetTop={sidebarOffsetTop}
+        />
         <div
           className={cn(
             "flex flex-1 flex-col overflow-hidden backdrop-blur-xl",
@@ -305,7 +300,7 @@ export function CourseWorkspace({
 
           <div className="flex-1 overflow-hidden">
             {sidePanelView === "modules" && (
-              <nav className="flex h-full flex-col overflow-y-auto px-3 py-4">
+              <nav className="flex h-full flex-col px-3 py-4">
                 {hasOverviewContent && (
                   <div className="mb-4">
                     <button
@@ -445,15 +440,15 @@ export function CourseWorkspace({
     course.modules,
     handleActivateAssistant,
     handleNavigateDashboard,
-    handleSignOut,
     hasConclusion,
     hasOverviewContent,
+    navigationPrimaryItems,
+    navigationSecondaryItems,
     selectionSourceRef,
+    sidebarOffsetTop,
     sidePanelView,
     viewMode,
   ]);
-
-  useSidebarContent(useGlobalNavigation ? navigationContent : undefined);
 
   if (!activeModule || !activeSubmodule) {
     return (
@@ -478,18 +473,25 @@ export function CourseWorkspace({
 
   return (
     <div
-      className={cn(
-        "flex h-full w-full overflow-hidden text-slate-100",
-        useGlobalNavigation ? "flex-col" : "flex-row",
-      )}
+      className="flex h-full w-full overflow-x-hidden text-slate-100"
+      style={{ height: panelHeight }}
     >
-      {!useGlobalNavigation && (
-        <aside className="flex h-full w-72 shrink-0 flex-col border-r border-white/10 bg-slate-950/70 md:w-[18.5rem]">
-          {navigationContent}
-        </aside>
-      )}
+      <aside
+        className="flex h-full shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/70"
+        style={{
+          flex: "0 0 calc((100% - 5rem) / 3 + 5rem)",
+          minWidth: "18rem",
+          height: panelHeight,
+        }}
+      >
+        {navigationContent}
+      </aside>
 
-      <section className="flex flex-1 flex-col overflow-hidden bg-transparent">
+      <section
+        className="flex flex-1 flex-col overflow-hidden bg-transparent"
+        style={{ height: panelHeight }}
+      >
+        {headerSlot}
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
           <div className="space-y-3">
             {viewMode === "overview" && (
@@ -498,8 +500,13 @@ export function CourseWorkspace({
                   Course Overview
                 </p>
                 <h1 className="text-2xl font-semibold text-white md:text-[2rem]">
-                  {course.overview?.focus ?? "Your personalized learning path"}
+                  {overviewTitle || "Your personalized learning path"}
                 </h1>
+                {overviewDescription && (
+                  <p className="text-sm text-slate-400">
+                    <Linkify text={overviewDescription} />
+                  </p>
+                )}
                 {course.overview?.totalDuration && (
                   <p className="text-sm text-slate-400">
                     Estimated total time: {course.overview.totalDuration}
@@ -536,6 +543,16 @@ export function CourseWorkspace({
               </>
             )}
           </div>
+          {headerSlot ? null : (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to chat
+            </button>
+          )}
         </header>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -628,13 +645,23 @@ export function CourseWorkspace({
 
               {course.overview && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {course.overview.focus && (
+                  {overviewTitle && (
                     <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
                       <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
-                        Primary Focus
+                        Course Title
                       </h3>
                       <p className="mt-3 whitespace-pre-line">
-                        <Linkify text={course.overview.focus ?? ""} />
+                        <Linkify text={overviewTitle} />
+                      </p>
+                    </div>
+                  )}
+                  {overviewDescription && (
+                    <div className="rounded-[20px] border border-white/10 bg-white/[0.04] px-5 py-5 text-sm text-slate-100 shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em]">
+                        Course Summary
+                      </h3>
+                      <p className="mt-3 whitespace-pre-line">
+                        <Linkify text={overviewDescription} />
                       </p>
                     </div>
                   )}

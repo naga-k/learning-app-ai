@@ -159,8 +159,11 @@ export async function listCoursesForDashboard(
       sessionId: courses.sessionId,
       createdAt: courses.createdAt,
       updatedAt: courses.updatedAt,
+      summary: courseVersions.summary,
+      structured: courseVersions.structured,
     })
     .from(courses)
+    .leftJoin(courseVersions, eq(courseVersions.id, courses.activeVersionId))
     .where(whereClause)
     .orderBy(desc(courses.updatedAt), desc(courses.id))
     .limit(limit);
@@ -212,6 +215,7 @@ export async function listRecentChatSessions(
       hasGeneratedCourse: sql<boolean>`bool_or(${courses.id} IS NOT NULL)`,
     })
     .from(chatSessions)
+    .innerJoin(chatMessages, eq(chatMessages.sessionId, chatSessions.id))
     .leftJoin(courses, eq(courses.sessionId, chatSessions.id))
     .where(whereClause)
     .groupBy(

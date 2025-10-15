@@ -249,9 +249,19 @@ Be verbose and detailed - this context is used to create a truly personalized le
         return {
           plan: planText,
           structuredPlan,
-          summary: `Created a personalized learning plan tailored to your specific goals and context. Ask the learner if they want tweaks before generating the course.`,
+          summary: `Created a personalized learning plan tailored to your specific goals and context. Remind them this is the roadmap—once it feels right they can say "Generate the course" for full lessons.`,
           startedAt: startTime,
           durationMs: elapsedMs,
+          ctaSuggestions: [
+            {
+              label: 'Generate course',
+              message: 'Generate the course',
+            },
+            {
+              label: 'Edit the plan',
+              message: 'Can we edit the plan?',
+            },
+          ],
         };
       } catch (error) {
         console.error('[generate_plan] failed after ms:', Date.now() - startTime, error);
@@ -330,10 +340,16 @@ Be comprehensive - this is used to create course content that feels custom-made 
         const structuredCourse = normalizeCourse(courseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);
 
+        const courseTitle =
+          structuredCourse.overview?.title?.trim() ??
+          structuredCourse.overview?.focus?.trim() ??
+          structuredCourse.modules[0]?.title ??
+          'Personalised course';
+
         await saveCourseVersion({
           userId: user.id,
           sessionId,
-          title: structuredCourse.overview?.focus ?? structuredCourse.modules[0]?.title ?? 'Personalised course',
+          title: courseTitle,
           summary: courseSummary,
           structured: structuredCourse,
         });
