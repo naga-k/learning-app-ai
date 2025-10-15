@@ -15,6 +15,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   Flag,
   List,
   LogOut as LogOutIcon,
@@ -152,6 +153,7 @@ export function CourseWorkspace({
       ),
     [course.modules],
   );
+  const firstLesson = flattenedLessons[0] ?? null;
 
   const currentLessonIndex = useMemo(() => {
     if (!activeModule || !activeSubmodule) return -1;
@@ -635,6 +637,18 @@ export function CourseWorkspace({
           {viewMode === "overview" && (
             <div ref={overviewContentRef} className="space-y-8">
               <div id="course-content-top" />
+              {firstLesson && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => goToLesson(firstLesson)}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-indigo-500/20 px-4 py-2 text-xs font-semibold text-indigo-100 transition hover:bg-indigo-500/30"
+                  >
+                    Start learning
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               {hasCourseSummary && (
                 <div className="rounded-[26px] border border-white/10 bg-white/[0.02] px-6 py-6 text-sm text-slate-200 shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200">
@@ -709,9 +723,10 @@ export function CourseWorkspace({
                             href={sanitizeUrl(resource.url)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-semibold text-white hover:underline"
+                            className="inline-flex items-center gap-2 font-semibold text-white hover:underline"
                           >
                             {resource.title}
+                            <ExternalLink className="h-4 w-4" aria-hidden="true" />
                           </a>
                         ) : (
                           <span className="font-semibold text-white">{resource.title}</span>
