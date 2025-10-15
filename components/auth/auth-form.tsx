@@ -50,6 +50,8 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+const GOOGLE_AUTH_ENABLED = false;
+
 export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProps) {
   const { supabase } = useSupabase();
   const router = useRouter();
@@ -197,6 +199,11 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
   );
 
   const handleGoogleSignIn = useCallback(async () => {
+    if (!GOOGLE_AUTH_ENABLED) {
+      setError(null);
+      setStatusMessage(null);
+      return;
+    }
     setError(null);
     setStatusMessage('Redirecting to Google...');
     setActiveAction('google');
@@ -357,7 +364,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
             {isPasswordLoading || isRecoveryLoading ? 'Please wait...' : buttonLabel}
           </button>
 
-          {mode !== 'recover' && (
+          {mode !== 'recover' && GOOGLE_AUTH_ENABLED && (
             <button
               type="button"
               onClick={handleGoogleSignIn}
