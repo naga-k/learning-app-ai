@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import type { Session } from "@supabase/supabase-js";
 import { Suspense } from "react";
+import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SupabaseProvider } from "@/components/supabase-provider";
 import { SupabaseListener } from "@/components/supabase-listener";
@@ -41,6 +42,12 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className="bg-slate-950">
+      <head>
+        <Script
+          src="https://t.contentsquare.net/uxa/d8ddc464e76de.js"
+          strategy="afterInteractive"
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-950 text-slate-100 antialiased`}
       >
