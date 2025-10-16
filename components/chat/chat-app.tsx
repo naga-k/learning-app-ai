@@ -237,7 +237,13 @@ export function ChatApp() {
             (part as { result?: unknown }).result;
 
           if (!isCourseToolOutput(payload)) continue;
-          if (!payload.jobId || payload.courseStructured) continue;
+          if (!payload.jobId) continue;
+          if (
+            payload.status === "completed" ||
+            payload.status === "failed"
+          ) {
+            continue;
+          }
 
           jobIds.push({
             jobId: payload.jobId,
@@ -309,6 +315,8 @@ export function ChatApp() {
                 error?: string | null;
                 resultSummary?: string | null;
                 resultCourseStructured?: CourseToolOutput["courseStructured"] | null;
+                partialCourseStructured?: CourseToolOutput["courseStructured"] | null;
+                moduleProgress?: CourseToolOutput["moduleProgress"] | null;
                 messageContent?: UIMessage | null;
                 assistantMessageId?: string | null;
               }
@@ -341,6 +349,15 @@ export function ChatApp() {
 
             if (jobData.resultCourseStructured) {
               updates.courseStructured = jobData.resultCourseStructured;
+            }
+            if (
+              jobData.partialCourseStructured &&
+              jobData.status !== "completed"
+            ) {
+              updates.courseStructured = jobData.partialCourseStructured;
+            }
+            if (jobData.moduleProgress) {
+              updates.moduleProgress = jobData.moduleProgress;
             }
 
             if (jobData.error) {
@@ -632,6 +649,7 @@ export function ChatApp() {
           headerSlot={headerBar}
           mobileMenuExpanded={mobileMenuExpanded}
           setMobileMenuExpanded={setMobileMenuExpanded}
+          moduleProgress={courseState?.output.moduleProgress ?? null}
         />
       </div>
     );

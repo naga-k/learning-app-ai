@@ -11,6 +11,7 @@ type CourseAssistantPanelProps = {
   lessonTitle: string;
   lessonSummary?: string | null;
   lessonContent: string;
+  lessonGenerating?: boolean;
   selectionSourceRef: { current: HTMLElement | null };
   isActive: boolean;
   onActivate: () => void;
@@ -37,6 +38,7 @@ export function CourseAssistantPanel({
   lessonTitle,
   lessonSummary,
   lessonContent,
+  lessonGenerating = false,
   selectionSourceRef,
   isActive,
   onActivate,
@@ -401,6 +403,12 @@ export function CourseAssistantPanel({
 
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 text-sm text-foreground transition-colors dark:text-slate-100">
+            {lessonGenerating && (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800 animate-pulse dark:border-amber-300/40 dark:bg-amber-500/10 dark:text-amber-100">
+                Lesson content is still generating. You&apos;ll see the full details once it&apos;s
+                ready.
+              </div>
+            )}
             {messages.length === 0 && (
               <div className="rounded-2xl border border-border bg-muted px-4 py-4 text-muted-foreground transition-colors dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
                 Ask for clarifications, summaries, or tips on this lesson. Highlight a passage and

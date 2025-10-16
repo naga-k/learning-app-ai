@@ -8,6 +8,7 @@ import {
   courseVersions,
   courses,
   courseGenerationJobs,
+  courseGenerationSnapshots,
 } from "./schema";
 
 export type StoredMessage = {
@@ -154,6 +155,8 @@ export async function saveCourseVersion(params: {
 
 export type CourseGenerationJobRecord =
   typeof courseGenerationJobs.$inferSelect;
+export type CourseGenerationSnapshotRecord =
+  typeof courseGenerationSnapshots.$inferSelect;
 
 const JOB_STATUS = {
   queued: "queued",
@@ -334,6 +337,41 @@ export async function getCourseGenerationJob(params: {
     .limit(1);
 
   return job ?? null;
+}
+
+export async function upsertCourseGenerationSnapshot(params: {
+  jobId: string;
+  structuredPartial: unknown;
+  moduleProgress?: Record<string, unknown> | null;
+}) {
+  const now = new Date();
+
+  await db
+    .insert(courseGenerationSnapshots)
+    .values({
+      jobId: params.jobId,
+      structuredPartial: params.structuredPartial,
+      moduleProgress: params.moduleProgress ?? null,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: courseGenerationSnapshots.jobId,
+      set: {
+        structuredPartial: params.structuredPartial,
+        moduleProgress: params.moduleProgress ?? null,
+        updatedAt: now,
+      },
+    });
+}
+
+export async function getCourseGenerationSnapshot(jobId: string) {
+  const [snapshot] = await db
+    .select()
+    .from(courseGenerationSnapshots)
+    .where(eq(courseGenerationSnapshots.jobId, jobId))
+    .limit(1);
+
+  return snapshot ?? null;
 }
 
 type CourseCursor = {
