@@ -245,7 +245,7 @@ export function ChatPanel({
                           return (
                             <div
                               key={`${message.id}-${index}`}
-                              className="mt-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
+                              className="mt-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 transition-colors dark:text-rose-100"
                             >
                               {part.errorText ?? "Something went wrong while running the tool."}
                             </div>
@@ -283,9 +283,9 @@ export function ChatPanel({
                             return (
                               <div
                                 key={`${message.id}-${index}`}
-                                className="space-y-2.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100"
+                                className="space-y-2.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-700 transition-colors dark:text-rose-100"
                               >
-                                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-200">
+                                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-600 transition-colors dark:text-rose-200">
                                   <svg
                                     className="h-4 w-4"
                                     fill="none"
@@ -301,12 +301,12 @@ export function ChatPanel({
                                   </svg>
                                   Something went wrong
                                   {typeof payload.durationMs === "number" && (
-                                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-rose-100/80">
+                                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-rose-600/80 transition-colors dark:text-rose-100/80">
                                       {formatDuration(payload.durationMs)}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm text-rose-100/90">
+                                <p className="text-sm text-rose-700 transition-colors dark:text-rose-100/90">
                                   {payload.errorMessage}
                                 </p>
                               </div>
@@ -363,7 +363,7 @@ export function ChatPanel({
                                 onSendMessage(messageText);
                               }}
                               disabled={status === "streaming" || !messageText}
-                              className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold uppercase tracking-wide text-foreground transition hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10 dark:focus:ring-indigo-500 dark:focus:ring-offset-slate-950"
+                              className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground px-3 py-1 text-xs font-semibold uppercase tracking-wide text-background transition hover:bg-foreground/90 hover:text-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10 dark:focus:ring-indigo-500 dark:focus:ring-offset-slate-950"
                             >
                               {cta.label}
                             </button>
