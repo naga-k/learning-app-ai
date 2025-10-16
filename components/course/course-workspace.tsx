@@ -23,6 +23,7 @@ import {
   MessageCircle,
   Settings,
   X,
+  Loader2,
 } from "lucide-react";
 import { CourseWithIds } from "@/lib/curriculum";
 import { cn, sanitizeUrl } from "@/lib/utils";
@@ -35,6 +36,12 @@ import {
   type NavigationRailItem,
 } from "@/components/course/navigation-rail";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import type { CourseModuleProgress } from "@/lib/ai/tool-output";
+
+type ModuleProgressEntry =
+  NonNullable<CourseModuleProgress["modules"]>[number];
+type ModuleProgressSubentry =
+  ModuleProgressEntry["submodules"][number];
 
 type CourseWorkspaceProps = {
   course: CourseWithIds;
@@ -44,6 +51,7 @@ type CourseWorkspaceProps = {
   headerSlot?: ReactNode;
   mobileMenuExpanded?: boolean;
   setMobileMenuExpanded?: (expanded: boolean | ((prev: boolean) => boolean)) => void;
+  moduleProgress?: CourseModuleProgress | null;
 };
 
 export function CourseWorkspace({
@@ -54,12 +62,16 @@ export function CourseWorkspace({
   headerSlot,
   mobileMenuExpanded: externalMobileMenuExpanded,
   setMobileMenuExpanded: externalSetMobileMenuExpanded,
+  moduleProgress,
 }: CourseWorkspaceProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
   const lessonContentRef = useRef<HTMLDivElement | null>(null);
   const overviewContentRef = useRef<HTMLDivElement | null>(null);
   const conclusionContentRef = useRef<HTMLDivElement | null>(null);
+  const hasInitializedRef = useRef(false);
+  const activeModuleIdRef = useRef<string>(course.modules[0]?.moduleId ?? "");
+  const activeSubmoduleIdRef = useRef<string>(course.modules[0]?.submodules[0]?.id ?? "");
   const [activeModuleId, setActiveModuleId] = useState<string>(
     course.modules[0]?.moduleId ?? "",
   );
@@ -149,6 +161,14 @@ export function CourseWorkspace({
   }, []);
 
   useEffect(() => {
+    activeModuleIdRef.current = activeModuleId;
+  }, [activeModuleId]);
+
+  useEffect(() => {
+    activeSubmoduleIdRef.current = activeSubmoduleId;
+  }, [activeSubmoduleId]);
+
+  useEffect(() => {
     if (isResizing) {
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
@@ -171,11 +191,45 @@ export function CourseWorkspace({
     const firstModule = course.modules[0];
     if (!firstModule) return;
 
-    setActiveModuleId(firstModule.moduleId);
-    setActiveSubmoduleId(firstModule.submodules[0]?.id ?? "");
-    const summaryExists = Boolean(summary?.trim());
-    const resourcesExist = (course.resources?.length ?? 0) > 0;
-    setViewMode(summaryExists || resourcesExist ? "overview" : "lesson");
+    const previousModuleId = activeModuleIdRef.current;
+    const moduleExists = previousModuleId
+      ? course.modules.some((module) => module.moduleId === previousModuleId)
+      : false;
+    const nextModuleId = moduleExists ? previousModuleId : firstModule.moduleId;
+
+    if (nextModuleId !== activeModuleIdRef.current) {
+      activeModuleIdRef.current = nextModuleId;
+      setActiveModuleId(nextModuleId);
+    }
+
+    const moduleForSubmodule =
+      course.modules.find((module) => module.moduleId === nextModuleId) ?? firstModule;
+
+    const previousSubmoduleId = activeSubmoduleIdRef.current;
+    const submoduleExists = previousSubmoduleId
+      ? moduleForSubmodule.submodules.some((submodule) => submodule.id === previousSubmoduleId)
+      : false;
+    const nextSubmoduleId = submoduleExists
+      ? previousSubmoduleId
+      : moduleForSubmodule.submodules[0]?.id ?? "";
+
+    if (nextSubmoduleId !== activeSubmoduleIdRef.current) {
+      activeSubmoduleIdRef.current = nextSubmoduleId;
+      setActiveSubmoduleId(nextSubmoduleId);
+    }
+
+    if (!hasInitializedRef.current) {
+      const summaryExists = Boolean(summary?.trim());
+      const resourcesExist = (course.resources?.length ?? 0) > 0;
+      const overviewDetailsExist =
+        Boolean(course.overview?.title?.trim()) ||
+        Boolean(course.overview?.description?.trim()) ||
+        Boolean(course.overview?.focus?.trim()) ||
+        Boolean(course.overview?.totalDuration?.trim());
+
+      setViewMode(summaryExists || resourcesExist || overviewDetailsExist ? "overview" : "lesson");
+      hasInitializedRef.current = true;
+    }
   }, [course, summary]);
 
   const hasCourseSummary = Boolean(summary?.trim());
@@ -219,6 +273,69 @@ export function CourseWorkspace({
     (sum, courseModule) => sum + courseModule.submodules.length,
     0,
   );
+  const moduleProgressMap = useMemo(() => {
+    if (!moduleProgress?.modules) {
+      return new Map<
+        string,
+        {
+          readyCount: number;
+          totalCount: number;
+          submoduleStatus: Map<string, boolean>;
+        }
+      >();
+    }
+
+    const map = new Map<
+      string,
+      {
+        readyCount: number;
+        totalCount: number;
+        submoduleStatus: Map<string, boolean>;
+      }
+    >();
+
+    moduleProgress.modules.forEach((entry: ModuleProgressEntry) => {
+      const statusMap = new Map<string, boolean>();
+      entry.submodules?.forEach((submodule: ModuleProgressSubentry) => {
+        statusMap.set(submodule.id, Boolean(submodule.ready));
+      });
+
+      const readyCount =
+        typeof entry.readyCount === "number"
+          ? entry.readyCount
+          : Array.from(statusMap.values()).filter(Boolean).length;
+      const totalCount =
+        typeof entry.totalCount === "number"
+          ? entry.totalCount
+          : statusMap.size;
+
+      map.set(entry.moduleId, {
+        readyCount,
+        totalCount,
+        submoduleStatus: statusMap,
+      });
+    });
+
+    return map;
+  }, [moduleProgress]);
+  const readyLessonIds = useMemo(() => {
+    const set = new Set<string>();
+    moduleProgressMap.forEach((value) => {
+      value.submoduleStatus.forEach((ready, submoduleId) => {
+        if (ready) set.add(submoduleId);
+      });
+    });
+    return set;
+  }, [moduleProgressMap]);
+
+  const allLessonsReady =
+    (moduleProgress?.readySubmodules ?? totalLessons) >=
+    (moduleProgress?.totalSubmodules ?? totalLessons);
+  const activeLessonReady = useMemo(() => {
+    if (!activeSubmoduleId) return true;
+    if (readyLessonIds.size === 0) return true;
+    return readyLessonIds.has(activeSubmoduleId);
+  }, [activeSubmoduleId, readyLessonIds]);
   const flattenedLessons = useMemo(
     () =>
       course.modules.flatMap((module) =>
@@ -400,9 +517,31 @@ export function CourseWorkspace({
                   </div>
                 )}
 
+                {moduleProgress && !allLessonsReady && (
+                  <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 shadow-sm animate-pulse dark:border-amber-300/40 dark:bg-amber-500/10 dark:text-amber-100">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>
+                      Generating lessons…{" "}
+                      <span className="font-semibold">
+                        {moduleProgress.readySubmodules ?? 0} of{" "}
+                        {moduleProgress.totalSubmodules ?? totalLessons}
+                      </span>{" "}
+                      ready
+                    </span>
+                  </div>
+                )}
+
                 {course.modules.map((module) => {
                   const moduleSelected = module.moduleId === activeModuleId;
                   const isActiveModule = viewMode === "lesson" && moduleSelected;
+                  const progressDetails = moduleProgressMap.get(module.moduleId);
+                  const readyCount =
+                    progressDetails?.readyCount ?? module.submodules.length;
+                  const totalCount =
+                    progressDetails?.totalCount ?? module.submodules.length;
+                  const moduleReady = readyCount >= totalCount;
+                  const moduleGenerating = !moduleReady;
+                  const moduleInteractive = moduleReady || isActiveModule;
 
                   return (
                     <div key={module.moduleId} className="mb-3">
@@ -415,17 +554,27 @@ export function CourseWorkspace({
                           );
                           setViewMode("lesson");
                         }}
+                        disabled={!moduleInteractive}
+                        aria-disabled={!moduleInteractive}
                         className={cn(
                           "flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition",
                           isActiveModule
                             ? "border-indigo-200 bg-indigo-100 text-indigo-900 shadow-sm dark:border-indigo-400/30 dark:bg-indigo-500/20 dark:text-indigo-100 dark:shadow-[0_0_35px_rgba(79,70,229,0.35)]"
                             : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/5",
+                          moduleGenerating && "animate-pulse",
+                          !moduleInteractive &&
+                            "cursor-not-allowed border-dashed border-slate-300 bg-slate-100 text-slate-400 opacity-70 hover:border-slate-300 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-500 dark:hover:bg-white/[0.03]",
                         )}
                       >
-                        <div>
+                        <div className="flex flex-col">
                           <p className="text-sm font-semibold">
                             Module {module.order}: {module.title}
                           </p>
+                          {moduleGenerating && (
+                            <span className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-200">
+                              {readyCount} of {totalCount} lessons ready
+                            </span>
+                          )}
                         </div>
                         {isActiveModule ? (
                           <ChevronDown className="h-4 w-4 flex-shrink-0" />
@@ -434,11 +583,15 @@ export function CourseWorkspace({
                         )}
                       </button>
 
-                      {isActiveModule && (
+                      {moduleInteractive && (
                         <ul className="mt-3 space-y-1 border-l border-slate-200 pl-3 dark:border-white/10">
                           {module.submodules.map((submodule) => {
                             const submoduleActive =
                               submodule.id === activeSubmoduleId;
+                            const lessonReady =
+                              readyLessonIds.size === 0
+                                ? true
+                                : readyLessonIds.has(submodule.id);
                             return (
                               <li key={submodule.id}>
                                 <button
@@ -452,14 +605,34 @@ export function CourseWorkspace({
                                     submoduleActive
                                       ? "bg-indigo-100 font-medium text-indigo-900 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-100 dark:shadow-[0_0_25px_rgba(79,70,229,0.35)]"
                                       : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5",
+                                    !lessonReady &&
+                                      "animate-pulse cursor-wait text-slate-500 dark:text-slate-500",
                                   )}
+                                  disabled={!lessonReady}
+                                  aria-disabled={!lessonReady}
                                 >
-                                  {submodule.order}. {submodule.title}
+                                  <span className="flex items-center justify-between">
+                                    <span>
+                                      {submodule.order}. {submodule.title}
+                                    </span>
+                                    {!lessonReady && (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-200">
+                                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                                        Generating
+                                      </span>
+                                    )}
+                                  </span>
                                 </button>
                               </li>
                             );
                           })}
                         </ul>
+                      )}
+
+                      {!moduleInteractive && (
+                        <div className="mt-3 rounded-xl border border-dashed border-slate-300/70 bg-slate-100/60 p-3 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
+                          Lessons are still generating. We’ll unlock this module soon.
+                        </div>
                       )}
                     </div>
                   );
@@ -491,7 +664,8 @@ export function CourseWorkspace({
                 moduleSummary={activeModule.summary}
                 lessonTitle={activeSubmodule.title}
                 lessonSummary={activeSubmodule.summary}
-                lessonContent={activeSubmodule.content}
+                lessonContent={activeLessonReady ? activeSubmodule.content : ""}
+                lessonGenerating={!activeLessonReady}
                 selectionSourceRef={selectionSourceRef}
                 isActive={sidePanelView === "assistant"}
                 onActivate={handleActivateAssistant}
@@ -519,6 +693,12 @@ export function CourseWorkspace({
     activeSubmodule,
     activeSubmoduleId,
     course.modules,
+    moduleProgress,
+    moduleProgressMap,
+    readyLessonIds,
+    activeLessonReady,
+    allLessonsReady,
+    totalLessons,
     handleActivateAssistant,
     handleNavigateDashboard,
     hasConclusion,
@@ -781,7 +961,8 @@ export function CourseWorkspace({
                     moduleSummary={activeModule.summary}
                     lessonTitle={activeSubmodule.title}
                     lessonSummary={activeSubmodule.summary}
-                    lessonContent={activeSubmodule.content}
+                    lessonContent={activeLessonReady ? activeSubmodule.content : ""}
+                    lessonGenerating={!activeLessonReady}
                     selectionSourceRef={selectionSourceRef}
                     isActive={mobileAccordionExpanded && mobileAccordionView === "assistant"}
                     onActivate={handleActivateAssistant}
@@ -905,7 +1086,14 @@ export function CourseWorkspace({
                   )}
                   </div>
 
-                  <MarkdownContent content={activeSubmodule.content} />
+                  {activeLessonReady ? (
+                    <MarkdownContent content={activeSubmodule.content} />
+                  ) : (
+                    <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-amber-300 bg-amber-100/60 p-8 text-center text-sm font-medium text-amber-800 animate-pulse dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-100">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <p>This lesson is still generating. Hang tight!</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-3">

@@ -176,12 +176,21 @@ export function ChatPanel({
                 {renderableMessages.map((message, messageIndex) => {
                   const isUser = message.role === "user";
                   let planToolPayload: PlanToolOutput | null = null;
+                  const seenTextParts = new Set<string>();
 
                   const partNodes = (Array.isArray(message.parts) ? message.parts : []).map(
                     (part, index) => {
                       const partKey = `${message.id}-${index}`;
 
                       if (part.type === "text") {
+                        const normalizedText = (part.text ?? "").trim();
+                        if (normalizedText.length === 0) {
+                          return null;
+                        }
+                        if (seenTextParts.has(normalizedText)) {
+                          return null;
+                        }
+                        seenTextParts.add(normalizedText);
                         return (
                           <Response
                             key={`${message.id}-${index}`}

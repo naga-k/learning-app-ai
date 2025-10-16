@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { UIMessage } from 'ai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { getChatMessage, getCourseGenerationJob } from '@/lib/db/operations';
+import {
+  getChatMessage,
+  getCourseGenerationJob,
+  getCourseGenerationSnapshot,
+} from '@/lib/db/operations';
 
 export async function GET(
   _req: Request,
@@ -39,6 +43,11 @@ export async function GET(
     }
   }
 
+  const snapshot =
+    job.status === 'processing'
+      ? await getCourseGenerationSnapshot(job.id)
+      : null;
+
   return NextResponse.json({
     job: {
       id: job.id,
@@ -48,6 +57,8 @@ export async function GET(
       assistantMessageId: job.assistantMessageId,
       resultSummary: job.resultSummary,
       resultCourseStructured: job.resultCourseStructured,
+      partialCourseStructured: snapshot?.structuredPartial ?? null,
+      moduleProgress: snapshot?.moduleProgress ?? null,
       messageContent,
     },
   });

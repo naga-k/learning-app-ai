@@ -16,6 +16,22 @@ export type PlanToolOutput = {
   }[];
 };
 
+export type CourseModuleProgress = {
+  overviewReady?: boolean;
+  conclusionReady?: boolean;
+  totalSubmodules?: number;
+  readySubmodules?: number;
+  modules?: {
+    moduleId: string;
+    readyCount: number;
+    totalCount: number;
+    submodules: {
+      id: string;
+      ready: boolean;
+    }[];
+  }[];
+};
+
 export type CourseToolOutput = {
   course?: string;
   courseStructured?: CourseWithIds;
@@ -24,6 +40,7 @@ export type CourseToolOutput = {
   summary?: string;
   startedAt?: number;
   durationMs?: number;
+  moduleProgress?: CourseModuleProgress;
 };
 
 export type ToolErrorOutput = {

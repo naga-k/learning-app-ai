@@ -54,3 +54,13 @@ export const courseGenerationJobs = pgTable("course_generation_jobs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const courseGenerationSnapshots = pgTable("course_generation_snapshots", {
+  jobId: uuid("job_id")
+    .primaryKey()
+    .references(() => courseGenerationJobs.id, { onDelete: "cascade" }),
+  structuredPartial: jsonb("structured_partial").notNull(),
+  moduleProgress: jsonb("module_progress"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});

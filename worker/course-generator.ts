@@ -6,6 +6,7 @@ import {
   requeueStaleCourseGenerationJobs,
   saveCourseVersion,
   updateCourseGenerationJobHeartbeat,
+  upsertCourseGenerationSnapshot,
   type CourseGenerationJobRecord,
 } from "@/lib/db/operations";
 import { mergeCourseToolOutputIntoMessage } from "@/lib/chat/messages";
@@ -90,6 +91,7 @@ type CourseResource = z.infer<typeof CourseResourceSchema>;
 type CourseOverviewResult = z.infer<typeof CourseOverviewResultSchema>;
 type CourseSubmoduleResult = z.infer<typeof CourseSubmoduleResultSchema>;
 type CourseConclusionResult = z.infer<typeof CourseConclusionResultSchema>;
+type LearningPlanSubtopicWithIds = LearningPlanModuleWithIds["subtopics"][number];
 
 const IDLE_DELAY_MS = Number(process.env.COURSE_GENERATION_WORKER_IDLE_MS ?? "3000");
 const ERROR_DELAY_MS = Number(process.env.COURSE_GENERATION_WORKER_ERROR_MS ?? "5000");
@@ -188,6 +190,20 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
 
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
+  let assistantMessageId = job.assistantMessageId ?? null;
+
+  const getAssistantMessageId = async () => {
+    if (assistantMessageId) return assistantMessageId;
+
+    const refreshed = await getCourseGenerationJob({
+      jobId: job.id,
+      userId: job.userId,
+    });
+
+    assistantMessageId = refreshed?.assistantMessageId ?? null;
+    return assistantMessageId;
+  };
+
   try {
     await updateCourseGenerationJobHeartbeat({
       jobId: job.id,
@@ -227,18 +243,135 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
             },
           });
 
+          if (!plan) {
+            throw new Error("Plan is required for plan-driven pipeline.");
+          }
+
+          const planWithIds = plan as LearningPlanWithIds;
+          const modulesWithIds = planWithIds.modules as LearningPlanModuleWithIds[];
           const aggregatedResources: CourseResource[] = [
             ...(overviewResult.resources ?? []),
           ];
           const generatedSubmodules = new Map<string, CourseSubmoduleResult>();
           const completedLessonLabels: string[] = [];
+          const totalSubmodules = modulesWithIds.reduce(
+            (sum, moduleWithIds) => sum + moduleWithIds.subtopics.length,
+            0,
+          );
 
-          if (!plan) {
-            throw new Error("Plan is required for plan-driven pipeline.");
-          }
+          const dedupeResources = (resources: CourseResource[]) => {
+            if (resources.length === 0) return [];
 
-          for (const planModule of plan.modules) {
-            for (const subtopic of planModule.subtopics) {
+            const seen = new Set<string>();
+            const result: CourseResource[] = [];
+
+            resources.forEach((resource) => {
+              const key = `${resource.title.trim().toLowerCase()}|${(resource.url ?? "").trim().toLowerCase()}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              result.push(resource);
+            });
+
+            return result;
+          };
+
+          const publishPartialSnapshot = async ({
+            conclusionResult,
+          }: {
+            conclusionResult: CourseConclusionResult | null;
+          }) => {
+            const readySubmoduleIds = new Set(generatedSubmodules.keys());
+            const partialCourse = CourseSchema.parse({
+              overview: {
+                title: overviewResult.title,
+                description: overviewResult.description,
+                focus: overviewResult.focus ?? undefined,
+                totalDuration: planWithIds.overview.totalDuration,
+              },
+              modules: modulesWithIds.map((moduleWithIds) => {
+            const subtopicsWithIds =
+              moduleWithIds.subtopics as LearningPlanSubtopicWithIds[];
+
+                return {
+                  moduleId: moduleWithIds.id,
+                  title: moduleWithIds.title,
+                  summary: moduleWithIds.objective,
+                  submodules: subtopicsWithIds.map((subtopicWithIds) => {
+                    const subtopicId = subtopicWithIds.id;
+                    const generated = generatedSubmodules.get(subtopicId);
+                    const fallbackContent = [
+                      `## ${subtopicWithIds.title}`,
+                      "",
+                      "_This lesson is still generating. Check back shortly._",
+                    ].join("\n");
+
+                    return {
+                      id: subtopicId,
+                      title: subtopicWithIds.title,
+                      duration: subtopicWithIds.duration ?? undefined,
+                      content: generated?.content ?? fallbackContent,
+                      summary: generated?.summary ?? subtopicWithIds.description,
+                    };
+                  }),
+                };
+              }),
+              resources: dedupeResources(aggregatedResources),
+              conclusion: conclusionResult ?? undefined,
+            });
+
+            const partialWithIds = normalizeCourse(partialCourse, planWithIds);
+            const moduleProgress = {
+              overviewReady: true,
+              conclusionReady: Boolean(conclusionResult),
+              totalSubmodules,
+              readySubmodules: readySubmoduleIds.size,
+              modules: modulesWithIds.map((moduleWithIds) => {
+                const subtopicsWithIds =
+                  moduleWithIds.subtopics as LearningPlanSubtopicWithIds[];
+
+                return {
+                  moduleId: moduleWithIds.id,
+                  readyCount: subtopicsWithIds.filter((subtopicWithIds) =>
+                    readySubmoduleIds.has(subtopicWithIds.id),
+                  ).length,
+                  totalCount: subtopicsWithIds.length,
+                  submodules: subtopicsWithIds.map((subtopicWithIds) => ({
+                    id: subtopicWithIds.id,
+                    ready: readySubmoduleIds.has(subtopicWithIds.id),
+                  })),
+                };
+              }),
+            };
+
+            await upsertCourseGenerationSnapshot({
+              jobId: job.id,
+              structuredPartial: partialWithIds,
+              moduleProgress,
+            });
+
+            const messageId = await getAssistantMessageId();
+            if (messageId) {
+              await mergeCourseToolOutputIntoMessage({
+                messageId,
+                updates: {
+                  jobId: job.id,
+                  status: "processing",
+                  courseStructured: partialWithIds,
+                  course: summarizeCourseForChat(partialWithIds),
+                  summary: "Generating your personalized course…",
+                  moduleProgress,
+                },
+              });
+            }
+          };
+
+          await publishPartialSnapshot({ conclusionResult: null });
+
+          for (const planModule of modulesWithIds) {
+            const subtopicsWithIds =
+              planModule.subtopics as LearningPlanSubtopicWithIds[];
+
+            for (const subtopic of subtopicsWithIds) {
               const completionSummary = completedLessonLabels.length
                 ? completedLessonLabels
                     .map((label, index) => `${index + 1}. ${label}`)
@@ -255,7 +388,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
               const submoduleResult = await generateJsonWithRetry<CourseSubmoduleResult>({
                 prompt: buildCourseSubmodulePrompt({
                   fullContext,
-                  plan,
+                  plan: planWithIds,
                   module: planModule,
                   subtopic,
                   completedLessonsSummary: completionSummary,
@@ -275,6 +408,8 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
               }
 
               completedLessonLabels.push(`${planModule.title} — ${subtopic.title}`);
+
+              await publishPartialSnapshot({ conclusionResult: null });
             }
           }
 
@@ -293,7 +428,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
             conclusionResult = await generateJsonWithRetry<CourseConclusionResult>({
               prompt: buildCourseConclusionPrompt({
                 fullContext,
-                plan,
+                plan: planWithIds,
                 courseHighlights,
               }),
               parse: (text) => {
@@ -314,58 +449,43 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
             conclusionResult = null;
           }
 
-          const dedupedResources = (() => {
-            if (aggregatedResources.length === 0) return [];
-
-            const seen = new Set<string>();
-            const result: CourseResource[] = [];
-
-            aggregatedResources.forEach((resource) => {
-              const key = `${resource.title.trim().toLowerCase()}|${(resource.url ?? "").trim().toLowerCase()}`;
-              if (seen.has(key)) return;
-              seen.add(key);
-              result.push(resource);
-            });
-
-            return result;
-          })();
+          await publishPartialSnapshot({ conclusionResult });
 
           const validated = CourseSchema.parse({
             overview: {
               title: overviewResult.title,
               description: overviewResult.description,
               focus: overviewResult.focus ?? undefined,
-              totalDuration: plan.overview.totalDuration,
+              totalDuration: planWithIds.overview.totalDuration,
             },
-            modules: plan.modules.map((planModule) => {
-              const moduleWithIds = planModule as LearningPlanModuleWithIds;
+            modules: modulesWithIds.map((moduleWithIds) => {
+                const subtopicsWithIds =
+                  moduleWithIds.subtopics as LearningPlanSubtopicWithIds[];
 
               return {
                 moduleId: moduleWithIds.id,
                 title: moduleWithIds.title,
                 summary: moduleWithIds.objective,
-                submodules: moduleWithIds.subtopics.map((subtopic) => {
-                  const subtopicWithIds =
-                    subtopic as LearningPlanModuleWithIds["subtopics"][number];
+                submodules: subtopicsWithIds.map((subtopicWithIds) => {
                   const subtopicId = subtopicWithIds.id;
                   const generated = generatedSubmodules.get(subtopicId);
                   const fallbackContent = [
                     `## ${subtopicWithIds.title}`,
-                  "",
-                  "Content is currently unavailable. Please regenerate this lesson.",
-                ].join("\n");
+                    "",
+                    "Content is currently unavailable. Please regenerate this lesson.",
+                  ].join("\n");
 
-                return {
-                  id: subtopicId,
-                  title: subtopicWithIds.title,
-                  duration: subtopicWithIds.duration ?? undefined,
-                  content: generated?.content ?? fallbackContent,
-                  summary: generated?.summary ?? subtopicWithIds.description,
-                };
+                  return {
+                    id: subtopicId,
+                    title: subtopicWithIds.title,
+                    duration: subtopicWithIds.duration ?? undefined,
+                    content: generated?.content ?? fallbackContent,
+                    summary: generated?.summary ?? subtopicWithIds.description,
+                  };
                 }),
               };
             }),
-            resources: dedupedResources.length > 0 ? dedupedResources : undefined,
+            resources: dedupeResources(aggregatedResources),
             conclusion: conclusionResult ?? undefined,
           });
 
@@ -398,6 +518,39 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
 
     const structuredCourse = normalizeCourse(courseObject, plan ?? undefined);
     const courseSummary = summarizeCourseForChat(structuredCourse);
+    const finalModuleProgress = {
+      overviewReady: true,
+      conclusionReady: Boolean(
+        structuredCourse.conclusion &&
+          (structuredCourse.conclusion.summary ||
+            structuredCourse.conclusion.celebrationMessage ||
+            (structuredCourse.conclusion.recommendedNextSteps ?? []).length > 0 ||
+            (structuredCourse.conclusion.stretchIdeas ?? []).length > 0),
+      ),
+      totalSubmodules: structuredCourse.modules.reduce(
+        (sum, module) => sum + module.submodules.length,
+        0,
+      ),
+      readySubmodules: structuredCourse.modules.reduce(
+        (sum, module) => sum + module.submodules.length,
+        0,
+      ),
+      modules: structuredCourse.modules.map((module) => ({
+        moduleId: module.moduleId,
+        readyCount: module.submodules.length,
+        totalCount: module.submodules.length,
+        submodules: module.submodules.map((submodule) => ({
+          id: submodule.id,
+          ready: true,
+        })),
+      })),
+    };
+
+    await upsertCourseGenerationSnapshot({
+      jobId: job.id,
+      structuredPartial: structuredCourse,
+      moduleProgress: finalModuleProgress,
+    });
 
     const courseTitle =
       structuredCourse.overview?.title?.trim() ??
@@ -445,6 +598,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
           summary: `Generated your personalized course with content tailored to your specific goals and needs`,
           startedAt: startTime,
           durationMs: Date.now() - startTime,
+          moduleProgress: finalModuleProgress,
         },
       });
     }
