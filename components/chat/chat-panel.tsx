@@ -308,9 +308,34 @@ export function ChatPanel({
                             );
                           }
 
-                          if (payload && isCourseTool && isCourseToolOutput(payload)) {
-                            return null;
-                          }
+                      if (payload && isCourseTool && isCourseToolOutput(payload)) {
+                        if (payload.courseStructured) {
+                          return null;
+                        }
+
+                        const status = payload.status ?? "queued";
+                        const copy =
+                          payload.summary ??
+                          (status === "processing"
+                            ? "Course generation is in progress..."
+                            : status === "completed"
+                              ? "Course generation finished."
+                              : status === "failed"
+                                ? "Course generation failed."
+                                : "Course generation has been queued and will run shortly.");
+
+                        const showSpinner = status === "queued" || status === "processing";
+
+                        return (
+                          <div
+                            key={`${message.id}-${index}`}
+                            className="mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100"
+                          >
+                            {showSpinner ? <Loader size={16} /> : null}
+                            <span>{copy}</span>
+                          </div>
+                        );
+                      }
 
                           if (payload) {
                             return (

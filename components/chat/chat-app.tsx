@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
-import { ArrowLeft, BookOpen, ChevronDown, List, LogOut } from 'lucide-react';
+import { ArrowLeft, BookOpen, List, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -21,6 +21,12 @@ import {
 type CourseSnapshot = {
   id: string;
   output: CourseToolOutput;
+};
+
+type PendingCourseJob = {
+  jobId: string;
+  messageId: string;
+  status?: CourseToolOutput["status"];
 };
 
 export function ChatApp() {
@@ -62,6 +68,127 @@ export function ChatApp() {
 
   const [courseState, setCourseState] = useState<CourseSnapshot | null>(null);
   const courseRef = useRef<string | null>(null);
+  const courseJobPollersRef = useRef<Map<string, number>>(new Map());
+
+  const applyCourseMessageUpdate = useCallback(
+    (
+      messageId: string,
+      options:
+        | { updates: Partial<CourseToolOutput>; replacementMessage?: undefined }
+        | { updates?: undefined; replacementMessage: UIMessage },
+    ) => {
+      setMessages((prev) =>
+        prev.map((message) => {
+          if (message.id !== messageId) return message;
+
+          if ("replacementMessage" in options && options.replacementMessage) {
+            const replacement = options.replacementMessage;
+            if (Array.isArray(replacement.parts)) {
+              const coursePart = replacement.parts
+                .map((part) => {
+                  if (!isToolOrDynamicToolUIPart(part)) return null;
+                  if (getToolOrDynamicToolName(part) !== "generate_course") return null;
+                  if (part.state !== "output-available") return null;
+
+                  const payload =
+                    (part as { output?: unknown }).output ??
+                    (part as { result?: unknown }).result ??
+                    null;
+
+                  return isCourseToolOutput(payload) ? payload : null;
+                })
+                .find(Boolean) as CourseToolOutput | null | undefined;
+
+              if (coursePart?.courseStructured && courseRef.current !== messageId) {
+                courseRef.current = messageId;
+                setCourseState({ id: messageId, output: coursePart });
+                setViewMode("course");
+              }
+            }
+
+            return replacement;
+          }
+
+          if (!("updates" in options) || !options.updates) {
+            return message;
+          }
+
+          if (!Array.isArray(message.parts)) {
+            return message;
+          }
+
+          let changed = false;
+
+          const updatedParts = message.parts.map((part) => {
+            if (!isToolOrDynamicToolUIPart(part)) return part;
+            if (getToolOrDynamicToolName(part) !== "generate_course") return part;
+            if (part.state !== "output-available") return part;
+
+            const payload =
+              (part as { output?: unknown }).output ??
+              (part as { result?: unknown }).result;
+
+            if (!isCourseToolOutput(payload)) return part;
+
+            const mergedPayload: CourseToolOutput = {
+              ...payload,
+              ...options.updates,
+            };
+
+            changed = true;
+
+            if ("output" in part) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const nextPart = { ...(part as any) };
+              nextPart.output = mergedPayload;
+              return nextPart;
+            }
+
+            if ("result" in part) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const nextPart = { ...(part as any) };
+              nextPart.result = mergedPayload;
+              return nextPart;
+            }
+
+            return part;
+          });
+
+          if (!changed) {
+            return message;
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const nextMessage = { ...(message as any) };
+          nextMessage.parts = updatedParts;
+
+          const coursePayload = updatedParts
+            .map((part) => {
+              if (!isToolOrDynamicToolUIPart(part)) return null;
+              if (getToolOrDynamicToolName(part) !== "generate_course") return null;
+              if (part.state !== "output-available") return null;
+
+              const updatedPayload =
+                (part as { output?: unknown }).output ??
+                (part as { result?: unknown }).result ??
+                null;
+
+              return isCourseToolOutput(updatedPayload) ? updatedPayload : null;
+            })
+            .find(Boolean) as CourseToolOutput | null | undefined;
+
+          if (coursePayload?.courseStructured && courseRef.current !== messageId) {
+            courseRef.current = messageId;
+            setCourseState({ id: messageId, output: coursePayload });
+            setViewMode("course");
+          }
+
+          return nextMessage as UIMessage;
+        }),
+      );
+    },
+    [setMessages, setViewMode],
+  );
 
   const latestCourse = useMemo<CourseSnapshot | null>(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -92,14 +219,162 @@ export function ChatApp() {
     return null;
   }, [messages]);
 
+  const pendingCourseJobs = useMemo<PendingCourseJob[]>(
+    () =>
+      messages.flatMap((message) => {
+        if (!message?.id || !Array.isArray(message.parts)) return [];
+
+        const jobIds: PendingCourseJob[] = [];
+
+        for (const part of message.parts) {
+          if (!isToolOrDynamicToolUIPart(part)) continue;
+          if (getToolOrDynamicToolName(part) !== "generate_course") continue;
+          if (part.state !== "output-available") continue;
+
+          const payload =
+            (part as { output?: unknown }).output ??
+            (part as { result?: unknown }).result;
+
+          if (!isCourseToolOutput(payload)) continue;
+          if (!payload.jobId || payload.courseStructured) continue;
+
+          jobIds.push({
+            jobId: payload.jobId,
+            messageId: message.id,
+            status: payload.status,
+          });
+        }
+
+        return jobIds;
+      }),
+    [messages],
+  );
+
   useEffect(() => {
     if (!latestCourse) return;
+
+    const courseStructured = latestCourse.output.courseStructured;
+    if (!courseStructured) return;
+
     if (courseRef.current === latestCourse.id) return;
 
     courseRef.current = latestCourse.id;
     setCourseState(latestCourse);
     setViewMode('course');
   }, [latestCourse]);
+
+  useEffect(() => {
+    const activeJobIds = new Set(pendingCourseJobs.map((job) => job.jobId));
+    const pollers = courseJobPollersRef.current;
+
+    pollers.forEach((intervalId, jobId) => {
+      if (!activeJobIds.has(jobId)) {
+        clearInterval(intervalId);
+        pollers.delete(jobId);
+      }
+    });
+
+    pendingCourseJobs.forEach((job) => {
+      if (pollers.has(job.jobId)) {
+        return;
+      }
+
+      let cancelled = false;
+
+      const stopPolling = () => {
+        const intervalId = pollers.get(job.jobId);
+        if (intervalId) {
+          clearInterval(intervalId);
+          pollers.delete(job.jobId);
+        }
+        cancelled = true;
+      };
+
+      const poll = async () => {
+        if (cancelled) return;
+
+        try {
+          const response = await fetch(`/api/course-jobs/${job.jobId}`);
+          if (!response.ok) {
+            throw new Error(`Failed to load job status (${response.status})`);
+          }
+
+          const data = await response.json();
+          const jobData = data?.job as
+            | {
+                id: string;
+                status?: string | null;
+                summary?: string | null;
+                error?: string | null;
+                resultSummary?: string | null;
+                resultCourseStructured?: CourseToolOutput["courseStructured"] | null;
+                messageContent?: UIMessage | null;
+                assistantMessageId?: string | null;
+              }
+            | undefined;
+
+          if (!jobData || cancelled) {
+            return;
+          }
+
+          const messageId = job.messageId;
+
+          if (jobData.messageContent && messageId) {
+            applyCourseMessageUpdate(messageId, {
+              replacementMessage: jobData.messageContent,
+            });
+          } else if (jobData.status && messageId) {
+            const updates: Partial<CourseToolOutput> = {
+              status: jobData.status as CourseToolOutput["status"],
+            };
+
+            if (jobData.summary) {
+              updates.summary = jobData.summary;
+              updates.course = jobData.summary;
+            }
+
+            if (jobData.resultSummary) {
+              updates.course = jobData.resultSummary;
+              updates.summary = jobData.resultSummary;
+            }
+
+            if (jobData.resultCourseStructured) {
+              updates.courseStructured = jobData.resultCourseStructured;
+            }
+
+            if (jobData.error) {
+              updates.summary = jobData.error;
+            }
+
+            applyCourseMessageUpdate(messageId, { updates });
+          }
+
+          if (
+            jobData.status === "completed" ||
+            jobData.status === "failed"
+          ) {
+            stopPolling();
+          }
+        } catch (error) {
+          console.error("[chat] failed to poll course job", error);
+          stopPolling();
+        }
+      };
+
+      void poll();
+      const intervalId = window.setInterval(poll, 4000);
+      pollers.set(job.jobId, intervalId);
+    });
+
+    return () => {
+      pollers.forEach((intervalId, jobId) => {
+        if (!activeJobIds.has(jobId)) {
+          clearInterval(intervalId);
+          pollers.delete(jobId);
+        }
+      });
+    };
+  }, [applyCourseMessageUpdate, pendingCourseJobs]);
 
   const courseStructured = courseState?.output.courseStructured;
   const courseSummary = courseState?.output.course;
@@ -269,6 +544,16 @@ export function ChatApp() {
       sendMessage({ text: pending });
     }, 0);
   }, [chatLocked, sendMessage, sessionId]);
+
+  useEffect(
+    () => () => {
+      courseJobPollersRef.current.forEach((intervalId) => {
+        clearInterval(intervalId);
+      });
+      courseJobPollersRef.current.clear();
+    },
+    [],
+  );
 
   if (sessionError) {
     return (
