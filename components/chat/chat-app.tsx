@@ -354,11 +354,13 @@ export function ChatApp() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground transition-colors">
-      <NavigationRail
-        primaryItems={chatPrimaryItems}
-        secondaryItems={chatSecondaryItems}
-        onNavigateDashboard={handleNavigateDashboard}
-      />
+      <div className="hidden lg:flex">
+        <NavigationRail
+          primaryItems={chatPrimaryItems}
+          secondaryItems={chatSecondaryItems}
+          onNavigateDashboard={handleNavigateDashboard}
+        />
+      </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {headerBar}
         <div className="flex-1 min-h-0 overflow-hidden">

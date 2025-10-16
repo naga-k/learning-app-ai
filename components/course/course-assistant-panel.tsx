@@ -379,9 +379,7 @@ export function CourseAssistantPanel({
       <div className={panelClasses}>
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 transition-colors dark:border-white/10">
           <div className="flex items-center gap-3 text-muted-foreground dark:text-slate-200">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary dark:bg-indigo-500/20 dark:text-indigo-200">
-              <MessageCircle className="h-4 w-4" />
-            </div>
+            <MessageCircle className="h-4 w-4 text-primary dark:text-indigo-200" />
             <div>
               <p className="text-sm font-semibold text-foreground dark:text-slate-100">Course Assistant</p>
               <p className="text-xs text-muted-foreground dark:text-slate-400">

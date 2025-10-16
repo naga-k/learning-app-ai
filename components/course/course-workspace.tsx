@@ -600,49 +600,51 @@ export function CourseWorkspace({
           <>
             {mobileAccordionExpanded && (
               <div
-                className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 lg:hidden"
+                className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm transition-colors dark:bg-slate-950/60 lg:hidden"
                 onClick={() => setMobileAccordionExpanded(false)}
               />
             )}
             <div className={cn(
-              "fixed left-0 top-0 bottom-0 w-[min(85vw,400px)] z-50 bg-slate-950/98 backdrop-blur-xl border-r border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ease-out lg:hidden flex flex-col",
+              "fixed left-0 top-0 bottom-0 w-[min(85vw,400px)] z-50 border-r border-border bg-card/95 text-foreground backdrop-blur-xl transition-colors transform transition-transform duration-300 ease-out lg:hidden flex flex-col shadow-none dark:border-white/10 dark:bg-slate-950/95 dark:text-slate-100",
               mobileAccordionExpanded ? "translate-x-0" : "-translate-x-full"
             )}>
-              <div className="flex items-center justify-between border-b border-white/10 px-5 py-6">
-                <h2 className="text-lg font-semibold text-slate-100">Course Menu</h2>
+              <div className="flex items-center justify-between border-b border-border px-5 py-6 transition-colors dark:border-white/10">
+                <h2 className="text-lg font-semibold text-foreground transition-colors dark:text-slate-100">
+                  Course Menu
+                </h2>
                 <button
                   type="button"
                   onClick={() => setMobileAccordionExpanded(false)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-slate-100 transition hover:border-white/20 hover:bg-white/15"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted/70 text-foreground transition hover:bg-muted hover:text-foreground dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-white/15"
                 >
                   <X className="h-4 w-4" />
                   <span className="sr-only">Close menu</span>
                 </button>
               </div>
 
-              <div className="border-b border-white/10 px-5 py-4">
+              <div className="border-b border-border px-5 py-4 transition-colors dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => {
                     setMobileAccordionExpanded(false);
                     handleNavigateDashboard();
                   }}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/10"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-white/15"
                 >
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
+              <div className="flex items-center gap-2 border-b border-border px-5 py-3 transition-colors dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setMobileAccordionView("modules")}
                   className={cn(
                     "flex-1 rounded-full border px-3 py-2 text-sm font-semibold transition",
                     mobileAccordionView === "modules"
-                      ? "border-white/20 bg-white/10 text-slate-100"
-                      : "border-white/10 bg-transparent text-slate-300 hover:bg-white/5",
+                      ? "border-border bg-muted text-foreground dark:border-white/20 dark:bg-white/10 dark:text-slate-100"
+                      : "border-transparent text-muted-foreground hover:bg-muted/60 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5",
                   )}
                 >
                   Modules
@@ -653,8 +655,8 @@ export function CourseWorkspace({
                   className={cn(
                     "flex-1 rounded-full border px-3 py-2 text-sm font-semibold transition",
                     mobileAccordionView === "assistant"
-                      ? "border-white/20 bg-white/10 text-slate-100"
-                      : "border-white/10 bg-transparent text-slate-300 hover:bg-white/5",
+                      ? "border-border bg-muted text-foreground dark:border-white/20 dark:bg-white/10 dark:text-slate-100"
+                      : "border-transparent text-muted-foreground hover:bg-muted/60 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5",
                   )}
                 >
                   Assistant
@@ -675,8 +677,8 @@ export function CourseWorkspace({
                           className={cn(
                             "flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition",
                             viewMode === "overview"
-                              ? "border-white/20 bg-white/10 text-slate-100 shadow-[0_0_30px_rgba(129,140,248,0.35)]"
-                              : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5",
+                              ? "border-border bg-indigo-100/70 text-indigo-900 shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-slate-100 dark:shadow-[0_0_30px_rgba(129,140,248,0.35)]"
+                              : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/40 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/5",
                           )}
                         >
                           <BookOpen className="h-4 w-4 flex-shrink-0" />
@@ -701,16 +703,16 @@ export function CourseWorkspace({
                               setViewMode("lesson");
                               setMobileAccordionExpanded(false);
                             }}
-                            className={cn(
-                              "flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition",
-                              isActiveModule
-                                ? "border-indigo-400/30 bg-indigo-500/20 text-indigo-100 shadow-[0_0_35px_rgba(79,70,229,0.35)]"
-                                : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5",
-                            )}
-                          >
-                            <div>
-                              <p className="text-sm font-semibold">
-                                Module {module.order}: {module.title}
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition",
+                            isActiveModule
+                              ? "border-indigo-200 bg-indigo-100 text-indigo-900 shadow-sm dark:border-indigo-400/30 dark:bg-indigo-500/20 dark:text-indigo-100 dark:shadow-[0_0_35px_rgba(79,70,229,0.35)]"
+                              : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/40 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/5",
+                          )}
+                        >
+                          <div>
+                            <p className="text-sm font-semibold">
+                              Module {module.order}: {module.title}
                               </p>
                             </div>
                             {isActiveModule ? (
@@ -721,7 +723,7 @@ export function CourseWorkspace({
                           </button>
 
                           {isActiveModule && (
-                            <ul className="mt-3 space-y-1 border-l border-white/10 pl-3">
+                            <ul className="mt-3 space-y-1 border-l border-border pl-3 transition-colors dark:border-white/10">
                               {module.submodules.map((submodule) => {
                                 const submoduleActive =
                                   submodule.id === activeSubmoduleId;
@@ -737,8 +739,8 @@ export function CourseWorkspace({
                                       className={cn(
                                         "w-full rounded-xl px-2 py-2 text-left text-sm transition",
                                         submoduleActive
-                                          ? "bg-indigo-500/20 font-medium text-indigo-100 shadow-[0_0_25px_rgba(79,70,229,0.35)]"
-                                          : "text-slate-400 hover:bg-white/5",
+                                          ? "bg-indigo-100/80 font-medium text-indigo-900 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-100 dark:shadow-[0_0_25px_rgba(79,70,229,0.35)]"
+                                          : "text-muted-foreground hover:bg-muted/40 dark:text-slate-400 dark:hover:bg-white/5",
                                       )}
                                     >
                                       {submodule.order}. {submodule.title}
@@ -753,7 +755,7 @@ export function CourseWorkspace({
                     })}
 
                     {hasConclusion && (
-                      <div className="mt-6 border-t border-white/10 pt-4">
+                      <div className="mt-6 border-t border-border pt-4 transition-colors dark:border-white/10">
                         <button
                           type="button"
                           onClick={() => {
@@ -763,8 +765,8 @@ export function CourseWorkspace({
                           className={cn(
                             "flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition",
                             viewMode === "conclusion"
-                              ? "border-emerald-300/40 bg-emerald-500/20 text-emerald-100 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
-                              : "border-transparent text-emerald-200 hover:border-emerald-200/30 hover:bg-emerald-500/10",
+                              ? "border-emerald-200 bg-emerald-100 text-emerald-900 shadow-sm dark:border-emerald-300/40 dark:bg-emerald-500/20 dark:text-emerald-100 dark:shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+                              : "border-transparent text-emerald-600 hover:border-emerald-200 hover:bg-emerald-100/70 dark:text-emerald-200 dark:hover:border-emerald-200/30 dark:hover:bg-emerald-500/10",
                           )}
                         >
                           <Flag className="h-4 w-4 flex-shrink-0" />
