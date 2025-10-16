@@ -30,19 +30,19 @@ export function AuthPageContent() {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12 sm:px-6">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(45,54,125,0.65),_transparent_55%)] blur-[120px]" />
-      <div className="absolute inset-0 -z-20 bg-slate-950" />
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 py-12 text-foreground transition-colors sm:px-6">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.25),_transparent_55%)] blur-[120px] dark:bg-[radial-gradient(circle_at_top,_rgba(45,54,125,0.65),_transparent_55%)]" />
+      <div className="absolute inset-0 -z-20 bg-background transition-colors dark:bg-slate-950" />
 
       <div className="flex w-full max-w-5xl flex-col items-center gap-10 text-center">
         <div className="space-y-3">
-          <h1 className="text-4xl font-semibold text-white">{heroHeading}</h1>
-          <p className="text-sm text-slate-400">{heroDescription}</p>
+          <h1 className="text-4xl font-semibold text-foreground dark:text-white">{heroHeading}</h1>
+          <p className="text-sm text-muted-foreground">{heroDescription}</p>
         </div>
 
         <AuthForm onModeChange={setMode} initialMode="sign-in" />
 
-        <footer className="text-xs text-slate-500">
+        <footer className="text-xs text-muted-foreground">
           <span className="mr-2">Need help?</span>
           <Link href="mailto:hello@diffstudio.com" className="underline underline-offset-4">
             Contact support

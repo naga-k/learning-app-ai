@@ -17,6 +17,7 @@ import {
   NavigationRail,
   type NavigationRailItem,
 } from '@/components/course/navigation-rail';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 
 type CourseSnapshot = {
   id: string;
@@ -557,7 +558,7 @@ export function ChatApp() {
 
   if (sessionError) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-slate-200">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background text-foreground transition-colors">
         <p>{sessionError}</p>
         <button
           type="button"
@@ -566,7 +567,7 @@ export function ChatApp() {
             setInitializingSession(true);
             hasSentInitialPromptRef.current = false;
           }}
-          className="mt-4 rounded-full border border-white/10 px-4 py-2 text-sm text-slate-100"
+          className="mt-4 inline-flex items-center justify-center rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/10 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
         >
           Try again
         </button>
@@ -576,51 +577,54 @@ export function ChatApp() {
 
   if (initializingSession) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground transition-colors">
         Preparing your workspace...
       </div>
     );
   }
 
   const headerBar = (
-    <div className="sticky top-0 z-30 flex w-full items-center justify-between gap-3 border-b border-white/5 bg-slate-950/80 px-4 py-6 backdrop-blur-xl sm:px-6">
+    <div className="sticky top-0 z-30 flex w-full items-center justify-between gap-3 border-b border-border bg-white/70 px-4 py-6 text-foreground shadow-sm backdrop-blur-xl transition-colors sm:px-6 dark:border-white/5 dark:bg-slate-950/80 dark:text-slate-100">
       {viewMode === 'course' ? (
         <button
           type="button"
           onClick={() => setMobileMenuExpanded((prev) => !prev)}
-          className="lg:hidden inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:shadow-[0_0_30px_rgba(99,102,241,0.25)] dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950 lg:hidden"
         >
           <List className="h-4 w-4" />
           Menu
         </button>
       ) : <div />}
-      {showCourseToggle ? (
-        viewMode === 'chat' ? (
-          <button
-            type="button"
-            onClick={() => setViewMode('course')}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-          >
-            <BookOpen className="h-4 w-4" />
-            Open course workspace
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setViewMode('chat')}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-100 shadow-[0_0_30px_rgba(99,102,241,0.25)] transition hover:border-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to chat
-          </button>
-        )
-      ) : null}
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
+        {showCourseToggle ? (
+          viewMode === 'chat' ? (
+            <button
+              type="button"
+              onClick={() => setViewMode('course')}
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:shadow-[0_0_30px_rgba(99,102,241,0.25)] dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
+            >
+              <BookOpen className="h-4 w-4" />
+              Open course workspace
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setViewMode('chat')}
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:shadow-[0_0_30px_rgba(99,102,241,0.25)] dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to chat
+            </button>
+          )
+        ) : null}
+      </div>
     </div>
   );
 
   if (showCourseWorkspace && courseStructured) {
     return (
-      <div className="flex h-screen w-full overflow-x-hidden text-slate-100">
+      <div className="flex h-screen w-full overflow-x-hidden bg-background text-foreground transition-colors">
         <CourseWorkspace
           course={courseStructured}
           summary={courseSummary}
@@ -634,12 +638,14 @@ export function ChatApp() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden text-slate-100">
-      <NavigationRail
-        primaryItems={chatPrimaryItems}
-        secondaryItems={chatSecondaryItems}
-        onNavigateDashboard={handleNavigateDashboard}
-      />
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground transition-colors">
+      <div className="hidden lg:flex">
+        <NavigationRail
+          primaryItems={chatPrimaryItems}
+          secondaryItems={chatSecondaryItems}
+          onNavigateDashboard={handleNavigateDashboard}
+        />
+      </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {headerBar}
         <div className="flex-1 min-h-0 overflow-hidden">
@@ -647,7 +653,7 @@ export function ChatApp() {
             ref={scrollContainerRef}
             className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pb-10 pt-6 sm:px-6 lg:pb-12"
           >
-            <div className="flex min-h-[60vh] flex-1 overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
+            <div className="flex min-h-[60vh] flex-1 overflow-hidden rounded-[26px] border border-border bg-card transition-colors dark:border-white/8 dark:bg-white/[0.04]">
               <ChatPanel
                 messages={messages}
                 status={status}

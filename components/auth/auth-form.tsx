@@ -277,10 +277,10 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
   }, [supabase]);
 
   return (
-    <div className="w-full max-w-md space-y-6 rounded-3xl border border-white/10 bg-white/[0.03] p-8 shadow-[0_0_60px_rgba(30,64,175,0.25)] backdrop-blur-2xl">
+    <div className="w-full max-w-md space-y-6 rounded-3xl border border-border bg-card p-8 text-foreground shadow-xl transition-[color,background-color,border-color,box-shadow] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100 dark:shadow-[0_0_60px_rgba(30,64,175,0.25)]">
       <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-semibold">{heading}</h1>
-        <p className="text-sm text-slate-400">
+        <h1 className="text-2xl font-semibold text-foreground">{heading}</h1>
+        <p className="text-sm text-muted-foreground">
           {mode === 'sign-in'
             ? 'Sign in to continue designing personalized learning paths.'
             : mode === 'sign-up'
@@ -291,7 +291,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-2">
-          <label htmlFor="email" className="block text-sm font-medium text-slate-300">
+          <label htmlFor="email" className="block text-sm font-medium text-foreground">
             Email
           </label>
           <input
@@ -301,13 +301,13 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
             onChange={(event) => setEmail(event.target.value)}
             required
             autoComplete="email"
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/50"
+            className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
           />
         </div>
 
         {mode !== 'recover' && (
           <div className="space-y-2">
-            <label htmlFor="password" className="block text-sm font-medium text-slate-300">
+            <label htmlFor="password" className="block text-sm font-medium text-foreground">
               Password
             </label>
             <input
@@ -318,25 +318,25 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
               onChange={(event) => setPassword(event.target.value)}
               required
               autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/50"
+              className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
             />
             {mode === 'sign-up' && passwordRules && (
-              <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 text-left">
-                <p className="font-medium text-slate-200">Your password must:</p>
+              <div className="space-y-2 rounded-lg border border-border bg-muted px-3 py-2 text-left text-xs text-muted-foreground transition-colors dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                <p className="font-medium text-foreground dark:text-slate-200">Your password must:</p>
                 <ul className="list-disc space-y-1 pl-5 text-left">
-                  <li className={passwordRules.length ? 'text-emerald-300' : undefined}>
+                  <li className={passwordRules.length ? 'text-emerald-600 dark:text-emerald-300' : undefined}>
                     Use at least 12 characters.
                   </li>
-                  <li className={passwordRules.letter ? 'text-emerald-300' : undefined}>
+                  <li className={passwordRules.letter ? 'text-emerald-600 dark:text-emerald-300' : undefined}>
                     Include at least one letter.
                   </li>
-                  <li className={passwordRules.number ? 'text-emerald-300' : undefined}>
+                  <li className={passwordRules.number ? 'text-emerald-600 dark:text-emerald-300' : undefined}>
                     Include at least one number.
                   </li>
-                  <li className={passwordRules.special ? 'text-emerald-300' : undefined}>
+                  <li className={passwordRules.special ? 'text-emerald-600 dark:text-emerald-300' : undefined}>
                     Include at least one special character (e.g. !@#$).
                   </li>
-                  <li className={passwordRules.common ? 'text-emerald-300' : undefined}>
+                  <li className={passwordRules.common ? 'text-emerald-600 dark:text-emerald-300' : undefined}>
                     Avoid common or easily guessed phrases.
                   </li>
                 </ul>
@@ -347,7 +347,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
 
         {mode === 'sign-up' && (
           <div className="space-y-2">
-            <label htmlFor="confirm-password" className="block text-sm font-medium text-slate-300">
+            <label htmlFor="confirm-password" className="block text-sm font-medium text-foreground">
               Confirm password
             </label>
             <input
@@ -358,7 +358,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
               autoComplete="new-password"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/50"
+              className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
             />
           </div>
         )}
@@ -379,7 +379,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           <div className="text-right text-sm">
             <button
               type="button"
-              className="font-semibold text-indigo-400 hover:text-indigo-300"
+              className="font-semibold text-primary transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               onClick={() => {
                 setMode('recover');
                 setError(null);
@@ -398,7 +398,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           <button
             type="submit"
             disabled={isBusy}
-            className="w-full rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_0_25px_rgba(99,102,241,0.45)] transition hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-[0_0_25px_rgba(99,102,241,0.45)]"
           >
             {isPasswordLoading || isRecoveryLoading ? 'Please wait...' : buttonLabel}
           </button>
@@ -408,7 +408,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
               type="button"
               onClick={handleMagicLinkSignIn}
               disabled={isBusy}
-              className="w-full rounded-full border border-indigo-400/20 bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-200 transition hover:border-indigo-400/60 hover:bg-indigo-500/20 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:text-primary/80"
             >
               {isMagicLinkLoading
                 ? 'Sending magic link...'
@@ -423,7 +423,7 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isBusy}
-              className="flex w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-3 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10 dark:focus-visible:ring-offset-slate-950"
             >
               {isGoogleLoading ? (
                 'Connecting to Google...'
@@ -439,11 +439,11 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
       </form>
 
       {mode !== 'recover' ? (
-        <div className="text-center text-sm text-slate-400">
+        <div className="text-center text-sm text-muted-foreground">
           <span>{toggleModeLabel}</span>{' '}
           <button
             type="button"
-            className="font-semibold text-indigo-400 hover:text-indigo-300"
+            className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={() => {
               setMode((current) => {
                 const nextMode = current === 'sign-in' ? 'sign-up' : 'sign-in';
@@ -459,11 +459,11 @@ export function AuthForm({ initialMode = 'sign-in', onModeChange }: AuthFormProp
           </button>
         </div>
       ) : (
-        <div className="text-center text-sm text-slate-400">
+        <div className="text-center text-sm text-muted-foreground">
           <span>{toggleModeLabel}</span>{' '}
           <button
             type="button"
-            className="font-semibold text-indigo-400 hover:text-indigo-300"
+            className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={() => {
               setMode('sign-in');
               setError(null);

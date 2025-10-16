@@ -1,12 +1,19 @@
 "use client";
 
-import type { ComponentPropsWithoutRef } from "react";
+import {
+  type ComponentPropsWithoutRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import "highlight.js/styles/github-dark.css";
-import { sanitizeUrl } from "@/lib/utils";
+import "highlight.js/styles/atom-one-light.css";
+import { Check, Copy } from "lucide-react";
+import { cn, sanitizeUrl } from "@/lib/utils";
 
 type MarkdownContentProps = {
   content: string;
@@ -19,16 +26,96 @@ type MarkdownInlineProps = {
 };
 
 const baseContentClasses =
-  "prose prose-base prose-slate max-w-none text-slate-100 prose-headings:text-slate-100 prose-p:text-slate-200 prose-p:leading-6 prose-strong:text-white prose-a:text-indigo-300 prose-a:no-underline hover:prose-a:underline prose-code:text-indigo-200 prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-700 prose-ul:list-disc prose-ol:list-decimal prose-li:text-slate-200 prose-blockquote:border-l-indigo-400 prose-blockquote:bg-indigo-500/10 prose-blockquote:py-1 prose-blockquote:italic";
+  "prose prose-base max-w-none text-foreground prose-headings:text-foreground prose-p:text-muted-foreground prose-p:leading-[1.55] prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-transparent prose-pre:border-0 prose-pre:my-3 prose-pre:p-0 prose-ul:list-disc prose-ol:list-decimal prose-li:text-muted-foreground prose-blockquote:border-l-primary/40 prose-blockquote:bg-primary/10 prose-blockquote:py-1 prose-blockquote:italic dark:prose-invert dark:text-slate-100 dark:prose-strong:text-white dark:prose-code:bg-slate-800/80 dark:prose-code:text-slate-100 dark:prose-pre:bg-transparent";
 
 const sharedRemarkPlugins = [remarkGfm];
 const sharedRehypePlugins = [rehypeHighlight];
+
+const CodeBlock: Components["code"] = ({ node: _node, inline, className, children, ...props }) => {
+  const [copied, setCopied] = useState(false);
+  const [canCopy, setCanCopy] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const preRef = useRef<HTMLPreElement | null>(null);
+
+  useEffect(() => {
+    setCanCopy(typeof navigator !== "undefined" && Boolean(navigator.clipboard));
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    if (!preRef.current || typeof navigator === "undefined" || !navigator.clipboard) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(preRef.current.innerText);
+      setCopied(true);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error("Unable to copy code block", error);
+    }
+  }, []);
+
+  if (inline) {
+    return (
+      <code {...props} className={className}>
+        {children}
+      </code>
+    );
+  }
+
+  const language =
+    className
+      ?.split(" ")
+      .find((token) => token.startsWith("language-"))
+      ?.replace("language-", "") ?? "";
+  const languageLabel = language || null;
+
+  return (
+    <div className="group/code relative my-2">
+      <pre
+        ref={preRef}
+        className={cn("code-surface", className)}
+      >
+        <code {...props} className={cn(className, "bg-transparent text-inherit dark:bg-transparent dark:text-inherit")}>
+          {children}
+        </code>
+      </pre>
+      <div className="pointer-events-none absolute inset-0 rounded-xl border border-border/60 shadow-sm transition-opacity group-hover/code:opacity-100 dark:border-slate-700/60" />
+      <div className="absolute right-3 top-3 flex items-center gap-2">
+        {languageLabel ? (
+          <span className="chip-language">
+            {languageLabel.replace(/[-_]/g, " ")}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!canCopy}
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-card/90 px-2 py-1 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+          aria-label={copied ? "Code copied to clipboard" : "Copy code to clipboard"}
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          <span>{copied ? "Copied" : "Copy"}</span>
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const sharedComponents: Partial<Components> = {
   a: ({ href, ...props }: { href?: string | null } & ComponentPropsWithoutRef<"a">) => (
     // open links in a new tab and use safe rel; sanitize href
     <a href={href ? sanitizeUrl(String(href)) : href ?? undefined} {...props} target="_blank" rel="noopener noreferrer" />
   ),
+  code: CodeBlock,
 };
 
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
@@ -48,7 +135,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
 }
 
 const inlineBaseClasses =
-  "prose prose-sm prose-slate max-w-none text-slate-100 prose-p:my-0 prose-p:text-inherit prose-strong:text-white prose-a:text-indigo-300 prose-a:no-underline hover:prose-a:underline prose-code:text-indigo-200 prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded";
+  "prose prose-sm max-w-none text-foreground prose-p:my-0 prose-p:text-inherit prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded dark:prose-invert dark:text-slate-100 dark:prose-strong:text-white dark:prose-code:bg-slate-800/80 dark:prose-code:text-slate-100";
 
 export function MarkdownInline({ content, className }: MarkdownInlineProps) {
   if (!content) return null;

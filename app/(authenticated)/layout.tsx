@@ -8,7 +8,7 @@ export default function AuthenticatedLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+    <div className="flex min-h-screen bg-background text-foreground transition-colors dark:bg-slate-950 dark:text-slate-100">
       <div
         id="app-scroll-container"
         className="flex flex-1 flex-col overflow-x-hidden"

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSupabase } from '@/components/supabase-provider';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 
 type DashboardViewProps = {
   initialCourses: DashboardCourse[];
@@ -243,38 +244,41 @@ export function DashboardView({
                   <Brain className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-100">Course Architect</p>
-                  <p className="text-xs text-slate-500">AI Learning Platform</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Course Architect</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-500">AI Learning Platform</p>
                 </div>
               </div>
-              <Button
-                type="button"
-                onClick={handleSignOut}
-                variant="ghost"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/10 hover:text-white"
-              >
-                <LogOutIcon className="h-4 w-4" />
-                Log out
-              </Button>
+              <div className="flex items-center gap-3">
+                <ThemeToggle />
+                <Button
+                  type="button"
+                  onClick={handleSignOut}
+                  variant="ghost"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-200 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-100 dark:hover:bg-white/10 dark:hover:text-white"
+                >
+                  <LogOutIcon className="h-4 w-4" />
+                  Log out
+                </Button>
+              </div>
             </div>
 
             <div className="mt-8 flex flex-col gap-3">
-              <h1 className="text-3xl font-semibold text-slate-50">Learning Dashboard</h1>
-              <p className="text-sm text-slate-400">
+              <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-50">Learning Dashboard</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 Track every personalised course you&apos;ve generated with Course Architect.
               </p>
             </div>
           </header>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <Card className="border-white/10 bg-white/[0.04] p-6 text-slate-100">
+            <Card className="border-slate-200 bg-white p-6 text-slate-900 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100">
               <div className="flex items-center gap-4">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
+                <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
                   <BookOpen className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Total courses</p>
-                  <p className="text-2xl font-semibold text-slate-50">{stats.total}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Total courses</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-50">{stats.total}</p>
                 </div>
               </div>
             </Card>
@@ -282,29 +286,35 @@ export function DashboardView({
 
           <section className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-50">Your courses</h2>
-              <p className="text-sm text-slate-400">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Your courses</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 Revisit a course to continue where you left off.
               </p>
             </div>
-            <div className="h-10" />
+            {allCourses.length > 0 && (
+              <Button
+                onClick={() => router.push('/chat')}
+                className="h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 px-4 text-sm font-medium text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)]"
+              >
+                Create Lesson
+              </Button>
+            )}
           </section>
 
           {allCourses.length === 0 ? (
-            <Card className="border-white/10 bg-white/[0.04] p-16 text-center text-slate-300">
-              <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-white/[0.06] text-slate-400">
+            <Card className="border-slate-200 bg-white p-16 text-center text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+              <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400">
                 <BookOpen className="h-7 w-7" />
               </div>
-              <p className="mb-3 text-lg font-medium text-slate-100">No courses yet</p>
-              <p className="text-sm text-slate-400">
+              <p className="mb-3 text-lg font-medium text-slate-900 dark:text-slate-100">No courses yet</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 Generate your first personalised course to see it appear here.
               </p>
               <Button
                 onClick={() => router.push('/chat')}
-                variant="outline"
-                className="mt-6 border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
+                className="mt-6 h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 px-6 text-sm font-medium text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)]"
               >
-                Start building
+                Create Lesson
               </Button>
             </Card>
           ) : (
@@ -332,35 +342,35 @@ export function DashboardView({
                   return (
                     <Card
                       key={course.id}
-                      className="border-white/10 bg-white/[0.04] p-6 text-slate-100 transition hover:border-white/20 hover:bg-white/[0.06]"
+                      className="border-slate-200 bg-white p-6 text-slate-900 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-white/[0.06]"
                     >
                       <div className="mb-3">
                         <div>
-                          <h3 className="line-clamp-2 min-h-[3rem] break-words text-sm sm:text-base font-semibold leading-6 text-slate-50">
+                          <h3 className="line-clamp-2 min-h-[3rem] break-words text-sm sm:text-base font-semibold leading-6 text-slate-900 dark:text-slate-50">
                             {course.topic}
                           </h3>
                           <div className="mt-2 min-h-[3.75rem]">
                             {course.description ? (
-                              <p className="line-clamp-3 text-xs sm:text-sm leading-5 text-slate-300">
+                              <p className="line-clamp-3 text-xs sm:text-sm leading-5 text-slate-700 dark:text-slate-300">
                                 {course.description}
                               </p>
                             ) : null}
                           </div>
-                          <div className="mt-3 border-t border-white/10 pt-2">
-                            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[0.65rem] sm:text-xs text-slate-300">
+                          <div className="mt-3 border-t border-slate-200 pt-2 dark:border-white/10">
+                            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[0.65rem] sm:text-xs text-slate-700 dark:text-slate-300">
                               {modulesLabel ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 sm:px-2.5 py-1 font-medium text-slate-200">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 sm:px-2.5 py-1 font-medium text-slate-800 dark:bg-white/[0.05] dark:text-slate-200">
                                   <BookOpen className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                                   {modulesLabel}
                                 </span>
                               ) : null}
                               {durationLabel ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 sm:px-2.5 py-1 font-medium text-slate-200">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 sm:px-2.5 py-1 font-medium text-slate-800 dark:bg-white/[0.05] dark:text-slate-200">
                                 <ClockIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                                   {durationLabel}
                                 </span>
                               ) : null}
-                              <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-2 sm:px-2.5 py-1 font-medium text-slate-200">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 sm:px-2.5 py-1 font-medium text-slate-800 dark:bg-white/[0.05] dark:text-slate-200">
                                 <CalendarIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
                                 <span className="hidden xs:inline">Created </span>{createdLabel}
                               </span>
@@ -371,7 +381,7 @@ export function DashboardView({
                       <Button
                         onClick={() => handleOpenCourse(course)}
                         variant="outline"
-                        className="mt-3 w-full border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
+                        className="mt-3 w-full border-slate-300 bg-slate-50 text-slate-900 hover:!bg-slate-100 hover:!text-slate-900 dark:border-white/20 dark:bg-white/[0.02] dark:text-slate-100 dark:hover:!bg-white/10 dark:hover:!text-slate-100"
                       >
                         Open course
                       </Button>
@@ -422,15 +432,15 @@ export function DashboardView({
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-50">Recent chats</h2>
-                <p className="text-sm text-slate-400">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Recent chats</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   Jump back into a conversation to keep refining your plan.
                 </p>
               </div>
               {generatedSessions.length > 0 ? (
                 <Button
                   variant="outline"
-                  className="h-10 border-white/20 bg-white/[0.02] px-4 text-sm font-medium text-slate-100 hover:!bg-white/10 hover:!text-slate-100"
+                  className="h-10 border-slate-300 bg-slate-50 px-4 text-sm font-medium text-slate-900 hover:!bg-slate-100 hover:!text-slate-900 dark:border-white/20 dark:bg-white/[0.02] dark:text-slate-100 dark:hover:!bg-white/10 dark:hover:!text-slate-100"
                   onClick={() => setShowAllSessions((current) => !current)}
                 >
                   {showAllSessions ? 'Hide generated' : 'View generated'}
@@ -439,7 +449,7 @@ export function DashboardView({
             </div>
 
             {sessionsToDisplay.length === 0 ? (
-              <Card className="border-white/10 bg-white/[0.04] p-8 text-center text-slate-300">
+              <Card className="border-slate-200 bg-white p-8 text-center text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
                 {emptySessionsMessage}
               </Card>
             ) : (
@@ -454,12 +464,12 @@ export function DashboardView({
                     return (
                       <Card
                         key={session.id}
-                        className="border-white/10 bg-white/[0.04] p-4 text-slate-100 transition hover:border-white/20 hover:bg-white/[0.06]"
+                        className="border-slate-200 bg-white p-4 text-slate-900 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-white/[0.06]"
                       >
                         <div className="flex items-start justify-between gap-2 sm:gap-3">
                           <div className="flex min-w-0 flex-1 flex-col gap-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-sm sm:text-base font-medium text-slate-50">
+                              <h3 className="truncate text-sm sm:text-base font-medium text-slate-900 dark:text-slate-50">
                                 {session.title}
                               </h3>
                               {showGeneratedBadge ? (
@@ -468,14 +478,14 @@ export function DashboardView({
                                 </Badge>
                               ) : null}
                             </div>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-500 dark:text-slate-500">
                               Updated {new Date(session.updatedAt).toLocaleString()}
                             </p>
                           </div>
                           <Button
                             onClick={() => router.push(`/chat?session=${session.id}`)}
                             variant="outline"
-                            className="border-white/20 bg-white/[0.02] text-slate-100 hover:!bg-white/10 hover:!text-slate-100 shrink-0 text-xs sm:text-sm px-3 sm:px-4"
+                            className="border-slate-300 bg-slate-50 text-slate-900 hover:!bg-slate-100 hover:!text-slate-900 shrink-0 text-xs sm:text-sm px-3 sm:px-4 dark:border-white/20 dark:bg-white/[0.02] dark:text-slate-100 dark:hover:!bg-white/10 dark:hover:!text-slate-100"
                           >
                             Open
                           </Button>
@@ -532,10 +542,10 @@ export function DashboardView({
       </div>
 
       <div
-        className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pb-6 sm:pt-8 lg:left-[var(--sidebar-width,256px)] lg:px-8"
+        className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 sm:px-6 sm:pb-6 sm:pt-8 lg:px-8"
       >
         <div className="pointer-events-auto">
-          <div className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+          <div className="mx-auto w-full max-w-3xl rounded-3xl border border-slate-200/60 bg-white/50 p-2 shadow-lg backdrop-blur-lg dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_20px_50px_rgba(15,23,42,0.45)]">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
               <input
                 value={draftMessage}
@@ -547,7 +557,7 @@ export function DashboardView({
                   }
                 }}
                 placeholder="What should we learn next?"
-                className="w-full flex-1 rounded-full border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-400 sm:py-4"
+                className="w-full flex-1 rounded-full border border-slate-300/50 bg-white/30 px-5 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-600 transition-all focus:border-indigo-400/40 focus:bg-white/50 focus:shadow-[0_0_15px_rgba(99,102,241,0.15)] dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-indigo-400/20 dark:focus:bg-white/[0.04] sm:py-4"
               />
               <Button
                 onClick={handleSubmit}

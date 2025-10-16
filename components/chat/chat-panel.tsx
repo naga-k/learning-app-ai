@@ -158,16 +158,16 @@ export function ChatPanel({
   }, [isLocked]);
 
   return (
-    <div className="relative flex min-h-[60vh] flex-1 flex-col overflow-hidden rounded-[26px] border border-white/8 bg-white/[0.04]">
+    <div className="relative flex min-h-[60vh] flex-1 flex-col overflow-hidden rounded-[26px] border border-border bg-card transition-colors dark:border-white/8 dark:bg-white/[0.04]">
       <div className="relative flex-1 overflow-hidden">
         <Conversation className="flex h-full flex-col">
           <ConversationContent className="flex flex-1 flex-col gap-2.5 px-6 py-8 sm:px-10">
             {messages.length === 0 ? (
-              <ConversationEmptyState className="space-y-2 rounded-3xl border border-white/10 bg-white/[0.04] px-8 py-12 text-left text-slate-200 shadow-[0_0_45px_rgba(15,23,42,0.75)] backdrop-blur-xl">
-                <h3 className="text-lg font-semibold text-white">
+              <ConversationEmptyState className="space-y-2 rounded-3xl border border-border bg-muted px-8 py-12 text-left text-muted-foreground shadow-xl transition-colors backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:shadow-[0_0_45px_rgba(15,23,42,0.75)]">
+                <h3 className="text-lg font-semibold text-foreground dark:text-white">
                   Learn something new?
                 </h3>
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-muted-foreground">
                   Drop a goal, topic, or skill and we’ll map the path to get you there.
                 </p>
               </ConversationEmptyState>
@@ -185,7 +185,12 @@ export function ChatPanel({
                         return (
                           <Response
                             key={`${message.id}-${index}`}
-                            className="w-full prose-sm prose-invert max-w-none text-slate-100"
+                            className={cn(
+                              "w-full max-w-none transition-colors prose prose-sm",
+                              isUser
+                                ? "text-white prose-invert [&_p]:text-white"
+                                : "text-slate-900 [&_p]:text-slate-900 dark:prose-invert dark:text-slate-100 dark:[&_p]:text-slate-100"
+                            )}
                           >
                             {part.text}
                           </Response>
@@ -223,12 +228,12 @@ export function ChatPanel({
                             <div
                               key={`${message.id}-${index}`}
                               aria-live="polite"
-                              className="mt-2 flex items-center gap-2 text-sm text-slate-300"
+                              className="mt-2 flex items-center gap-2 text-sm text-muted-foreground transition-colors dark:text-slate-300"
                             >
                               <Loader size={16} />
                               <span className="animate-pulse">{streamingMessage}</span>
                               {elapsedLabel && (
-                                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground dark:text-slate-500">
                                   {elapsedLabel}
                                 </span>
                               )}
@@ -240,7 +245,7 @@ export function ChatPanel({
                           return (
                             <div
                               key={`${message.id}-${index}`}
-                              className="mt-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
+                              className="mt-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 transition-colors dark:text-rose-100"
                             >
                               {part.errorText ?? "Something went wrong while running the tool."}
                             </div>
@@ -278,9 +283,9 @@ export function ChatPanel({
                             return (
                               <div
                                 key={`${message.id}-${index}`}
-                                className="space-y-2.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100"
+                                className="space-y-2.5 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-700 transition-colors dark:text-rose-100"
                               >
-                                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-200">
+                                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-600 transition-colors dark:text-rose-200">
                                   <svg
                                     className="h-4 w-4"
                                     fill="none"
@@ -296,12 +301,12 @@ export function ChatPanel({
                                   </svg>
                                   Something went wrong
                                   {typeof payload.durationMs === "number" && (
-                                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-rose-100/80">
+                                    <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-rose-600/80 transition-colors dark:text-rose-100/80">
                                       {formatDuration(payload.durationMs)}
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm text-rose-100/90">
+                                <p className="text-sm text-rose-700 transition-colors dark:text-rose-100/90">
                                   {payload.errorMessage}
                                 </p>
                               </div>
@@ -341,7 +346,7 @@ export function ChatPanel({
                             return (
                               <Response
                                 key={`${message.id}-${index}`}
-                                className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100"
+                                className="w-full rounded-2xl border border-border bg-muted p-4 text-sm text-slate-900 [&_p]:text-slate-900 transition-colors dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:[&_p]:text-slate-100"
                               >
                                 {typeof payload === "string"
                                   ? payload
@@ -362,7 +367,7 @@ export function ChatPanel({
                     planOutput && planOutput.plan ? (
                       <Response
                         key="plan-content"
-                        className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-100"
+                        className="mt-2 w-full rounded-2xl border border-border bg-muted p-4 text-sm text-slate-900 [&_p]:text-slate-900 transition-colors dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:[&_p]:text-slate-100"
                       >
                         {planOutput.plan}
                       </Response>
@@ -383,7 +388,7 @@ export function ChatPanel({
                                 onSendMessage(messageText);
                               }}
                               disabled={status === "streaming" || !messageText}
-                              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="inline-flex items-center rounded-full border border-foreground/10 bg-foreground px-3 py-1 text-xs font-semibold uppercase tracking-wide text-background transition hover:bg-foreground/90 hover:text-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10 dark:focus:ring-indigo-500 dark:focus:ring-offset-slate-950"
                             >
                               {cta.label}
                             </button>
@@ -399,8 +404,8 @@ export function ChatPanel({
                         className={cn(
                           "max-w-3xl space-y-1 rounded-xl px-3 py-2 text-sm leading-6 transition-colors",
                           isUser
-                            ? "bg-indigo-500/45 text-white/95"
-                            : "bg-slate-900/45 text-slate-100",
+                            ? "bg-primary text-white shadow-sm dark:bg-indigo-500/45 dark:text-white/95"
+                            : "bg-slate-100 text-slate-900 shadow-sm dark:bg-slate-900/45 dark:text-slate-100",
                           "flex-col items-stretch",
                         )}
                       >
@@ -416,7 +421,7 @@ export function ChatPanel({
                   <Message from="assistant">
                     <MessageContent
                       variant="flat"
-                      className="inline-flex items-center gap-3 whitespace-nowrap rounded-2xl bg-white/10 px-5 py-3 text-sm text-slate-300"
+                      className="inline-flex items-center gap-3 whitespace-nowrap rounded-2xl bg-muted px-5 py-3 text-sm text-muted-foreground transition-colors dark:bg-white/10 dark:text-slate-300"
                     >
                       <Loader size={20} />
                       <span className="animate-pulse">Thinking...</span>
@@ -427,24 +432,24 @@ export function ChatPanel({
               </>
             )}
           </ConversationContent>
-          <ConversationScrollButton className="border-white/10 bg-white/[0.08] text-slate-100 hover:border-white/20 hover:bg-white/15" />
+          <ConversationScrollButton className="border border-border bg-muted text-foreground transition hover:bg-accent hover:text-accent-foreground dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-white/15" />
         </Conversation>
       </div>
 
-      <div className="border-t border-white/10 bg-transparent px-4 pb-6 pt-4 sm:px-6">
+      <div className="border-t border-border bg-transparent px-4 pb-6 pt-4 transition-colors sm:px-6 dark:border-white/10">
         {isLocked ? (
-          <div className="mx-auto mb-3 w-full max-w-4xl rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          <div className="mx-auto mb-3 w-full max-w-4xl rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
             This conversation already produced a course. Sending new messages is disabled to
             keep the plan in sync.
           </div>
         ) : null}
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex w-full max-w-4xl items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl"
+          className="mx-auto flex w-full max-w-4xl items-center gap-2 rounded-full border border-border bg-card p-2 shadow-lg transition-colors backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_20px_50px_rgba(15,23,42,0.45)]"
         >
           <textarea
             ref={textareaRef}
-            className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-full border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-full border border-transparent bg-transparent px-5 py-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-400"
             value={input}
             placeholder={
               isLocked
@@ -469,7 +474,7 @@ export function ChatPanel({
           <button
             type="submit"
             disabled={status === "streaming" || !input.trim() || isLocked}
-            className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60"
           >
             {status === "streaming" ? (
               <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
