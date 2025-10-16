@@ -33,7 +33,7 @@ export function NavigationRail({
 
   return (
     <div
-      className="sticky z-20 flex w-20 flex-col justify-between border-r border-white/10 bg-white/[0.04] py-6"
+      className="surface-sidebar sticky z-20 flex w-20 flex-col justify-between py-6"
       style={stickyStyle}
     >
       <div className="flex flex-col items-center gap-6">
@@ -45,7 +45,7 @@ export function NavigationRail({
           <button
             type="button"
             onClick={onNavigateDashboard}
-            className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium text-slate-400 transition hover:text-slate-100"
+            className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium text-muted-foreground transition hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100"
           >
             <LayoutDashboard className="h-5 w-5" />
             <span className="text-[11px] tracking-tight">Dashboard</span>
@@ -62,10 +62,10 @@ export function NavigationRail({
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition",
                   disabled
-                    ? "cursor-not-allowed text-slate-500 opacity-40 hover:text-slate-500"
+                    ? "cursor-not-allowed text-muted-foreground opacity-40 hover:text-muted-foreground"
                     : active
-                      ? "bg-white/15 text-white"
-                      : "text-slate-400 hover:text-slate-100",
+                      ? "bg-accent text-accent-foreground dark:bg-white/15 dark:text-white"
+                      : "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100",
                 )}
               >
                 <Icon className="h-5 w-5" />
@@ -83,10 +83,10 @@ export function NavigationRail({
             onClick={onClick}
             disabled={disabled}
             className={cn(
-              "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition hover:text-slate-100",
+              "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition hover:text-foreground",
               disabled
-                ? "cursor-not-allowed text-slate-500 opacity-40 hover:text-slate-500"
-                : "text-slate-500",
+                ? "cursor-not-allowed text-muted-foreground opacity-40 hover:text-muted-foreground"
+                : "text-muted-foreground dark:text-slate-500 dark:hover:text-slate-100",
             )}
           >
             <Icon className="h-5 w-5" />

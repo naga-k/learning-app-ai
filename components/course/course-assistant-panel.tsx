@@ -368,7 +368,7 @@ export function CourseAssistantPanel({
     );
 
   const panelClasses = cn(
-    "flex h-full flex-col border-l border-white/10 bg-slate-950/70 text-slate-100",
+    "flex h-full flex-col border-l border-border bg-card text-foreground transition-colors dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-100",
     !isActive && "hidden",
     className,
   );
@@ -377,14 +377,14 @@ export function CourseAssistantPanel({
     <>
       {highlightButtonPortal}
       <div className={panelClasses}>
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
-          <div className="flex items-center gap-3 text-slate-200">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-200">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 transition-colors dark:border-white/10">
+          <div className="flex items-center gap-3 text-muted-foreground dark:text-slate-200">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary dark:bg-indigo-500/20 dark:text-indigo-200">
               <MessageCircle className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold">Course Assistant</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-sm font-semibold text-foreground dark:text-slate-100">Course Assistant</p>
+              <p className="text-xs text-muted-foreground dark:text-slate-400">
                 Ask questions about this lesson. Highlight text for instant context.
               </p>
             </div>
@@ -393,7 +393,7 @@ export function CourseAssistantPanel({
             type="button"
             onClick={handleClearConversation}
             disabled={!canClearConversation}
-            className="inline-flex items-center justify-center rounded-full border border-transparent bg-white/[0.05] p-2 text-slate-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-full border border-border bg-muted p-2 text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 dark:border-transparent dark:bg-white/[0.05] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white dark:focus-visible:ring-indigo-300 dark:focus-visible:ring-offset-slate-950"
             aria-label="Clear assistant conversation"
             title="Clear conversation"
           >
@@ -402,9 +402,9 @@ export function CourseAssistantPanel({
         </div>
 
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 text-sm text-slate-100">
+          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 text-sm text-foreground transition-colors dark:text-slate-100">
             {messages.length === 0 && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-slate-300">
+              <div className="rounded-2xl border border-border bg-muted px-4 py-4 text-muted-foreground transition-colors dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
                 Ask for clarifications, summaries, or tips on this lesson. Highlight a passage and
                 capture it to give the assistant more context.
               </div>
@@ -416,12 +416,14 @@ export function CourseAssistantPanel({
                 <div key={message.id} className={cn("flex", isUser ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-3 shadow-sm",
-                      isUser ? "bg-indigo-500/60 text-white" : "bg-white/[0.06] text-slate-100",
+                      "max-w-[85%] rounded-2xl px-4 py-3 shadow-sm transition-colors",
+                      isUser
+                        ? "bg-primary text-primary-foreground dark:bg-indigo-500/60 dark:text-white"
+                        : "bg-muted text-foreground dark:bg-white/[0.06] dark:text-slate-100",
                     )}
                   >
                     {isUser && message.selectionPreview && (
-                      <p className="mb-1 text-[11px] font-medium text-indigo-100/80">
+                      <p className="mb-1 text-[11px] font-medium text-primary-foreground/80 dark:text-indigo-100/80">
                         {`"${message.selectionPreview}"`}
                       </p>
                     )}
@@ -432,7 +434,7 @@ export function CourseAssistantPanel({
             })}
 
             {isSending && !hasAssistantReply && (
-              <div className="mr-auto inline-flex items-center gap-3 rounded-2xl bg-white/[0.06] px-4 py-3 text-xs text-slate-200">
+              <div className="mr-auto inline-flex items-center gap-3 rounded-2xl bg-muted px-4 py-3 text-xs text-muted-foreground transition-colors dark:bg-white/[0.06] dark:text-slate-200">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Thinking...
               </div>
@@ -443,22 +445,22 @@ export function CourseAssistantPanel({
           <form
             ref={formRef}
             onSubmit={handleSubmit}
-            className="border-t border-white/10 bg-transparent px-4 pb-5 pt-4 sm:px-6"
+            className="border-t border-border bg-transparent px-4 pb-5 pt-4 transition-colors sm:px-6 dark:border-white/10"
           >
             <div className="space-y-3">
               {capturedSelection && (
-                <div className="mx-auto max-w-3xl rounded-2xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-50">
+                <div className="mx-auto max-w-3xl rounded-2xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-50">
                   <div className="flex items-start gap-2">
-                    <Sparkles className="mt-[2px] h-4 w-4 flex-shrink-0 text-indigo-200" />
+                    <Sparkles className="mt-[2px] h-4 w-4 flex-shrink-0 text-primary dark:text-indigo-200" />
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-200">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary dark:text-indigo-200">
                           Highlight captured
                         </p>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded-full border border-transparent bg-indigo-500/30 px-2 py-1 text-[11px] font-semibold text-indigo-50 transition hover:bg-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center gap-1 rounded-full border border-transparent bg-primary/20 px-2 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500/30 dark:text-indigo-50 dark:hover:bg-indigo-500/40 dark:focus-visible:ring-indigo-300 dark:focus-visible:ring-offset-slate-950"
                             onClick={clearCapturedSelection}
                             disabled={isSending}
                           >
@@ -467,7 +469,7 @@ export function CourseAssistantPanel({
                           </button>
                         </div>
                       </div>
-                      <p className="whitespace-pre-wrap leading-snug text-indigo-100/90">
+                      <p className="whitespace-pre-wrap leading-snug text-primary/80 dark:text-indigo-100/90">
                         {capturedSelection}
                       </p>
                     </div>
@@ -475,7 +477,7 @@ export function CourseAssistantPanel({
                 </div>
               )}
 
-              <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[28px] border border-white/10 bg-white/[0.04] p-2 shadow-[0_20px_45px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+              <div className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[28px] border border-border bg-card p-2 shadow-lg transition-colors backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_20px_45px_rgba(15,23,42,0.55)]">
                 <textarea
                   ref={textareaRef}
                   value={question}
@@ -487,7 +489,7 @@ export function CourseAssistantPanel({
                     adjustTextareaHeight(event.target as HTMLTextAreaElement);
                   }}
                   placeholder="Ask about this lesson or request a quick tip..."
-                  className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-[22px] border border-white/10 bg-white/[0.02] px-5 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-indigo-400/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="max-h-40 min-h-[3rem] flex-1 resize-none rounded-[22px] border border-transparent bg-transparent px-5 py-3 text-sm text-foreground placeholder:text-muted-foreground transition focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-indigo-400/60 dark:focus:ring-indigo-500/30"
                   onKeyDown={handleInputKeyDown}
                   rows={1}
                   style={{
@@ -501,7 +503,7 @@ export function CourseAssistantPanel({
                   aria-label="Send question to course assistant"
                   disabled={isSending || (!hasQuestion && !hasSelection)}
                   className={cn(
-                    "inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60",
+                    "inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 text-white shadow-[0_0_30px_rgba(99,102,241,0.45)] transition hover:shadow-[0_0_45px_rgba(99,102,241,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-slate-950",
                   )}
                 >
                   {isSending ? (
