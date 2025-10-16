@@ -19,7 +19,11 @@ import {
 } from '@/lib/curriculum';
 import { extractJsonFromText } from '@/lib/ai/json';
 import { buildLearningPlanPrompt } from '@/lib/prompts/plan';
-import { buildCoursePrompt } from '@/lib/prompts/course';
+import {
+  buildCourseOverviewPrompt,
+  buildCourseSubmodulePrompt,
+  buildCourseConclusionPrompt,
+} from '@/lib/prompts/course';
 import {
   planningAndDeliveryPrimer,
   discoveryPhasePrimer,
@@ -38,6 +42,7 @@ import {
   supportsOpenAIWebSearch,
 } from '@/lib/ai/provider';
 import { generateChatTitle } from '@/lib/chat/title';
+import { isPlanToolOutput } from '@/lib/ai/tool-output';
 
 export const runtime = 'nodejs';
 
@@ -133,6 +138,38 @@ const generateJsonWithRetry = async <T>({
 
 // Allow streaming responses up to 30 seconds
 
+const CourseResourceSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  url: z.string().optional(),
+  type: z.string().optional(),
+});
+
+const CourseOverviewResultSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  focus: z.string().optional(),
+  resources: z.array(CourseResourceSchema).optional(),
+});
+
+const CourseSubmoduleResultSchema = z.object({
+  content: z.string().min(1),
+  summary: z.string().optional(),
+  recommendedResources: z.array(CourseResourceSchema).optional(),
+});
+
+const CourseConclusionResultSchema = z.object({
+  summary: z.string().optional(),
+  celebrationMessage: z.string().optional(),
+  recommendedNextSteps: z.array(z.string().min(1)).optional(),
+  stretchIdeas: z.array(z.string().min(1)).optional(),
+});
+
+type CourseResource = z.infer<typeof CourseResourceSchema>;
+type CourseOverviewResult = z.infer<typeof CourseOverviewResultSchema>;
+type CourseSubmoduleResult = z.infer<typeof CourseSubmoduleResultSchema>;
+type CourseConclusionResult = z.infer<typeof CourseConclusionResultSchema>;
+
 const createInstructionMessage = (id: string, text: string): UIMessage => ({
   id,
   role: 'assistant',
@@ -161,6 +198,45 @@ const hasToolOutput = (messages: UIMessage[], toolName: string): boolean =>
       return state === 'output-available' && preliminary !== true;
     });
   });
+
+const extractLatestStructuredPlan = (
+  messages: UIMessage[],
+): LearningPlanWithIds | null => {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!message || message.role !== 'assistant') continue;
+    if (!Array.isArray(message.parts)) continue;
+
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+      if (!isToolOrDynamicToolUIPart(part)) continue;
+      if (getToolOrDynamicToolName(part) !== 'generate_plan') continue;
+
+      const { state, preliminary } = part as {
+        state?: string;
+        preliminary?: boolean;
+      };
+
+      if (state !== 'output-available' || preliminary) continue;
+
+      const payload =
+        (part as { output?: unknown }).output ??
+        (part as { result?: unknown }).result;
+
+      if (isPlanToolOutput(payload) && payload.structuredPlan) {
+        try {
+          return normalizeLearningPlan(
+            LearningPlanSchema.parse(payload.structuredPlan),
+          );
+        } catch (error) {
+          console.warn('[chat] Failed to normalize structured plan from history', error);
+          return payload.structuredPlan as LearningPlanWithIds;
+        }
+      }
+    }
+  }
+  return null;
+};
 
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -211,6 +287,7 @@ export async function POST(req: Request) {
   });
 
   const messages: UIMessage[] = [...historyMessages, latestUserMessage];
+  let latestStructuredPlan = extractLatestStructuredPlan(messages);
 
   const planGenerated = hasToolOutput(messages, 'generate_plan');
   const courseGenerated = hasToolOutput(messages, 'generate_course');
@@ -227,8 +304,6 @@ export async function POST(req: Request) {
       createInstructionMessage('primer-personalization', personalizationPrimer),
     );
   }
-
-  let latestStructuredPlan: LearningPlanWithIds | null = null;
 
   console.log('[chat] using AI provider:', activeAIProviderName, {
     chat: getModelId('chat'),
@@ -371,26 +446,159 @@ Be comprehensive - this is used to create course content that feels custom-made 
 
       const startTime = Date.now();
 
-      try {
-        const coursePrompt = buildCoursePrompt({
-          fullContext,
-          plan: parsedPlan,
-        });
+      if (!parsedPlan) {
+        throw new Error(
+          'Unable to generate the course because an approved learning plan was not found. Ask me to create a plan first.',
+        );
+      }
 
-        console.log('[generate_course] Calling generateText (reasoningEffort=low)...');
-        const courseObject = await generateJsonWithRetry({
-          prompt: coursePrompt,
+      try {
+        console.log('[generate_course] Generating course overview...');
+        const overviewResult = await generateJsonWithRetry<CourseOverviewResult>({
+          prompt: buildCourseOverviewPrompt({
+            fullContext,
+            plan: parsedPlan,
+          }),
           model: getModel('course'),
           tools: webSearchTools,
           providerOptions: courseProviderOptions,
           parse: (text) => {
-            const courseJsonText = extractJsonFromText(text);
-            const parsedCourse = JSON.parse(courseJsonText);
-            return CourseSchema.parse(parsedCourse);
+            const overviewJsonText = extractJsonFromText(text);
+            const parsedOverview = JSON.parse(overviewJsonText);
+            return CourseOverviewResultSchema.parse(parsedOverview);
           },
         });
 
-        const structuredCourse = normalizeCourse(courseObject, parsedPlan);
+        const aggregatedResources: CourseResource[] = [
+          ...(overviewResult.resources ?? []),
+        ];
+        const generatedSubmodules = new Map<string, CourseSubmoduleResult>();
+        const completedLessonLabels: string[] = [];
+
+        for (const planModule of parsedPlan.modules) {
+          for (const subtopic of planModule.subtopics) {
+            const completionSummary = completedLessonLabels.length
+              ? completedLessonLabels
+                  .map((label, index) => `${index + 1}. ${label}`)
+                  .join('\n')
+              : '';
+
+            console.log(
+              '[generate_course] Generating lesson:',
+              `${planModule.title} -> ${subtopic.title}`,
+            );
+
+            const submoduleResult = await generateJsonWithRetry<CourseSubmoduleResult>({
+              prompt: buildCourseSubmodulePrompt({
+                fullContext,
+                plan: parsedPlan,
+                module: planModule,
+                subtopic,
+                completedLessonsSummary: completionSummary,
+              }),
+              model: getModel('course'),
+              tools: webSearchTools,
+              providerOptions: courseProviderOptions,
+              parse: (text) => {
+                const submoduleJsonText = extractJsonFromText(text);
+                const parsedSubmodule = JSON.parse(submoduleJsonText);
+                return CourseSubmoduleResultSchema.parse(parsedSubmodule);
+              },
+            });
+
+            generatedSubmodules.set(subtopic.id, submoduleResult);
+            if (Array.isArray(submoduleResult.recommendedResources)) {
+              submoduleResult.recommendedResources.forEach((resource) => {
+                aggregatedResources.push(resource);
+              });
+            }
+
+            completedLessonLabels.push(`${planModule.title} — ${subtopic.title}`);
+          }
+        }
+
+        let conclusionResult: CourseConclusionResult | null = null;
+
+        const courseHighlights = completedLessonLabels.length
+          ? completedLessonLabels
+              .map((label, index) => `${index + 1}. ${label}`)
+              .join('\n')
+          : 'No lessons were generated in this draft.';
+
+        try {
+          console.log('[generate_course] Generating course conclusion...');
+          conclusionResult = await generateJsonWithRetry<CourseConclusionResult>({
+            prompt: buildCourseConclusionPrompt({
+              fullContext,
+              plan: parsedPlan,
+              courseHighlights,
+            }),
+            model: getModel('course'),
+            tools: webSearchTools,
+            providerOptions: courseProviderOptions,
+            parse: (text) => {
+              const conclusionJsonText = extractJsonFromText(text);
+              const parsedConclusion = JSON.parse(conclusionJsonText);
+              return CourseConclusionResultSchema.parse(parsedConclusion);
+            },
+          });
+        } catch (conclusionError) {
+          console.warn(
+            '[generate_course] Conclusion generation failed; proceeding without conclusion.',
+            conclusionError,
+          );
+          conclusionResult = null;
+        }
+
+        const dedupedResources = (() => {
+          if (aggregatedResources.length === 0) return [];
+          const seen = new Set<string>();
+          const result: CourseResource[] = [];
+
+          aggregatedResources.forEach((resource) => {
+            const key = `${resource.title.trim().toLowerCase()}|${(resource.url ?? '').trim().toLowerCase()}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            result.push(resource);
+          });
+
+          return result;
+        })();
+
+        const courseObject = {
+          overview: {
+            title: overviewResult.title,
+            description: overviewResult.description,
+            focus: overviewResult.focus ?? undefined,
+            totalDuration: parsedPlan.overview.totalDuration,
+          },
+          modules: parsedPlan.modules.map((planModule) => ({
+            moduleId: planModule.id,
+            title: planModule.title,
+            summary: planModule.objective,
+            submodules: planModule.subtopics.map((subtopic) => {
+              const generated = generatedSubmodules.get(subtopic.id);
+              const fallbackContent = [
+                `## ${subtopic.title}`,
+                '',
+                'Content is currently unavailable. Please regenerate this lesson.',
+              ].join('\n');
+
+              return {
+                id: subtopic.id,
+                title: subtopic.title,
+                duration: subtopic.duration ?? undefined,
+                content: generated?.content ?? fallbackContent,
+                summary: generated?.summary ?? subtopic.description,
+              };
+            }),
+          })),
+          resources: dedupedResources.length > 0 ? dedupedResources : undefined,
+          conclusion: conclusionResult ?? undefined,
+        };
+
+        const validatedCourseObject = CourseSchema.parse(courseObject);
+        const structuredCourse = normalizeCourse(validatedCourseObject, parsedPlan);
         const courseSummary = summarizeCourseForChat(structuredCourse);
 
         const courseTitle =
