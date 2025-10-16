@@ -1,4 +1,7 @@
-import type { LearningPlanWithIds } from '@/lib/curriculum';
+import type {
+  LearningPlanModuleWithIds,
+  LearningPlanWithIds,
+} from '@/lib/curriculum';
 
 const courseJsonSchema = `
 {
@@ -89,3 +92,153 @@ ${courseJsonSchema}
 Final reminder: output ONLY valid JSON matching the schema, grounded in the conversation, and unmistakably tailored to this learner.`;
 
 export { courseJsonSchema };
+
+const courseOverviewJsonSchema = `
+{
+  "title": "string (3-6 words capturing the course theme)",
+  "description": "string (1-2 sentence promise of the experience)",
+  "focus": "string (optional, core emphasis learners should keep in mind)",
+  "resources": [
+    {
+      "title": "string",
+      "description": "string (optional)",
+      "url": "string (optional)",
+      "type": "string (optional)"
+    }
+  ] (optional)
+}`.trim();
+
+type BuildCourseOverviewPromptArgs = {
+  fullContext: string;
+  plan: LearningPlanWithIds | null;
+};
+
+const formatPlanOutline = (plan: LearningPlanWithIds | null) => {
+  if (!plan) return 'No approved plan was provided.';
+  const modules = plan.modules
+    .map(
+      (module) =>
+        `- ${module.title} (${module.duration}) → ${module.objective}\n${module.subtopics
+          .map((subtopic) => `    • ${subtopic.title} (${subtopic.duration}) — ${subtopic.description}`)
+          .join('\n')}`,
+    )
+    .join('\n\n');
+
+  return `Total time: ${plan.overview.totalDuration}
+Goal: ${plan.overview.goal}
+Modules:
+${modules}`;
+};
+
+export const buildCourseOverviewPrompt = ({
+  fullContext,
+  plan,
+}: BuildCourseOverviewPromptArgs) => `You are preparing the opening snapshot for a personalized course.
+
+Return ONLY valid JSON that matches this schema:
+${courseOverviewJsonSchema}
+
+Ground the overview in the approved learning plan and the learner's personal context. Lean on the plan for pacing, but rewrite in fresh language that will excite the learner.
+
+Learner & plan context:
+${fullContext}
+
+Plan outline:
+${formatPlanOutline(plan)}
+`;
+
+const courseSubmoduleJsonSchema = `
+{
+  "content": "string (complete markdown lesson, starting with ## {Submodule Title})",
+  "summary": "string (optional 1 sentence navigation blurb)",
+  "recommendedResources": [
+    {
+      "title": "string",
+      "description": "string (optional)",
+      "url": "string (optional)",
+      "type": "string (optional)"
+    }
+  ] (optional)
+}`.trim();
+
+type BuildCourseSubmodulePromptArgs = {
+  fullContext: string;
+  plan: LearningPlanWithIds;
+  module: LearningPlanModuleWithIds;
+  subtopic: LearningPlanModuleWithIds['subtopics'][number];
+  completedLessonsSummary: string;
+};
+
+const buildModuleContext = (
+  module: LearningPlanModuleWithIds,
+  subtopic: LearningPlanModuleWithIds['subtopics'][number],
+) => `Module: ${module.title}
+Module objective: ${module.objective}
+Module duration: ${module.duration}
+Current lesson: ${subtopic.title}
+Lesson duration: ${subtopic.duration}
+Lesson focus: ${subtopic.description}`;
+
+export const buildCourseSubmodulePrompt = ({
+  fullContext,
+  plan,
+  module,
+  subtopic,
+  completedLessonsSummary,
+}: BuildCourseSubmodulePromptArgs) => `You are writing a single lesson inside a hyper-personalized course for one learner.
+
+Return ONLY valid JSON matching this schema:
+${courseSubmoduleJsonSchema}
+
+Writing rules:
+- Write directly to the learner using their language, motivations, and constraints.
+- Start the lesson with "## ${subtopic.title}".
+- Blend explanations, examples, bullets, callouts, and checkpoints so the learner can skim or deep dive.
+- Keep the effort within ${subtopic.duration}, allowing time for practice and reflection.
+- Reference prior completed lessons when helpful: ${completedLessonsSummary || 'No lessons completed yet—this is the first.'}
+- Do NOT invent new modules or lessons. Stay aligned with the plan structure.
+
+Learner & conversation context:
+${fullContext}
+
+Plan overview (for reference):
+${formatPlanOutline(plan)}
+
+Focus of this lesson:
+${buildModuleContext(module, subtopic)}
+`;
+
+const courseConclusionJsonSchema = `
+{
+  "summary": "string (optional recap tying progress to learner goals)",
+  "celebrationMessage": "string (optional encouraging message)",
+  "recommendedNextSteps": ["string", "..."] (optional),
+  "stretchIdeas": ["string", "..."] (optional)
+}`.trim();
+
+type BuildCourseConclusionPromptArgs = {
+  fullContext: string;
+  plan: LearningPlanWithIds | null;
+  courseHighlights: string;
+};
+
+export const buildCourseConclusionPrompt = ({
+  fullContext,
+  plan,
+  courseHighlights,
+}: BuildCourseConclusionPromptArgs) => `You are wrapping up a personalized course for one learner.
+
+Return ONLY valid JSON matching this schema:
+${courseConclusionJsonSchema}
+
+Make the tone celebratory but grounded in what the learner actually achieved. Tie recommendations to their original motivations and constraints.
+
+Learner & conversation context:
+${fullContext}
+
+Plan overview:
+${formatPlanOutline(plan)}
+
+Course highlights so far:
+${courseHighlights}
+`;

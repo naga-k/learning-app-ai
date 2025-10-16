@@ -13,9 +13,15 @@ import {
   CourseSchema,
   normalizeCourse,
   summarizeCourseForChat,
+  type LearningPlanModuleWithIds,
   type LearningPlanWithIds,
 } from "@/lib/curriculum";
-import { buildCoursePrompt } from "@/lib/prompts/course";
+import {
+  buildCourseConclusionPrompt,
+  buildCourseOverviewPrompt,
+  buildCourseSubmodulePrompt,
+  buildCoursePrompt,
+} from "@/lib/prompts/course";
 import { extractJsonFromText } from "@/lib/ai/json";
 import { generateText } from "ai";
 import {
@@ -24,6 +30,7 @@ import {
   getModel,
   supportsOpenAIWebSearch,
 } from "@/lib/ai/provider";
+import { z } from "zod";
 
 const requiredEnvVars = ["SUPABASE_DB_URL", "OPENAI_API_KEY", "AI_PROVIDER"];
 
@@ -51,6 +58,38 @@ const courseProviderOptions = isOpenAIProvider
       },
     }
   : undefined;
+
+const CourseResourceSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  url: z.string().optional(),
+  type: z.string().optional(),
+});
+
+const CourseOverviewResultSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  focus: z.string().optional(),
+  resources: z.array(CourseResourceSchema).optional(),
+});
+
+const CourseSubmoduleResultSchema = z.object({
+  content: z.string().min(1),
+  summary: z.string().optional(),
+  recommendedResources: z.array(CourseResourceSchema).optional(),
+});
+
+const CourseConclusionResultSchema = z.object({
+  summary: z.string().optional(),
+  celebrationMessage: z.string().optional(),
+  recommendedNextSteps: z.array(z.string().min(1)).optional(),
+  stretchIdeas: z.array(z.string().min(1)).optional(),
+});
+
+type CourseResource = z.infer<typeof CourseResourceSchema>;
+type CourseOverviewResult = z.infer<typeof CourseOverviewResultSchema>;
+type CourseSubmoduleResult = z.infer<typeof CourseSubmoduleResultSchema>;
+type CourseConclusionResult = z.infer<typeof CourseConclusionResultSchema>;
 
 const IDLE_DELAY_MS = Number(process.env.COURSE_GENERATION_WORKER_IDLE_MS ?? "3000");
 const ERROR_DELAY_MS = Number(process.env.COURSE_GENERATION_WORKER_ERROR_MS ?? "5000");
@@ -168,24 +207,194 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
       });
     }, HEARTBEAT_INTERVAL_MS);
 
-    const coursePrompt = buildCoursePrompt({
-      fullContext,
-      plan,
-    });
+    const usePlanDrivenPipeline = Boolean(plan);
 
-    const courseObject = await generateJsonWithRetry({
-      prompt: coursePrompt,
-      parse: (text) => {
-        console.log("[course.generate] Model response received", {
-          jobId: job.id,
-          elapsedMs: Date.now() - startTime,
-          workerId,
-        });
-        const courseJsonText = extractJsonFromText(text);
-        const parsedCourse = JSON.parse(courseJsonText);
-        return CourseSchema.parse(parsedCourse);
-      },
-    });
+    const courseObject = usePlanDrivenPipeline
+      ? await (async () => {
+          console.log("[course.generate] Generating course overview", {
+            jobId: job.id,
+            workerId,
+          });
+          const overviewResult = await generateJsonWithRetry<CourseOverviewResult>({
+            prompt: buildCourseOverviewPrompt({
+              fullContext,
+              plan,
+            }),
+            parse: (text) => {
+              const overviewJsonText = extractJsonFromText(text);
+              const parsedOverview = JSON.parse(overviewJsonText);
+              return CourseOverviewResultSchema.parse(parsedOverview);
+            },
+          });
+
+          const aggregatedResources: CourseResource[] = [
+            ...(overviewResult.resources ?? []),
+          ];
+          const generatedSubmodules = new Map<string, CourseSubmoduleResult>();
+          const completedLessonLabels: string[] = [];
+
+          if (!plan) {
+            throw new Error("Plan is required for plan-driven pipeline.");
+          }
+
+          for (const planModule of plan.modules) {
+            for (const subtopic of planModule.subtopics) {
+              const completionSummary = completedLessonLabels.length
+                ? completedLessonLabels
+                    .map((label, index) => `${index + 1}. ${label}`)
+                    .join("\n")
+                : "";
+
+              console.log("[course.generate] Generating lesson", {
+                jobId: job.id,
+                workerId,
+                module: planModule.title,
+                submodule: subtopic.title,
+              });
+
+              const submoduleResult = await generateJsonWithRetry<CourseSubmoduleResult>({
+                prompt: buildCourseSubmodulePrompt({
+                  fullContext,
+                  plan,
+                  module: planModule,
+                  subtopic,
+                  completedLessonsSummary: completionSummary,
+                }),
+                parse: (text) => {
+                  const submoduleJsonText = extractJsonFromText(text);
+                  const parsedSubmodule = JSON.parse(submoduleJsonText);
+                  return CourseSubmoduleResultSchema.parse(parsedSubmodule);
+                },
+              });
+
+              generatedSubmodules.set(subtopic.id, submoduleResult);
+              if (Array.isArray(submoduleResult.recommendedResources)) {
+                submoduleResult.recommendedResources.forEach((resource) => {
+                  aggregatedResources.push(resource);
+                });
+              }
+
+              completedLessonLabels.push(`${planModule.title} — ${subtopic.title}`);
+            }
+          }
+
+          let conclusionResult: CourseConclusionResult | null = null;
+          const courseHighlights = completedLessonLabels.length
+            ? completedLessonLabels
+                .map((label, index) => `${index + 1}. ${label}`)
+                .join("\n")
+            : "No lessons were generated in this draft.";
+
+          try {
+            console.log("[course.generate] Generating course conclusion", {
+              jobId: job.id,
+              workerId,
+            });
+            conclusionResult = await generateJsonWithRetry<CourseConclusionResult>({
+              prompt: buildCourseConclusionPrompt({
+                fullContext,
+                plan,
+                courseHighlights,
+              }),
+              parse: (text) => {
+                const conclusionJsonText = extractJsonFromText(text);
+                const parsedConclusion = JSON.parse(conclusionJsonText);
+                return CourseConclusionResultSchema.parse(parsedConclusion);
+              },
+            });
+          } catch (conclusionError) {
+            console.warn(
+              "[course.generate] Conclusion generation failed; proceeding without conclusion.",
+              {
+                jobId: job.id,
+                workerId,
+                error: conclusionError,
+              },
+            );
+            conclusionResult = null;
+          }
+
+          const dedupedResources = (() => {
+            if (aggregatedResources.length === 0) return [];
+
+            const seen = new Set<string>();
+            const result: CourseResource[] = [];
+
+            aggregatedResources.forEach((resource) => {
+              const key = `${resource.title.trim().toLowerCase()}|${(resource.url ?? "").trim().toLowerCase()}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              result.push(resource);
+            });
+
+            return result;
+          })();
+
+          const validated = CourseSchema.parse({
+            overview: {
+              title: overviewResult.title,
+              description: overviewResult.description,
+              focus: overviewResult.focus ?? undefined,
+              totalDuration: plan.overview.totalDuration,
+            },
+            modules: plan.modules.map((planModule) => {
+              const moduleWithIds = planModule as LearningPlanModuleWithIds;
+
+              return {
+                moduleId: moduleWithIds.id,
+                title: moduleWithIds.title,
+                summary: moduleWithIds.objective,
+                submodules: moduleWithIds.subtopics.map((subtopic) => {
+                  const subtopicWithIds =
+                    subtopic as LearningPlanModuleWithIds["subtopics"][number];
+                  const subtopicId = subtopicWithIds.id;
+                  const generated = generatedSubmodules.get(subtopicId);
+                  const fallbackContent = [
+                    `## ${subtopicWithIds.title}`,
+                  "",
+                  "Content is currently unavailable. Please regenerate this lesson.",
+                ].join("\n");
+
+                return {
+                  id: subtopicId,
+                  title: subtopicWithIds.title,
+                  duration: subtopicWithIds.duration ?? undefined,
+                  content: generated?.content ?? fallbackContent,
+                  summary: generated?.summary ?? subtopicWithIds.description,
+                };
+                }),
+              };
+            }),
+            resources: dedupedResources.length > 0 ? dedupedResources : undefined,
+            conclusion: conclusionResult ?? undefined,
+          });
+
+          return validated;
+        })()
+      : await (async () => {
+          console.warn("[course.generate] No plan provided—falling back to single prompt generation.", {
+            jobId: job.id,
+            workerId,
+          });
+          const coursePrompt = buildCoursePrompt({
+            fullContext,
+            plan: null,
+          });
+
+          return generateJsonWithRetry({
+            prompt: coursePrompt,
+            parse: (text) => {
+              console.log("[course.generate] Model response received (fallback)", {
+                jobId: job.id,
+                elapsedMs: Date.now() - startTime,
+                workerId,
+              });
+              const courseJsonText = extractJsonFromText(text);
+              const parsedCourse = JSON.parse(courseJsonText);
+              return CourseSchema.parse(parsedCourse);
+            },
+          });
+        })();
 
     const structuredCourse = normalizeCourse(courseObject, plan ?? undefined);
     const courseSummary = summarizeCourseForChat(structuredCourse);

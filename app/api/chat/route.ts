@@ -43,6 +43,7 @@ import {
   supportsOpenAIWebSearch,
 } from '@/lib/ai/provider';
 import { generateChatTitle } from '@/lib/chat/title';
+import { isPlanToolOutput } from '@/lib/ai/tool-output';
 import { mergeCourseToolOutputIntoMessage } from '@/lib/chat/messages';
 
 export const runtime = 'nodejs';
@@ -159,6 +160,45 @@ const hasToolOutput = (messages: UIMessage[], toolName: string): boolean =>
     });
   });
 
+const extractLatestStructuredPlan = (
+  messages: UIMessage[],
+): LearningPlanWithIds | null => {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!message || message.role !== 'assistant') continue;
+    if (!Array.isArray(message.parts)) continue;
+
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+      if (!isToolOrDynamicToolUIPart(part)) continue;
+      if (getToolOrDynamicToolName(part) !== 'generate_plan') continue;
+
+      const { state, preliminary } = part as {
+        state?: string;
+        preliminary?: boolean;
+      };
+
+      if (state !== 'output-available' || preliminary) continue;
+
+      const payload =
+        (part as { output?: unknown }).output ??
+        (part as { result?: unknown }).result;
+
+      if (isPlanToolOutput(payload) && payload.structuredPlan) {
+        try {
+          return normalizeLearningPlan(
+            LearningPlanSchema.parse(payload.structuredPlan),
+          );
+        } catch (error) {
+          console.warn('[chat] Failed to normalize structured plan from history', error);
+          return payload.structuredPlan as LearningPlanWithIds;
+        }
+      }
+    }
+  }
+  return null;
+};
+
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -208,6 +248,7 @@ export async function POST(req: Request) {
   });
 
   const messages: UIMessage[] = [...historyMessages, latestUserMessage];
+  let latestStructuredPlan = extractLatestStructuredPlan(messages);
 
   const planGenerated = hasToolOutput(messages, 'generate_plan');
   const courseGenerated = hasToolOutput(messages, 'generate_course');
@@ -224,8 +265,6 @@ export async function POST(req: Request) {
       createInstructionMessage('primer-personalization', personalizationPrimer),
     );
   }
-
-  let latestStructuredPlan: LearningPlanWithIds | null = null;
 
   console.log('[chat] using AI provider:', activeAIProviderName, {
     chat: getModelId('chat'),
