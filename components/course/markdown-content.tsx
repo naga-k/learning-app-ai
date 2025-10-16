@@ -31,7 +31,7 @@ const baseContentClasses =
 const sharedRemarkPlugins = [remarkGfm];
 const sharedRehypePlugins = [rehypeHighlight];
 
-const CodeBlock: Components["code"] = ({ node: _node, inline, className, children, ...props }) => {
+const CodeBlock: Components["code"] = ({ node: _node, inline, className, children, ...props }: ComponentPropsWithoutRef<"code"> & { inline?: boolean; node?: any }) => {
   const [copied, setCopied] = useState(false);
   const [canCopy, setCanCopy] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
