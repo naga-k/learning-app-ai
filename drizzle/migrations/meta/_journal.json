@@ -15,6 +15,20 @@
       "when": 1760459800585,
       "tag": "0001_conscious_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1760619518885,
+      "tag": "0002_harsh_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1760634727590,
+      "tag": "0003_colossal_madrox",
+      "breakpoints": true
     }
   ]
 }

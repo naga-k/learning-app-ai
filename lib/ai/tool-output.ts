@@ -17,8 +17,10 @@ export type PlanToolOutput = {
 };
 
 export type CourseToolOutput = {
-  course: string;
+  course?: string;
   courseStructured?: CourseWithIds;
+  jobId?: string;
+  status?: "queued" | "processing" | "completed" | "failed";
   summary?: string;
   startedAt?: number;
   durationMs?: number;
@@ -41,8 +43,29 @@ const hasStringProperty = (value: unknown, key: string): boolean =>
 export const isPlanToolOutput = (value: unknown): value is PlanToolOutput =>
   hasStringProperty(value, 'plan');
 
-export const isCourseToolOutput = (value: unknown): value is CourseToolOutput =>
-  hasStringProperty(value, 'course');
+export const isCourseToolOutput = (value: unknown): value is CourseToolOutput => {
+  if (!value || typeof value !== 'object') return false;
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.course === 'string' && record.course.trim().length > 0) {
+    return true;
+  }
+
+  if (typeof record.jobId === 'string' && record.jobId.trim().length > 0) {
+    return true;
+  }
+
+  if (typeof record.status === 'string' && record.status.trim().length > 0) {
+    return true;
+  }
+
+  if (record.courseStructured) {
+    return true;
+  }
+
+  return false;
+};
 
 export const isToolErrorOutput = (value: unknown): value is ToolErrorOutput =>
   hasStringProperty(value, 'errorMessage');
