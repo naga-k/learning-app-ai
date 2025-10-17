@@ -101,6 +101,28 @@ export function CourseWorkspace({
   >("modules");
   const [sidebarWidth, setSidebarWidth] = useState(480); // Default width in pixels
   const [isResizing, setIsResizing] = useState(false);
+  const [expandedModuleIds, setExpandedModuleIds] = useState<Set<string>>(new Set());
+
+  // Helper function to toggle module expansion
+  const toggleModuleExpanded = useCallback((moduleId: string) => {
+    setExpandedModuleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+      } else {
+        next.add(moduleId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Helper function to ensure module is expanded
+  const ensureModuleExpanded = useCallback((moduleId: string) => {
+    setExpandedModuleIds((prev) => {
+      if (prev.has(moduleId)) return prev;
+      return new Set([...prev, moduleId]);
+    });
+  }, []);
 
   // Use external state if provided, otherwise use internal state
   const mobileAccordionExpanded = externalMobileMenuExpanded ?? internalMobileMenuExpanded;
@@ -548,11 +570,19 @@ export function CourseWorkspace({
                       <button
                         type="button"
                         onClick={() => {
-                          setActiveModuleId(module.moduleId);
-                          setActiveSubmoduleId(
-                            module.submodules[0]?.id ?? activeSubmoduleId,
-                          );
-                          setViewMode("lesson");
+                          const isExpanded = expandedModuleIds.has(module.moduleId);
+                          if (isExpanded) {
+                            // Collapse the module
+                            toggleModuleExpanded(module.moduleId);
+                          } else {
+                            // Expand the module and navigate to first lesson
+                            toggleModuleExpanded(module.moduleId);
+                            setActiveModuleId(module.moduleId);
+                            setActiveSubmoduleId(
+                              module.submodules[0]?.id ?? activeSubmoduleId,
+                            );
+                            setViewMode("lesson");
+                          }
                         }}
                         disabled={!moduleInteractive}
                         aria-disabled={!moduleInteractive}
@@ -576,14 +606,14 @@ export function CourseWorkspace({
                             </span>
                           )}
                         </div>
-                        {isActiveModule ? (
+                        {expandedModuleIds.has(module.moduleId) ? (
                           <ChevronDown className="h-4 w-4 flex-shrink-0" />
                         ) : (
                           <ChevronRight className="h-4 w-4 flex-shrink-0" />
                         )}
                       </button>
 
-                      {moduleReady && (
+                      {moduleReady && expandedModuleIds.has(module.moduleId) && (
                         <ul className="mt-3 space-y-1 border-l border-slate-200 pl-3 dark:border-white/10">
                           {module.submodules.map((submodule) => {
                             const submoduleActive =
@@ -600,6 +630,8 @@ export function CourseWorkspace({
                                     setActiveModuleId(module.moduleId);
                                     setActiveSubmoduleId(submodule.id);
                                     setViewMode("lesson");
+                                    // Ensure parent module is expanded
+                                    ensureModuleExpanded(module.moduleId);
                                   }}
                                   className={cn(
                                     "w-full rounded-xl px-2 py-2 text-left text-sm transition",
@@ -694,6 +726,7 @@ export function CourseWorkspace({
     activeSubmodule,
     activeSubmoduleId,
     course.modules,
+    expandedModuleIds,
     moduleProgress,
     moduleProgressMap,
     readyLessonIds,
@@ -710,6 +743,8 @@ export function CourseWorkspace({
     sidebarOffsetTop,
     sidePanelView,
     viewMode,
+    toggleModuleExpanded,
+    ensureModuleExpanded,
   ]);
 
   if (!activeModule || !activeSubmodule) {
