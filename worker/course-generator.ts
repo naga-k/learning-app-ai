@@ -427,7 +427,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                 parse: (text) => {
                   try {
                     const submoduleJsonText = extractJsonFromText(text);
-                    const parsedSubmodule = JSON.parse(submoduleJsonText);
+                    let parsedSubmodule = JSON.parse(submoduleJsonText);
                     
                     // Log the parsed JSON structure before validation
                     console.log("[course.generate] Submodule JSON before validation", {
@@ -443,6 +443,34 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                       arrayLength: Array.isArray(parsedSubmodule) ? parsedSubmodule.length : "N/A",
                       rawJsonPreview: JSON.stringify(parsedSubmodule).substring(0, 500),
                     });
+                    
+                    // DEFENSIVE: If model returned array instead of object, wrap it as recommendedResources
+                    if (Array.isArray(parsedSubmodule)) {
+                      console.warn("[course.generate] Detected orphaned array (model returned array instead of object), wrapping as recommendedResources", {
+                        jobId: job.id,
+                        workerId,
+                        module: planModule.title,
+                        submodule: subtopic.title,
+                        arrayLength: parsedSubmodule.length,
+                      });
+                      
+                      // Check if it looks like resources (has title, url, type fields)
+                      const looksLikeResources = Array.isArray(parsedSubmodule) && 
+                        parsedSubmodule.length > 0 && 
+                        typeof parsedSubmodule[0] === "object" &&
+                        ("title" in parsedSubmodule[0] || "url" in parsedSubmodule[0] || "type" in parsedSubmodule[0]);
+                      
+                      if (looksLikeResources) {
+                        parsedSubmodule = {
+                          content: `## ${subtopic.title}\n\n_Content could not be generated. Please regenerate this lesson._`,
+                          recommendedResources: parsedSubmodule,
+                        };
+                        console.log("[course.generate] Wrapped array as recommendedResources", {
+                          jobId: job.id,
+                          resourceCount: parsedSubmodule.recommendedResources.length,
+                        });
+                      }
+                    }
                     
                     return CourseSubmoduleResultSchema.parse(parsedSubmodule);
                   } catch (parseError) {
