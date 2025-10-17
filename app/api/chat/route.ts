@@ -488,6 +488,16 @@ Be comprehensive - this is used to create course content that feels custom-made 
     ),
   ];
 
+  const stripWebSearchParts = (parts?: UIMessage['parts']): UIMessage['parts'] =>
+    Array.isArray(parts)
+      ? parts.filter(
+          (part): part is UIMessage['parts'][number] => {
+            if (!isToolOrDynamicToolUIPart(part)) return true;
+            return getToolOrDynamicToolName(part) !== 'web_search';
+          },
+        )
+      : (parts ?? []);
+
   const result = streamText({
     model: getModel('chat'),
     system: systemPrompt,
@@ -495,6 +505,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
     tools: {
       generate_plan: generatePlanTool,
       generate_course: generateCourseTool,
+      ...(webSearchTools ?? {}),
     },
     stopWhen: stepCountIs(3),
     providerOptions: chatProviderOptions,
@@ -516,6 +527,7 @@ Be comprehensive - this is used to create course content that feels custom-made 
         const messageToPersist: UIMessage = {
           ...responseMessage,
           id: messageId,
+          parts: stripWebSearchParts(responseMessage.parts),
         };
 
         await insertChatMessage({
