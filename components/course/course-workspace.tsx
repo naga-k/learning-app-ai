@@ -37,6 +37,11 @@ import {
 } from "@/components/course/navigation-rail";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import type { CourseModuleProgress } from "@/lib/ai/tool-output";
+import type {
+  EngagementBlock,
+  QuizEngagementBlock,
+  ReflectionEngagementBlock,
+} from "@/lib/ai/tools/types";
 
 type ModuleProgressEntry =
   NonNullable<CourseModuleProgress["modules"]>[number];
@@ -53,6 +58,185 @@ type CourseWorkspaceProps = {
   setMobileMenuExpanded?: (expanded: boolean | ((prev: boolean) => boolean)) => void;
   moduleProgress?: CourseModuleProgress | null;
 };
+
+const isQuizBlock = (
+  block: EngagementBlock,
+): block is QuizEngagementBlock => block.type === "quiz";
+
+const isReflectionBlock = (
+  block: EngagementBlock,
+): block is ReflectionEngagementBlock => block.type === "reflection";
+
+function QuizEngagementBlockCard({
+  block,
+  index,
+}: {
+  block: QuizEngagementBlock;
+  index: number;
+}) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  const handleCheckAnswer = () => {
+    if (selectedIndex === null) return;
+    setRevealed(true);
+  };
+
+  const isCorrectSelection =
+    revealed && selectedIndex === block.correctOptionIndex;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_0_45px_-35px_rgba(148,163,184,0.55)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-200">
+        <span className="inline-flex items-center gap-2">
+          <BookOpen className="h-3.5 w-3.5" />
+          Quiz {index + 1}
+        </span>
+        {block.difficulty && (
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold tracking-[0.2em] text-slate-500 dark:bg-white/10 dark:text-slate-300">
+            {block.difficulty}
+          </span>
+        )}
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-slate-900 dark:text-slate-100">
+        {block.prompt}
+      </p>
+
+      <div className="mt-4 space-y-2">
+        {block.options.map((option, optionIndex) => {
+          const isSelected = selectedIndex === optionIndex;
+          const isCorrect = optionIndex === block.correctOptionIndex;
+          const highlightState = revealed
+            ? isCorrect
+              ? "border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/20 dark:text-emerald-100"
+              : isSelected
+                ? "border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-400/50 dark:bg-rose-500/20 dark:text-rose-100"
+                : "border-slate-200 text-slate-700 dark:border-white/10 dark:text-slate-200"
+            : isSelected
+              ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-indigo-400/40 dark:bg-indigo-500/20 dark:text-indigo-100"
+              : "border-slate-200 text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/60 dark:border-white/10 dark:text-slate-200 dark:hover:border-indigo-300/40 dark:hover:bg-white/10";
+
+          return (
+            <button
+              key={optionIndex}
+              type="button"
+              onClick={() => {
+                setSelectedIndex(optionIndex);
+                if (revealed) {
+                  setRevealed(false);
+                }
+              }}
+              className={cn(
+                "w-full rounded-xl border px-3 py-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900",
+                highlightState,
+              )}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={handleCheckAnswer}
+          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+        >
+          Check answer
+        </button>
+
+        {revealed && (
+          <div className="text-xs text-slate-600 dark:text-slate-300">
+            {isCorrectSelection
+              ? "Nice! You picked the strongest option."
+              : "Close! Take another look at the options above."}
+            {block.rationale && (
+              <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-300">
+                {block.rationale}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReflectionEngagementBlockCard({
+  block,
+  index,
+}: {
+  block: ReflectionEngagementBlock;
+  index: number;
+}) {
+  const [notes, setNotes] = useState("");
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-6 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">
+        <span className="inline-flex items-center gap-2">
+          <MessageCircle className="h-3.5 w-3.5" />
+          Reflection {index + 1}
+        </span>
+        {typeof block.expectedDurationMinutes === "number" && (
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 shadow-sm dark:bg-white/10 dark:text-slate-200">
+            ⏱ {block.expectedDurationMinutes} min
+          </span>
+        )}
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-slate-900 dark:text-slate-100">
+        {block.prompt}
+      </p>
+
+      {block.guidance && (
+        <p className="mt-3 rounded-xl bg-white px-4 py-3 text-xs italic text-slate-500 shadow-sm dark:bg-white/5 dark:text-slate-300">
+          {block.guidance}
+        </p>
+      )}
+
+      <label className="mt-5 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+        Your notes
+        <textarea
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Capture a quick reflection while the ideas are fresh…"
+          className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30"
+          rows={4}
+        />
+      </label>
+    </div>
+  );
+}
+
+function LessonEngagementBlocks({ blocks }: { blocks?: EngagementBlock[] }) {
+  if (!blocks || blocks.length === 0) return null;
+
+  return (
+    <div className="mt-10 space-y-5">
+      <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.35em] text-indigo-600 dark:text-indigo-200">
+        <Loader2 className="h-3.5 w-3.5 animate-spin [animation-duration:2.2s]" />
+        Active practice
+      </div>
+
+      <div className="space-y-5">
+        {blocks.map((block, index) =>
+          isQuizBlock(block) ? (
+            <QuizEngagementBlockCard block={block} index={index} key={`quiz-${index}`} />
+          ) : isReflectionBlock(block) ? (
+            <ReflectionEngagementBlockCard
+              block={block}
+              index={index}
+              key={`reflection-${index}`}
+            />
+          ) : null,
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function CourseWorkspace({
   course,
@@ -1122,7 +1306,12 @@ export function CourseWorkspace({
                   </div>
 
                   {activeLessonReady ? (
-                    <MarkdownContent content={activeSubmodule.content} />
+                    <>
+                      <MarkdownContent content={activeSubmodule.content} />
+                      <LessonEngagementBlocks
+                        blocks={activeSubmodule.engagementBlocks}
+                      />
+                    </>
                   ) : (
                     <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-amber-300 bg-amber-100/60 p-8 text-center text-sm font-medium text-amber-800 animate-pulse dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-100">
                       <Loader2 className="h-6 w-6 animate-spin" />

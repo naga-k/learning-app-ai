@@ -32,6 +32,9 @@ import {
   supportsOpenAIWebSearch,
 } from "@/lib/ai/provider";
 import { z } from "zod";
+import { EngagementBlockArraySchema } from "@/lib/ai/tools/types";
+import { resolveEngagementBlocksFromResults } from "@/lib/ai/tools/execution";
+import type { ToolExecutionContext } from "@/lib/ai/tools/registry";
 
 const requiredEnvVars = ["SUPABASE_DB_URL", "OPENAI_API_KEY", "AI_PROVIDER"];
 
@@ -78,6 +81,7 @@ const CourseSubmoduleResultSchema = z.object({
   content: z.string().min(1),
   summary: z.string().optional(),
   recommendedResources: z.array(CourseResourceSchema).optional(),
+  engagementBlocks: EngagementBlockArraySchema.optional(),
 });
 
 const CourseConclusionResultSchema = z.object({
@@ -275,6 +279,10 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
             ...(overviewResult.resources ?? []),
           ];
           const generatedSubmodules = new Map<string, CourseSubmoduleResult>();
+          const engagementDiagnostics = new Map<
+            string,
+            { source: "model" | "tool" | "fallback"; blockCount: number }
+          >();
           const completedLessonLabels: string[] = [];
           const totalSubmodules = modulesWithIds.reduce(
             (sum, moduleWithIds) => sum + moduleWithIds.subtopics.length,
@@ -333,6 +341,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                       duration: subtopicWithIds.duration ?? undefined,
                       content: generated?.content ?? fallbackContent,
                       summary: generated?.summary ?? subtopicWithIds.description,
+                      engagementBlocks: generated?.engagementBlocks ?? undefined,
                     };
                   }),
                 };
@@ -453,7 +462,54 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                 },
               });
 
-              generatedSubmodules.set(subtopic.id, submoduleResult);
+              const toolContext: ToolExecutionContext = {
+                moduleTitle: planModule.title,
+                lessonTitle: subtopic.title,
+                domain:
+                  typeof payload.metadata?.domain === "string"
+                    ? payload.metadata.domain
+                    : planWithIds.overview.goal,
+                learnerLevel:
+                  typeof payload.metadata?.learnerLevel === "string"
+                    ? payload.metadata.learnerLevel
+                    : undefined,
+              };
+
+              let engagementBlocks = Array.isArray(
+                submoduleResult.engagementBlocks,
+              )
+                ? submoduleResult.engagementBlocks
+                : [];
+
+              let engagementSource: "model" | "tool" | "fallback" = "model";
+
+              if (engagementBlocks.length === 0) {
+                const resolution = resolveEngagementBlocksFromResults(
+                  [],
+                  toolContext,
+                );
+                engagementBlocks = resolution.blocks;
+                engagementSource = resolution.usedFallback ? "fallback" : "tool";
+              }
+
+              engagementDiagnostics.set(subtopic.id, {
+                source: engagementBlocks.length > 0 ? engagementSource : "fallback",
+                blockCount: engagementBlocks.length,
+              });
+
+              console.log("[course.generate] Engagement blocks resolved", {
+                jobId: job.id,
+                workerId,
+                module: planModule.title,
+                lesson: subtopic.title,
+                source: engagementSource,
+                blockCount: engagementBlocks.length,
+              });
+
+              generatedSubmodules.set(subtopic.id, {
+                ...submoduleResult,
+                engagementBlocks,
+              });
               if (Array.isArray(submoduleResult.recommendedResources)) {
                 submoduleResult.recommendedResources.forEach((resource) => {
                   aggregatedResources.push(resource);
@@ -465,6 +521,20 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
               await publishPartialSnapshot({ conclusionResult: null });
             }
           }
+
+          const engagementSummary = Array.from(engagementDiagnostics.values()).reduce(
+            (acc, { source }) => {
+              acc[source] = (acc[source] ?? 0) + 1;
+              return acc;
+            },
+            {} as Record<"model" | "tool" | "fallback", number>,
+          );
+
+          console.log("[course.generate] Engagement summary", {
+            jobId: job.id,
+            workerId,
+            summary: engagementSummary,
+          });
 
           let conclusionResult: CourseConclusionResult | null = null;
           const courseHighlights = completedLessonLabels.length
@@ -556,6 +626,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                     duration: subtopicWithIds.duration ?? undefined,
                     content: generated?.content ?? fallbackContent,
                     summary: generated?.summary ?? subtopicWithIds.description,
+                    engagementBlocks: generated?.engagementBlocks ?? undefined,
                   };
                 }),
               };
