@@ -2,6 +2,9 @@
 
 import {
   type ComponentPropsWithoutRef,
+  type ReactElement,
+  type ReactNode,
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -110,12 +113,49 @@ const CodeBlock: Components["code"] = ({ inline, className, children, ...props }
   );
 };
 
+// Helper function to check if children contain block-level elements
+const hasBlockLevelChild = (children: ReactNode): boolean => {
+  let hasBlock = false;
+  
+  const checkChild = (child: ReactNode): void => {
+    if (hasBlock) return;
+    
+    if (!child) return;
+    
+    // Check if it's a React element
+    if (typeof child === 'object' && 'type' in child) {
+      const element = child as ReactElement;
+      // Check if it's our CodeBlock component or a div (which CodeBlock returns)
+      if (element.type === 'div' || element.props?.className?.includes('group/code')) {
+        hasBlock = true;
+        return;
+      }
+    }
+    
+    // Recursively check arrays of children
+    if (Array.isArray(child)) {
+      child.forEach(checkChild);
+    }
+  };
+  
+  checkChild(children);
+  return hasBlock;
+};
+
 const sharedComponents: Partial<Components> = {
   a: ({ href, ...props }: { href?: string | null } & ComponentPropsWithoutRef<"a">) => (
     // open links in a new tab and use safe rel; sanitize href
     <a href={href ? sanitizeUrl(String(href)) : href ?? undefined} {...props} target="_blank" rel="noopener noreferrer" />
   ),
   code: CodeBlock,
+  p: ({ children, ...props }) => {
+    // If paragraph contains block-level elements (like our CodeBlock div),
+    // render as Fragment to avoid invalid HTML nesting
+    if (hasBlockLevelChild(children)) {
+      return <Fragment>{children}</Fragment>;
+    }
+    return <p {...props}>{children}</p>;
+  },
 };
 
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
