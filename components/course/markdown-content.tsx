@@ -5,6 +5,7 @@ import {
   type ReactElement,
   type ReactNode,
   Fragment,
+  isValidElement,
   useCallback,
   useEffect,
   useRef,
@@ -113,33 +114,66 @@ const CodeBlock: Components["code"] = ({ inline, className, children, ...props }
   );
 };
 
+const blockLevelTags = new Set([
+  "div",
+  "pre",
+  "table",
+  "ul",
+  "ol",
+  "li",
+  "blockquote",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+]);
+
 // Helper function to check if children contain block-level elements
 const hasBlockLevelChild = (children: ReactNode): boolean => {
-  let hasBlock = false;
-  
-  const checkChild = (child: ReactNode): void => {
-    if (hasBlock) return;
-    
-    if (!child) return;
-    
-    // Check if it's a React element
-    if (typeof child === 'object' && 'type' in child) {
-      const element = child as ReactElement;
-      // Check if it's our CodeBlock component or a div (which CodeBlock returns)
-      if (element.type === 'div' || element.props?.className?.includes('group/code')) {
-        hasBlock = true;
-        return;
+  if (!children) {
+    return false;
+  }
+
+  const items = Array.isArray(children) ? children : [children];
+
+  for (const child of items) {
+    if (child == null || typeof child === "boolean") {
+      continue;
+    }
+
+    if (Array.isArray(child)) {
+      if (hasBlockLevelChild(child)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (isValidElement(child)) {
+      if (
+        child.type === CodeBlock ||
+        (typeof child.type === "string" && blockLevelTags.has(child.type))
+      ) {
+        return true;
+      }
+
+      const { children: nestedChildren, className } = child.props as {
+        children?: ReactNode;
+        className?: string;
+      };
+
+      if (typeof className === "string" && className.includes("group/code")) {
+        return true;
+      }
+
+      if (nestedChildren && hasBlockLevelChild(nestedChildren)) {
+        return true;
       }
     }
-    
-    // Recursively check arrays of children
-    if (Array.isArray(child)) {
-      child.forEach(checkChild);
-    }
-  };
-  
-  checkChild(children);
-  return hasBlock;
+  }
+
+  return false;
 };
 
 const sharedComponents: Partial<Components> = {
