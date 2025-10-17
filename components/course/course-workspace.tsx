@@ -211,7 +211,13 @@ function ReflectionEngagementBlockCard({
   );
 }
 
-function LessonEngagementBlocks({ blocks }: { blocks?: EngagementBlock[] }) {
+function LessonEngagementBlocks({ 
+  blocks, 
+  submoduleId 
+}: { 
+  blocks?: EngagementBlock[];
+  submoduleId: string;
+}) {
   if (!blocks || blocks.length === 0) return null;
 
   return (
@@ -224,12 +230,12 @@ function LessonEngagementBlocks({ blocks }: { blocks?: EngagementBlock[] }) {
       <div className="space-y-5">
         {blocks.map((block, index) =>
           isQuizBlock(block) ? (
-            <QuizEngagementBlockCard block={block} index={index} key={`quiz-${index}`} />
+            <QuizEngagementBlockCard block={block} index={index} key={`${submoduleId}-quiz-${index}`} />
           ) : isReflectionBlock(block) ? (
             <ReflectionEngagementBlockCard
               block={block}
               index={index}
-              key={`reflection-${index}`}
+              key={`${submoduleId}-reflection-${index}`}
             />
           ) : null,
         )}
@@ -1310,6 +1316,7 @@ export function CourseWorkspace({
                       <MarkdownContent content={activeSubmodule.content} />
                       <LessonEngagementBlocks
                         blocks={activeSubmodule.engagementBlocks}
+                        submoduleId={activeSubmodule.id}
                       />
                     </>
                   ) : (
