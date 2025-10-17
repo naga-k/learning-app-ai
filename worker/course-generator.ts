@@ -244,18 +244,19 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
               try {
                 const overviewJsonText = extractJsonFromText(text);
                 const parsedOverview = JSON.parse(overviewJsonText);
-                
+
                 console.log("[course.generate] Overview JSON before validation", {
                   jobId: job.id,
                   workerId,
                   isArray: Array.isArray(parsedOverview),
                   type: typeof parsedOverview,
-                  keys: typeof parsedOverview === "object" && !Array.isArray(parsedOverview)
-                    ? Object.keys(parsedOverview).sort()
-                    : "N/A",
+                  keys:
+                    typeof parsedOverview === "object" && !Array.isArray(parsedOverview)
+                      ? Object.keys(parsedOverview).sort()
+                      : "N/A",
                   rawJsonPreview: JSON.stringify(parsedOverview).substring(0, 500),
                 });
-                
+
                 return CourseOverviewResultSchema.parse(parsedOverview);
               } catch (parseError) {
                 console.error("[course.generate] Overview parse FAILED", {
@@ -427,9 +428,8 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                 parse: (text) => {
                   try {
                     const submoduleJsonText = extractJsonFromText(text);
-                    const parsedSubmodule = JSON.parse(submoduleJsonText);
-                    
-                    // Log the parsed JSON structure before validation
+                    let parsedSubmodule = JSON.parse(submoduleJsonText);
+
                     console.log("[course.generate] Submodule JSON before validation", {
                       jobId: job.id,
                       workerId,
@@ -437,17 +437,64 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                       submodule: subtopic.title,
                       isArray: Array.isArray(parsedSubmodule),
                       type: typeof parsedSubmodule,
-                      keys: typeof parsedSubmodule === "object" && !Array.isArray(parsedSubmodule) 
-                        ? Object.keys(parsedSubmodule).sort()
+                      keys:
+                        typeof parsedSubmodule === "object" && !Array.isArray(parsedSubmodule)
+                          ? Object.keys(parsedSubmodule).sort()
+                          : "N/A",
+                      arrayLength: Array.isArray(parsedSubmodule)
+                        ? parsedSubmodule.length
                         : "N/A",
-                      arrayLength: Array.isArray(parsedSubmodule) ? parsedSubmodule.length : "N/A",
                       rawJsonPreview: JSON.stringify(parsedSubmodule).substring(0, 500),
                     });
-                    
+
+                    if (Array.isArray(parsedSubmodule)) {
+                      console.warn(
+                        "[course.generate] Detected array response for lesson; converting to fallback object",
+                        {
+                          jobId: job.id,
+                          workerId,
+                          module: planModule.title,
+                          submodule: subtopic.title,
+                          arrayLength: parsedSubmodule.length,
+                        },
+                      );
+
+                      const arrayValue = parsedSubmodule;
+                      const looksLikeResources = arrayValue.every((entry) => {
+                        if (!entry || typeof entry !== "object") return false;
+                        const candidate = entry as Record<string, unknown>;
+                        return (
+                          typeof candidate.title === "string" ||
+                          typeof candidate.url === "string" ||
+                          typeof candidate.type === "string"
+                        );
+                      });
+
+                      const looksLikeStrings = arrayValue.every((entry) => typeof entry === "string");
+
+                      const fallback: CourseSubmoduleResult = {
+                        content: `## ${subtopic.title}\n\n_Content could not be generated. Please regenerate this lesson._`,
+                        summary: subtopic.description,
+                      };
+
+                      if (looksLikeResources) {
+                        fallback.recommendedResources = arrayValue as CourseResource[];
+                      } else if (looksLikeStrings && arrayValue.length > 0) {
+                        const items = arrayValue
+                          .map((entry) => (entry as string).trim())
+                          .filter(Boolean);
+                        if (items.length > 0) {
+                          fallback.content = `${fallback.content}\n\n- ${items.join("\n- ")}`;
+                        }
+                      }
+
+                      parsedSubmodule = fallback;
+                    }
+
                     return CourseSubmoduleResultSchema.parse(parsedSubmodule);
                   } catch (parseError) {
-                    // Log detailed error info for debugging
-                    const errorMsg = parseError instanceof Error ? parseError.message : String(parseError);
+                    const errorMsg =
+                      parseError instanceof Error ? parseError.message : String(parseError);
                     console.error("[course.generate] Submodule parse FAILED", {
                       jobId: job.id,
                       workerId,
@@ -455,7 +502,10 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                       submodule: subtopic.title,
                       error: errorMsg,
                       errorStack: parseError instanceof Error ? parseError.stack : undefined,
-                      zodError: parseError instanceof Error && parseError.cause ? parseError.cause : undefined,
+                      zodError:
+                        parseError instanceof Error && parseError.cause
+                          ? parseError.cause
+                          : undefined,
                     });
                     throw parseError;
                   }
@@ -558,18 +608,19 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                 try {
                   const conclusionJsonText = extractJsonFromText(text);
                   const parsedConclusion = JSON.parse(conclusionJsonText);
-                  
+
                   console.log("[course.generate] Conclusion JSON before validation", {
                     jobId: job.id,
                     workerId,
                     isArray: Array.isArray(parsedConclusion),
                     type: typeof parsedConclusion,
-                    keys: typeof parsedConclusion === "object" && !Array.isArray(parsedConclusion)
-                      ? Object.keys(parsedConclusion).sort()
-                      : "N/A",
+                    keys:
+                      typeof parsedConclusion === "object" && !Array.isArray(parsedConclusion)
+                        ? Object.keys(parsedConclusion).sort()
+                        : "N/A",
                     rawJsonPreview: JSON.stringify(parsedConclusion).substring(0, 500),
                   });
-                  
+
                   return CourseConclusionResultSchema.parse(parsedConclusion);
                 } catch (parseError) {
                   console.error("[course.generate] Conclusion parse FAILED", {
@@ -658,18 +709,19 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                 });
                 const courseJsonText = extractJsonFromText(text);
                 const parsedCourse = JSON.parse(courseJsonText);
-                
+
                 console.log("[course.generate] Full course JSON before validation (fallback)", {
                   jobId: job.id,
                   workerId,
                   isArray: Array.isArray(parsedCourse),
                   type: typeof parsedCourse,
-                  keys: typeof parsedCourse === "object" && !Array.isArray(parsedCourse)
-                    ? Object.keys(parsedCourse).sort()
-                    : "N/A",
+                  keys:
+                    typeof parsedCourse === "object" && !Array.isArray(parsedCourse)
+                      ? Object.keys(parsedCourse).sort()
+                      : "N/A",
                   rawJsonPreview: JSON.stringify(parsedCourse).substring(0, 500),
                 });
-                
+
                 return CourseSchema.parse(parsedCourse);
               } catch (parseError) {
                 console.error("[course.generate] Course parse FAILED (fallback)", {

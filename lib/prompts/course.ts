@@ -171,8 +171,10 @@ ${formatPlanOutline(plan)}
 `;
 
 const courseSubmoduleJsonSchema = `
+CRITICAL: The root JSON MUST ALWAYS be an OBJECT. Never output an array at the top level.
+
 {
-  "content": "string (complete markdown lesson, starting with ## {Submodule Title})",
+  "content": "string (REQUIRED - complete markdown lesson, starting with ## {Submodule Title}. This is the main lesson text, always required even if resources are included.)",
   "summary": "string (optional 1 sentence navigation blurb)",
   "recommendedResources": [
     {
@@ -181,7 +183,7 @@ const courseSubmoduleJsonSchema = `
       "url": "string (optional)",
       "type": "string (optional)"
     }
-  ] (optional),
+  ] (optional - this is a NESTED array within the object, not the root output),
   "engagementBlocks": [
     {
       "type": "quiz",
@@ -226,8 +228,13 @@ export const buildCourseSubmodulePrompt = ({
   completedLessonsSummary,
 }: BuildCourseSubmodulePromptArgs) => `You are writing a single lesson inside a hyper-personalized course for one learner.
 
-Return ONLY valid JSON matching this schema:
+Return ONLY valid JSON as a single OBJECT matching this schema:
 ${courseSubmoduleJsonSchema}
+
+IMPORTANT REMINDER:
+- The output MUST ALWAYS be an OBJECT with "content", "summary", "recommendedResources", and "engagementBlocks" fields.
+- NEVER output an array at the root level, even if the lesson is primarily about listing resources or templates.
+- If the lesson includes resources, they go in the "recommendedResources" array INSIDE the object, never as the root output.
 
 Writing rules:
 - Write directly to the learner using their language, motivations, and constraints.
