@@ -2,6 +2,10 @@
 
 import {
   type ComponentPropsWithoutRef,
+  type ReactElement,
+  type ReactNode,
+  Fragment,
+  isValidElement,
   useCallback,
   useEffect,
   useRef,
@@ -110,12 +114,82 @@ const CodeBlock: Components["code"] = ({ inline, className, children, ...props }
   );
 };
 
+const blockLevelTags = new Set([
+  "div",
+  "pre",
+  "table",
+  "ul",
+  "ol",
+  "li",
+  "blockquote",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+]);
+
+// Helper function to check if children contain block-level elements
+const hasBlockLevelChild = (children: ReactNode): boolean => {
+  if (!children) {
+    return false;
+  }
+
+  const items = Array.isArray(children) ? children : [children];
+
+  for (const child of items) {
+    if (child == null || typeof child === "boolean") {
+      continue;
+    }
+
+    if (Array.isArray(child)) {
+      if (hasBlockLevelChild(child)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (isValidElement(child)) {
+      if (
+        child.type === CodeBlock ||
+        (typeof child.type === "string" && blockLevelTags.has(child.type))
+      ) {
+        return true;
+      }
+
+      const { children: nestedChildren, className } = child.props as {
+        children?: ReactNode;
+        className?: string;
+      };
+
+      if (typeof className === "string" && className.includes("group/code")) {
+        return true;
+      }
+
+      if (nestedChildren && hasBlockLevelChild(nestedChildren)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
 const sharedComponents: Partial<Components> = {
   a: ({ href, ...props }: { href?: string | null } & ComponentPropsWithoutRef<"a">) => (
     // open links in a new tab and use safe rel; sanitize href
     <a href={href ? sanitizeUrl(String(href)) : href ?? undefined} {...props} target="_blank" rel="noopener noreferrer" />
   ),
   code: CodeBlock,
+  p: ({ children, ...props }) => {
+    // If paragraph contains block-level elements (like our CodeBlock div),
+    // render as Fragment to avoid invalid HTML nesting
+    if (hasBlockLevelChild(children)) {
+      return <Fragment>{children}</Fragment>;
+    }
+    return <p {...props}>{children}</p>;
+  },
 };
 
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
