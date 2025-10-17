@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EngagementBlockArraySchema } from "./ai/tools/types";
 
 const SubtopicSchema = z.object({
   title: z.string().min(1),
@@ -35,6 +36,9 @@ const CourseSubmoduleSchema = z.object({
   ),
   summary: z.string().optional().describe(
     "Brief one-sentence summary of the lesson for navigation purposes"
+  ),
+  engagementBlocks: EngagementBlockArraySchema.optional().describe(
+    "Interactive elements for the lesson, such as quizzes or reflections, derived from tool executions or deterministic fallbacks."
   ),
 });
 

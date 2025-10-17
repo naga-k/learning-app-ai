@@ -21,7 +21,23 @@ const courseJsonSchema = `
           "title": "string",
           "duration": "string (optional)",
           "content": "string (full lesson content in markdown format)",
-          "summary": "string (optional, brief one-sentence summary)"
+          "summary": "string (optional, brief one-sentence summary)",
+          "engagementBlocks": [
+            {
+              "type": "quiz",
+              "prompt": "string",
+              "options": ["string", "..."],
+              "correctOptionIndex": "number (0-based index of correct option)",
+              "rationale": "string (optional explanation of the answer)",
+              "difficulty": "\"beginner\" | \"intermediate\" | \"advanced\" (optional)"
+            } |
+            {
+              "type": "reflection",
+              "prompt": "string",
+              "guidance": "string (optional coaching or framing)",
+              "expectedDurationMinutes": "number (optional, estimated effort)"
+            }
+          ] (optional, include 1-3 interactive blocks tailored to the learner)
         }
       ]
     }
@@ -79,6 +95,13 @@ Produce full course content that mirrors the approved plan and feels unmistakabl
 - Preserve module order and submodule intent from the plan. Each submodule should be a complete markdown lesson starting with \`## {Submodule Title}\`.
 - Blend formats (headings, lists, tables, callouts, code fences, case snippets) to keep lessons skimmable and lively.
 - Relate each lesson back to what the learner said they need, how they will use it, and what success looks like for them.
+
+**Interactive engagement**
+- For every submodule, populate the \`engagementBlocks\` array with 1–2 activities tailored to the learner’s context.
+- Available tools:
+  - \`generate_multiple_choice_quiz\`: fast knowledge checks. Include \`prompt\`, 2–4 \`options\`, a \`correctOptionIndex\`, plus optional \`rationale\` and \`difficulty\`.
+  - \`generate_reflection_prompt\`: targeted reflections. Include \`prompt\`, optional \`guidance\`, and optional \`expectedDurationMinutes\`.
+- Choose the mix that reinforces the key takeaway of that lesson. Avoid generic prompts—hook them into the learner’s actual goals, constraints, or projects.
 
 **Pacing cues**
 - Conceptual explanation: ~200–250 words per learner minute.
@@ -158,7 +181,23 @@ const courseSubmoduleJsonSchema = `
       "url": "string (optional)",
       "type": "string (optional)"
     }
-  ] (optional)
+  ] (optional),
+  "engagementBlocks": [
+    {
+      "type": "quiz",
+      "prompt": "string",
+      "options": ["string", "..."],
+      "correctOptionIndex": "number (0-based index of correct option)",
+      "rationale": "string (optional)",
+      "difficulty": "\"beginner\" | \"intermediate\" | \"advanced\" (optional)"
+    } |
+    {
+      "type": "reflection",
+      "prompt": "string",
+      "guidance": "string (optional)",
+      "expectedDurationMinutes": "number (optional)"
+    }
+  ] (optional, include 1-3 interactive blocks tailored to the learner)
 }`.trim();
 
 type BuildCourseSubmodulePromptArgs = {
@@ -197,6 +236,12 @@ Writing rules:
 - Keep the effort within ${subtopic.duration}, allowing time for practice and reflection.
 - Reference prior completed lessons when helpful: ${completedLessonsSummary || 'No lessons completed yet—this is the first.'}
 - Do NOT invent new modules or lessons. Stay aligned with the plan structure.
+- Populate \`engagementBlocks\` with 1–2 interactive activities that reinforce the lesson's key insight. Prefer a mix of quiz and reflection when it fits the learner's goals.
+
+Available engagement tools:
+- \`generate_multiple_choice_quiz\`: Use for concise comprehension checks. Provide a personalized \`prompt\`, 2–4 plausible \`options\`, the \`correctOptionIndex\`, and optional \`rationale\`/\`difficulty\`.
+- \`generate_reflection_prompt\`: Use for self-assessment or planning. Provide a contextual \`prompt\`, optional \`guidance\`, and optional \`expectedDurationMinutes\`.
+Pick whichever tool (or combination) best matches this learner's scenario; skip a tool only if it would feel forced.
 
 Learner & conversation context:
 ${fullContext}
