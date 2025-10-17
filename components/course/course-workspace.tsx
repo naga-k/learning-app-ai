@@ -583,7 +583,7 @@ export function CourseWorkspace({
                         )}
                       </button>
 
-                      {moduleInteractive && (
+                      {moduleReady && (
                         <ul className="mt-3 space-y-1 border-l border-slate-200 pl-3 dark:border-white/10">
                           {module.submodules.map((submodule) => {
                             const submoduleActive =
@@ -597,6 +597,7 @@ export function CourseWorkspace({
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    setActiveModuleId(module.moduleId);
                                     setActiveSubmoduleId(submodule.id);
                                     setViewMode("lesson");
                                   }}
@@ -629,7 +630,7 @@ export function CourseWorkspace({
                         </ul>
                       )}
 
-                      {!moduleInteractive && (
+                      {!moduleReady && (
                         <div className="mt-3 rounded-xl border border-dashed border-slate-300/70 bg-slate-100/60 p-3 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
                           Lessons are still generating. We’ll unlock this module soon.
                         </div>
@@ -902,8 +903,7 @@ export function CourseWorkspace({
                             )}
                           </button>
 
-                          {isActiveModule && (
-                            <ul className="mt-3 space-y-1 border-l border-border pl-3 transition-colors dark:border-white/10">
+                          <ul className="mt-3 space-y-1 border-l border-border pl-3 transition-colors dark:border-white/10">
                               {module.submodules.map((submodule) => {
                                 const submoduleActive =
                                   submodule.id === activeSubmoduleId;
@@ -912,6 +912,7 @@ export function CourseWorkspace({
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        setActiveModuleId(module.moduleId);
                                         setActiveSubmoduleId(submodule.id);
                                         setViewMode("lesson");
                                         setMobileAccordionExpanded(false);
@@ -929,7 +930,6 @@ export function CourseWorkspace({
                                 );
                               })}
                             </ul>
-                          )}
                         </div>
                       );
                     })}
