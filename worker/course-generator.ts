@@ -24,7 +24,7 @@ import {
   buildCoursePrompt,
 } from "@/lib/prompts/course";
 import { extractJsonFromText } from "@/lib/ai/json";
-import { generateText, NoObjectGeneratedError, Output } from "ai";
+import { generateText } from "ai";
 import {
   activeAIProvider,
   activeAIProviderName,
@@ -116,172 +116,46 @@ const WORKER_CONCURRENCY = Math.max(
   Number(process.env.COURSE_GENERATION_WORKER_CONCURRENCY ?? "3"),
 );
 
-const JSON_REMINDER = "Reminder: Respond with valid JSON matching the schema.";
-const MAX_JSON_JOB_ATTEMPTS = Math.max(
-  1,
-  Number(process.env.COURSE_GENERATION_JSON_JOB_ATTEMPTS ?? "2"),
-);
-
 type CourseGenerationJobPayload = {
   fullContext?: string;
   planNormalized?: LearningPlanWithIds | null;
   metadata?: Record<string, unknown>;
 };
 
-class CourseJsonStructureError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message);
-    this.name = "CourseJsonStructureError";
-    if (options?.cause !== undefined) {
-      this.cause = options.cause;
-    }
-  }
-
-  cause?: unknown;
-}
-
-type StructuredGenerationParams<TValue, TResult = TValue> = {
+type GenerateJsonWithRetryParams<T> = {
   prompt: string;
-  schema: z.ZodType<TValue>;
-  logLabel: string;
-  logMeta: Record<string, unknown>;
-  transform?: (value: TValue) => TResult;
-  fallbackParse?: (rawText: string) => Promise<unknown> | unknown;
+  parse: (text: string) => T;
 };
 
-function safeJsonPreview(value: unknown) {
-  try {
-    return JSON.stringify(value).substring(0, 500);
-  } catch {
-    return "[unserializable]";
-  }
-}
-
-function isLikelyJsonError(error: unknown): boolean {
-  if (error == null) return false;
-  if (NoObjectGeneratedError.isInstance?.(error)) return true;
-  if (error instanceof Error) {
-    if (/json/i.test(error.message)) return true;
-    if (error.cause && isLikelyJsonError(error.cause)) return true;
-  }
-  return false;
-}
-
-function extractErrorText(error: unknown): string | null {
-  if (!error || typeof error !== "object") {
-    return null;
-  }
-
-  if ("text" in error && typeof (error as { text?: unknown }).text === "string") {
-    return (error as { text: string }).text;
-  }
-
-  if (error instanceof Error && error.cause) {
-    return extractErrorText(error.cause);
-  }
-
-  return null;
-}
-
-async function generateStructuredWithRetry<TValue, TResult = TValue>({
+async function generateJsonWithRetry<T>({
   prompt,
-  schema,
-  logLabel,
-  logMeta,
-  transform,
-  fallbackParse,
-}: StructuredGenerationParams<TValue, TResult>): Promise<TResult> {
-  const prompts = [prompt, `${prompt}\n\n${JSON_REMINDER}`];
-  let lastError: unknown;
+  parse,
+}: GenerateJsonWithRetryParams<T>): Promise<T> {
+  const attempt = async (effectivePrompt: string) => {
+    const generation = await generateText({
+      model: getModel("course"),
+      prompt: effectivePrompt,
+      tools: webSearchTools,
+      providerOptions: courseProviderOptions,
+    });
 
-  const applyTransform = (value: TValue): TResult =>
-    (transform ? transform(value) : (value as unknown as TResult));
-
-  const logStructured = (value: unknown, attempt: number) => {
-    const baseLog = {
-      ...logMeta,
-      attempt,
-      isArray: Array.isArray(value),
-      type: typeof value,
-      keys:
-        typeof value === "object" && value !== null && !Array.isArray(value)
-          ? Object.keys(value as Record<string, unknown>).sort()
-          : "N/A",
-      rawJsonPreview: safeJsonPreview(value),
-    };
-    console.log(`[course.generate] ${logLabel}`, baseLog);
+    return parse(generation.text);
   };
 
-  for (let attemptIndex = 0; attemptIndex < prompts.length; attemptIndex += 1) {
-    const effectivePrompt = prompts[attemptIndex];
+  try {
+    return await attempt(prompt);
+  } catch (error) {
+    const needsReminder =
+      error instanceof Error
+        ? /json/i.test(error.message) || /could not extract valid json/i.test(error.message)
+        : false;
 
-    try {
-      const generation = await generateText({
-        model: getModel("course"),
-        prompt: effectivePrompt,
-        tools: webSearchTools,
-        providerOptions: courseProviderOptions,
-        experimental_output: Output.object({ schema }),
-      });
-
-      const parsed = generation.experimental_output;
-      logStructured(parsed, attemptIndex + 1);
-      return applyTransform(parsed);
-    } catch (error) {
-      lastError = error;
-
-      if (!isLikelyJsonError(error)) {
-        throw error;
-      }
-
-      const rawText = extractErrorText(error);
-      if (rawText && fallbackParse) {
-        try {
-          const fallbackValue = await fallbackParse(rawText);
-          if (fallbackValue != null) {
-            const validated = schema.parse(fallbackValue as unknown);
-            console.warn(`[course.generate] ${logLabel} repaired via fallback parse`, {
-              ...logMeta,
-              attempt: attemptIndex + 1,
-            });
-            logStructured(validated, attemptIndex + 1);
-            return applyTransform(validated);
-          }
-        } catch (fallbackError) {
-          lastError = fallbackError;
-          console.error(`[course.generate] ${logLabel} fallback parse failed`, {
-            ...logMeta,
-            attempt: attemptIndex + 1,
-            error: fallbackError instanceof Error ? fallbackError.message : fallbackError,
-          });
-        }
-      }
-
-      if (attemptIndex < prompts.length - 1) {
-        console.warn(`[course.generate] ${logLabel} retrying after JSON error`, {
-          ...logMeta,
-          attempt: attemptIndex + 1,
-          error: error instanceof Error ? error.message : error,
-        });
-        continue;
-      }
+    if (!needsReminder) {
+      throw error;
     }
+
+    return attempt(`${prompt}\n\nReminder: Respond with valid JSON matching the schema.`);
   }
-
-  const causeMessage =
-    lastError instanceof Error
-      ? lastError.message
-      : typeof lastError === "string"
-        ? lastError
-        : null;
-
-  const failureMessage = causeMessage
-    ? `${logLabel} generation failed due to invalid JSON output: ${causeMessage}`
-    : `${logLabel} generation failed due to invalid JSON output.`;
-
-  throw new CourseJsonStructureError(failureMessage, {
-    cause: lastError,
-  });
 }
 
 function sleep(ms: number) {
@@ -290,11 +164,7 @@ function sleep(ms: number) {
   });
 }
 
-async function processJob(
-  job: CourseGenerationJobRecord,
-  workerId: string,
-  attempt = 1,
-) {
+async function processJob(job: CourseGenerationJobRecord, workerId: string) {
   const payload = (job.payload ?? {}) as CourseGenerationJobPayload;
   const fullContext = typeof payload.fullContext === "string" ? payload.fullContext : null;
   const planPayload = payload.planNormalized ?? null;
@@ -320,8 +190,6 @@ async function processJob(
     planProvided: Boolean(plan),
     contextLength: fullContext.length,
     workerId,
-    attempt,
-    maxAttempts: MAX_JSON_JOB_ATTEMPTS,
   });
 
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -367,18 +235,38 @@ async function processJob(
             jobId: job.id,
             workerId,
           });
-          const overviewResult = await generateStructuredWithRetry({
+          const overviewResult = await generateJsonWithRetry<CourseOverviewResult>({
             prompt: buildCourseOverviewPrompt({
               fullContext,
               plan,
             }),
-            schema: CourseOverviewResultSchema,
-            logLabel: "Overview JSON before validation",
-            logMeta: { jobId: job.id, workerId },
-            fallbackParse: (rawText) => {
-              const overviewJsonText = extractJsonFromText(rawText);
-              if (!overviewJsonText) return null;
-              return JSON.parse(overviewJsonText);
+            parse: (text) => {
+              try {
+                const overviewJsonText = extractJsonFromText(text);
+                const parsedOverview = JSON.parse(overviewJsonText);
+
+                console.log("[course.generate] Overview JSON before validation", {
+                  jobId: job.id,
+                  workerId,
+                  isArray: Array.isArray(parsedOverview),
+                  type: typeof parsedOverview,
+                  keys:
+                    typeof parsedOverview === "object" && !Array.isArray(parsedOverview)
+                      ? Object.keys(parsedOverview).sort()
+                      : "N/A",
+                  rawJsonPreview: JSON.stringify(parsedOverview).substring(0, 500),
+                });
+
+                return CourseOverviewResultSchema.parse(parsedOverview);
+              } catch (parseError) {
+                console.error("[course.generate] Overview parse FAILED", {
+                  jobId: job.id,
+                  workerId,
+                  error: parseError instanceof Error ? parseError.message : String(parseError),
+                  errorStack: parseError instanceof Error ? parseError.stack : undefined,
+                });
+                throw parseError;
+              }
             },
           });
 
@@ -529,7 +417,7 @@ async function processJob(
                 submodule: subtopic.title,
               });
 
-              const submoduleResult = await generateStructuredWithRetry<CourseSubmoduleResult>({
+              const submoduleResult = await generateJsonWithRetry<CourseSubmoduleResult>({
                 prompt: buildCourseSubmodulePrompt({
                   fullContext,
                   plan: planWithIds,
@@ -537,31 +425,90 @@ async function processJob(
                   subtopic,
                   completedLessonsSummary: completionSummary,
                 }),
-                schema: CourseSubmoduleResultSchema,
-                logLabel: "Submodule JSON before validation",
-                logMeta: {
-                  jobId: job.id,
-                  workerId,
-                  module: planModule.title,
-                  submodule: subtopic.title,
-                },
-                fallbackParse: (rawText) => {
-                  const submoduleJsonText = extractJsonFromText(rawText);
-                  if (!submoduleJsonText) return null;
-                  const parsed = JSON.parse(submoduleJsonText);
-                  if (Array.isArray(parsed)) {
-                    const looksLikeResources =
-                      parsed.length > 0 &&
-                      typeof parsed[0] === "object" &&
-                      parsed[0] !== null &&
-                      ("title" in parsed[0] || "url" in parsed[0] || "type" in parsed[0]);
-                    return {
-                      content: `## ${subtopic.title}\n\n_Content could not be generated. Please regenerate this lesson._`,
-                      summary: subtopic.description,
-                      recommendedResources: looksLikeResources ? parsed : undefined,
-                    };
+                parse: (text) => {
+                  try {
+                    const submoduleJsonText = extractJsonFromText(text);
+                    let parsedSubmodule = JSON.parse(submoduleJsonText);
+
+                    console.log("[course.generate] Submodule JSON before validation", {
+                      jobId: job.id,
+                      workerId,
+                      module: planModule.title,
+                      submodule: subtopic.title,
+                      isArray: Array.isArray(parsedSubmodule),
+                      type: typeof parsedSubmodule,
+                      keys:
+                        typeof parsedSubmodule === "object" && !Array.isArray(parsedSubmodule)
+                          ? Object.keys(parsedSubmodule).sort()
+                          : "N/A",
+                      arrayLength: Array.isArray(parsedSubmodule)
+                        ? parsedSubmodule.length
+                        : "N/A",
+                      rawJsonPreview: JSON.stringify(parsedSubmodule).substring(0, 500),
+                    });
+
+                    if (Array.isArray(parsedSubmodule)) {
+                      console.warn(
+                        "[course.generate] Detected array response for lesson; converting to fallback object",
+                        {
+                          jobId: job.id,
+                          workerId,
+                          module: planModule.title,
+                          submodule: subtopic.title,
+                          arrayLength: parsedSubmodule.length,
+                        },
+                      );
+
+                      const arrayValue = parsedSubmodule;
+                      const looksLikeResources = arrayValue.every((entry) => {
+                        if (!entry || typeof entry !== "object") return false;
+                        const candidate = entry as Record<string, unknown>;
+                        return (
+                          typeof candidate.title === "string" ||
+                          typeof candidate.url === "string" ||
+                          typeof candidate.type === "string"
+                        );
+                      });
+
+                      const looksLikeStrings = arrayValue.every((entry) => typeof entry === "string");
+
+                      const fallback: CourseSubmoduleResult = {
+                        content: `## ${subtopic.title}\n\n_Content could not be generated. Please regenerate this lesson._`,
+                        summary: subtopic.description,
+                      };
+
+                      if (looksLikeResources) {
+                        fallback.recommendedResources = arrayValue as CourseResource[];
+                      } else if (looksLikeStrings && arrayValue.length > 0) {
+                        const items = arrayValue
+                          .map((entry) => (entry as string).trim())
+                          .filter(Boolean);
+                        if (items.length > 0) {
+                          fallback.content = `${fallback.content}\n\n- ${items.join("\n- ")}`;
+                        }
+                      }
+
+                      parsedSubmodule = fallback;
+                    }
+
+                    return CourseSubmoduleResultSchema.parse(parsedSubmodule);
+                  } catch (parseError) {
+                    const errorMsg =
+                      parseError instanceof Error ? parseError.message : String(parseError);
+                    console.error("[course.generate] Submodule parse FAILED", {
+                      jobId: job.id,
+                      workerId,
+                      module: planModule.title,
+                      submodule: subtopic.title,
+                      error: errorMsg,
+                      errorStack: parseError instanceof Error ? parseError.stack : undefined,
+                      zodError:
+                        parseError instanceof Error && parseError.cause
+                          ? parseError.cause
+                          : undefined,
+                    });
+                    throw parseError;
                   }
-                  return parsed;
                 },
               });
 
@@ -651,19 +598,39 @@ async function processJob(
               jobId: job.id,
               workerId,
             });
-            conclusionResult = await generateStructuredWithRetry({
+            conclusionResult = await generateJsonWithRetry<CourseConclusionResult>({
               prompt: buildCourseConclusionPrompt({
                 fullContext,
                 plan: planWithIds,
                 courseHighlights,
               }),
-              schema: CourseConclusionResultSchema,
-              logLabel: "Conclusion JSON before validation",
-              logMeta: { jobId: job.id, workerId },
-              fallbackParse: (rawText) => {
-                const conclusionJsonText = extractJsonFromText(rawText);
-                if (!conclusionJsonText) return null;
-                return JSON.parse(conclusionJsonText);
+              parse: (text) => {
+                try {
+                  const conclusionJsonText = extractJsonFromText(text);
+                  const parsedConclusion = JSON.parse(conclusionJsonText);
+
+                  console.log("[course.generate] Conclusion JSON before validation", {
+                    jobId: job.id,
+                    workerId,
+                    isArray: Array.isArray(parsedConclusion),
+                    type: typeof parsedConclusion,
+                    keys:
+                      typeof parsedConclusion === "object" && !Array.isArray(parsedConclusion)
+                        ? Object.keys(parsedConclusion).sort()
+                        : "N/A",
+                    rawJsonPreview: JSON.stringify(parsedConclusion).substring(0, 500),
+                  });
+
+                  return CourseConclusionResultSchema.parse(parsedConclusion);
+                } catch (parseError) {
+                  console.error("[course.generate] Conclusion parse FAILED", {
+                    jobId: job.id,
+                    workerId,
+                    error: parseError instanceof Error ? parseError.message : String(parseError),
+                    errorStack: parseError instanceof Error ? parseError.stack : undefined,
+                  });
+                  throw parseError;
+                }
               },
             });
           } catch (conclusionError) {
@@ -731,25 +698,42 @@ async function processJob(
             plan: null,
           });
 
-          const courseResult = await generateStructuredWithRetry({
+          return generateJsonWithRetry({
             prompt: coursePrompt,
-            schema: CourseSchema,
-            logLabel: "Full course JSON before validation (fallback)",
-            logMeta: { jobId: job.id, workerId },
-            fallbackParse: (rawText) => {
-              const courseJsonText = extractJsonFromText(rawText);
-              if (!courseJsonText) return null;
-              return JSON.parse(courseJsonText);
+            parse: (text) => {
+              try {
+                console.log("[course.generate] Model response received (fallback)", {
+                  jobId: job.id,
+                  elapsedMs: Date.now() - startTime,
+                  workerId,
+                });
+                const courseJsonText = extractJsonFromText(text);
+                const parsedCourse = JSON.parse(courseJsonText);
+
+                console.log("[course.generate] Full course JSON before validation (fallback)", {
+                  jobId: job.id,
+                  workerId,
+                  isArray: Array.isArray(parsedCourse),
+                  type: typeof parsedCourse,
+                  keys:
+                    typeof parsedCourse === "object" && !Array.isArray(parsedCourse)
+                      ? Object.keys(parsedCourse).sort()
+                      : "N/A",
+                  rawJsonPreview: JSON.stringify(parsedCourse).substring(0, 500),
+                });
+
+                return CourseSchema.parse(parsedCourse);
+              } catch (parseError) {
+                console.error("[course.generate] Course parse FAILED (fallback)", {
+                  jobId: job.id,
+                  workerId,
+                  error: parseError instanceof Error ? parseError.message : String(parseError),
+                  errorStack: parseError instanceof Error ? parseError.stack : undefined,
+                });
+                throw parseError;
+              }
             },
           });
-
-          console.log("[course.generate] Model response received (fallback)", {
-            jobId: job.id,
-            elapsedMs: Date.now() - startTime,
-            workerId,
-          });
-
-          return courseResult;
         })();
 
     const structuredCourse = normalizeCourse(courseObject, plan ?? undefined);
@@ -845,17 +829,6 @@ async function processJob(
       workerId,
     });
   } catch (error) {
-    if (error instanceof CourseJsonStructureError && attempt < MAX_JSON_JOB_ATTEMPTS) {
-      console.warn("[course.generate] Job attempt failed due to JSON output; retrying", {
-        jobId: job.id,
-        workerId,
-        attempt,
-        nextAttempt: attempt + 1,
-        error: error.message,
-      });
-      return processJob(job, workerId, attempt + 1);
-    }
-
     const message =
       error instanceof Error ? error.message : typeof error === "string" ? error : "Unknown error";
     console.error("[course.generate] Job failed", {
