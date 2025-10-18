@@ -5,7 +5,9 @@ import {
   getChatMessage,
   getCourseGenerationJob,
   getCourseGenerationSnapshot,
+  listCourseEngagementBlocks,
 } from '@/lib/db/operations';
+import type { CourseEngagementBlockSummary } from '@/lib/ai/tool-output';
 
 export async function GET(
   _req: Request,
@@ -48,6 +50,20 @@ export async function GET(
       ? await getCourseGenerationSnapshot(job.id)
       : null;
 
+  let engagementBlocks: CourseEngagementBlockSummary[] | null = null;
+  if (job.resultCourseVersionId) {
+    const storedBlocks = await listCourseEngagementBlocks({
+      courseVersionId: job.resultCourseVersionId,
+    });
+    engagementBlocks = storedBlocks.map((block) => ({
+      blockId: block.blockId,
+      blockType: block.blockType,
+      blockRevision: block.blockRevision,
+      contentHash: block.contentHash,
+      submoduleId: block.submoduleId,
+    }));
+  }
+
   return NextResponse.json({
     job: {
       id: job.id,
@@ -60,6 +76,9 @@ export async function GET(
       partialCourseStructured: snapshot?.structuredPartial ?? null,
       moduleProgress: snapshot?.moduleProgress ?? null,
       messageContent,
+      courseId: job.resultCourseId ?? null,
+      courseVersionId: job.resultCourseVersionId ?? null,
+      engagementBlocks,
     },
   });
 }

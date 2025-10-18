@@ -9,6 +9,8 @@ import {
   courses,
   courseGenerationJobs,
   courseGenerationSnapshots,
+  courseEngagementBlocks,
+  courseEngagementResponses,
 } from "./schema";
 
 export type StoredMessage = {
@@ -17,6 +19,11 @@ export type StoredMessage = {
   content: unknown;
   createdAt: Date;
 };
+
+export type CourseEngagementBlockRecord =
+  typeof courseEngagementBlocks.$inferSelect;
+export type CourseEngagementResponseRecord =
+  typeof courseEngagementResponses.$inferSelect;
 
 export async function createChatSession({
   userId,
@@ -151,6 +158,179 @@ export async function saveCourseVersion(params: {
     .where(eq(courses.id, course.id));
 
   return { courseId: course.id, versionId: version.id };
+}
+
+export async function replaceCourseEngagementBlocks(params: {
+  courseVersionId: string;
+  blocks: {
+    blockId: string;
+    blockType: string;
+    blockOrder: number;
+    blockRevision: number;
+    contentHash: string;
+    submoduleId: string;
+    payload: unknown;
+  }[];
+}) {
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(courseEngagementBlocks)
+      .where(eq(courseEngagementBlocks.courseVersionId, params.courseVersionId));
+
+    if (params.blocks.length === 0) {
+      return;
+    }
+
+    await tx.insert(courseEngagementBlocks).values(
+      params.blocks.map((block) => ({
+        courseVersionId: params.courseVersionId,
+        blockId: block.blockId,
+        blockType: block.blockType,
+        blockOrder: block.blockOrder,
+        blockRevision: block.blockRevision,
+        contentHash: block.contentHash,
+        submoduleId: block.submoduleId,
+        payload: block.payload,
+        updatedAt: new Date(),
+      })),
+    );
+  });
+}
+
+export async function listCourseEngagementBlocks(params: {
+  courseVersionId: string;
+}) {
+  const rows = await db
+    .select()
+    .from(courseEngagementBlocks)
+    .where(eq(courseEngagementBlocks.courseVersionId, params.courseVersionId))
+    .orderBy(courseEngagementBlocks.blockOrder);
+
+  return rows;
+}
+
+export async function listCourseEngagementResponses(params: {
+  userId: string;
+  courseVersionId: string;
+}) {
+  const rows = await db
+    .select()
+    .from(courseEngagementResponses)
+    .where(
+      and(
+        eq(courseEngagementResponses.userId, params.userId),
+        eq(courseEngagementResponses.courseVersionId, params.courseVersionId),
+      ),
+    );
+
+  return rows;
+}
+
+export async function upsertCourseEngagementResponse(params: {
+  userId: string;
+  courseId: string;
+  courseVersionId: string;
+  blockId: string;
+  blockType: string;
+  submoduleId: string;
+  blockRevision: number;
+  contentHash: string;
+  response: unknown;
+  score?: number | null;
+  isCorrect?: boolean | null;
+}) {
+  await db
+    .insert(courseEngagementResponses)
+    .values({
+      userId: params.userId,
+      courseId: params.courseId,
+      courseVersionId: params.courseVersionId,
+      blockId: params.blockId,
+      blockType: params.blockType,
+      submoduleId: params.submoduleId,
+      blockRevision: params.blockRevision,
+      contentHash: params.contentHash,
+      response: params.response,
+      score: params.score ?? null,
+      isCorrect: params.isCorrect ?? null,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [
+        courseEngagementResponses.userId,
+        courseEngagementResponses.courseVersionId,
+        courseEngagementResponses.blockId,
+      ],
+      set: {
+        response: params.response,
+        score: params.score ?? null,
+        isCorrect: params.isCorrect ?? null,
+        blockRevision: params.blockRevision,
+        contentHash: params.contentHash,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+export async function deleteCourseEngagementResponse(params: {
+  userId: string;
+  courseVersionId: string;
+  blockId: string;
+}) {
+  await db
+    .delete(courseEngagementResponses)
+    .where(
+      and(
+        eq(courseEngagementResponses.userId, params.userId),
+        eq(courseEngagementResponses.courseVersionId, params.courseVersionId),
+        eq(courseEngagementResponses.blockId, params.blockId),
+      ),
+    );
+}
+
+export async function getCourseVersionForUser(params: {
+  courseVersionId: string;
+  userId: string;
+}) {
+  const [row] = await db
+    .select({
+      version: courseVersions,
+      course: courses,
+    })
+    .from(courseVersions)
+    .innerJoin(courses, eq(courseVersions.courseId, courses.id))
+    .where(
+      and(
+        eq(courseVersions.id, params.courseVersionId),
+        eq(courses.userId, params.userId),
+      ),
+    )
+    .limit(1);
+
+  if (!row) return null;
+
+  return {
+    version: row.version,
+    course: row.course,
+  };
+}
+
+export async function getCourseEngagementBlock(params: {
+  courseVersionId: string;
+  blockId: string;
+}) {
+  const [row] = await db
+    .select()
+    .from(courseEngagementBlocks)
+    .where(
+      and(
+        eq(courseEngagementBlocks.courseVersionId, params.courseVersionId),
+        eq(courseEngagementBlocks.blockId, params.blockId),
+      ),
+    )
+    .limit(1);
+
+  return row ?? null;
 }
 
 export type CourseGenerationJobRecord =

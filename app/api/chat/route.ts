@@ -32,6 +32,7 @@ import {
   listChatMessages,
   markCourseGenerationJobFailed,
   setCourseGenerationJobAssistantMessageId,
+  listCourseEngagementBlocks,
 } from '@/lib/db/operations';
 import { randomUUID } from 'crypto';
 import type { UIMessage } from 'ai';
@@ -43,7 +44,7 @@ import {
   supportsOpenAIWebSearch,
 } from '@/lib/ai/provider';
 import { generateChatTitle } from '@/lib/chat/title';
-import { isPlanToolOutput } from '@/lib/ai/tool-output';
+import { isPlanToolOutput, type CourseEngagementBlockSummary } from '@/lib/ai/tool-output';
 import { mergeCourseToolOutputIntoMessage } from '@/lib/chat/messages';
 
 export const runtime = 'nodejs';
@@ -570,6 +571,21 @@ Be comprehensive - this is used to create course content that feels custom-made 
                 jobRecord?.status === 'completed' &&
                 jobRecord.resultCourseStructured
               ) {
+                let engagementSummary:
+                  | CourseEngagementBlockSummary[]
+                  | undefined;
+                if (jobRecord.resultCourseVersionId) {
+                  const storedBlocks = await listCourseEngagementBlocks({
+                    courseVersionId: jobRecord.resultCourseVersionId,
+                  });
+                  engagementSummary = storedBlocks.map((block) => ({
+                    blockId: block.blockId,
+                    blockType: block.blockType,
+                    blockRevision: block.blockRevision,
+                    contentHash: block.contentHash,
+                    submoduleId: block.submoduleId,
+                  }));
+                }
                 await mergeCourseToolOutputIntoMessage({
                   messageId: messageToPersist.id,
                   updates: {
@@ -583,6 +599,9 @@ Be comprehensive - this is used to create course content that feels custom-made 
                       'Your personalized course is ready.',
                     courseStructured: jobRecord
                       .resultCourseStructured as CourseWithIds,
+                    courseId: jobRecord.resultCourseId ?? undefined,
+                    courseVersionId: jobRecord.resultCourseVersionId ?? undefined,
+                    engagementBlocks: engagementSummary,
                   },
                 });
               } else if (jobRecord?.status === 'failed' && jobRecord.error) {

@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+const EngagementMetadataSchema = z.object({
+  id: z.string().min(1).optional(),
+  revision: z.number().int().positive().optional(),
+  contentHash: z.string().min(1).optional(),
+});
+
 export const QuizEngagementBlockSchema = z.object({
   type: z.literal("quiz"),
   prompt: z.string().min(1),
@@ -7,7 +13,7 @@ export const QuizEngagementBlockSchema = z.object({
   correctOptionIndex: z.number().int().nonnegative(),
   rationale: z.string().optional(),
   difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
-});
+}).merge(EngagementMetadataSchema);
 
 export type QuizEngagementBlock = z.infer<typeof QuizEngagementBlockSchema>;
 
@@ -16,7 +22,7 @@ export const ReflectionEngagementBlockSchema = z.object({
   prompt: z.string().min(1),
   guidance: z.string().optional(),
   expectedDurationMinutes: z.number().int().positive().optional(),
-});
+}).merge(EngagementMetadataSchema);
 
 export type ReflectionEngagementBlock = z.infer<
   typeof ReflectionEngagementBlockSchema
@@ -31,3 +37,8 @@ export type EngagementBlock = z.infer<typeof EngagementBlockSchema>;
 
 export const EngagementBlockArraySchema = z.array(EngagementBlockSchema);
 
+export type EngagementBlockWithMetadata = EngagementBlock & {
+  id?: string;
+  revision?: number;
+  contentHash?: string;
+};

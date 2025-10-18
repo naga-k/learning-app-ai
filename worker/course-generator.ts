@@ -7,6 +7,7 @@ import {
   saveCourseVersion,
   updateCourseGenerationJobHeartbeat,
   upsertCourseGenerationSnapshot,
+  replaceCourseEngagementBlocks,
   type CourseGenerationJobRecord,
 } from "@/lib/db/operations";
 import { mergeCourseToolOutputIntoMessage } from "@/lib/chat/messages";
@@ -14,6 +15,7 @@ import {
   CourseSchema,
   normalizeCourse,
   summarizeCourseForChat,
+  type CourseEngagementBlockWithIds,
   type LearningPlanModuleWithIds,
   type LearningPlanWithIds,
 } from "@/lib/curriculum";
@@ -62,6 +64,19 @@ const courseProviderOptions = isOpenAIProvider
       },
     }
   : undefined;
+
+const isPersistableEngagementBlock = (
+  block: CourseEngagementBlockWithIds | null | undefined,
+): block is CourseEngagementBlockWithIds =>
+  Boolean(
+    block &&
+      typeof block.id === "string" &&
+      block.id.length > 0 &&
+      typeof block.revision === "number" &&
+      Number.isFinite(block.revision) &&
+      typeof block.contentHash === "string" &&
+      block.contentHash.length > 0,
+  );
 
 const CourseResourceSchema = z.object({
   title: z.string().min(1),
@@ -786,6 +801,38 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
       structured: structuredCourse,
     });
 
+    let engagementOrder = 0;
+    const engagementBlocksToPersist = structuredCourse.modules.flatMap((module) =>
+      module.submodules.flatMap((submodule) => {
+        const blocks = (submodule.engagementBlocks ?? []).filter(
+          isPersistableEngagementBlock,
+        );
+
+        return blocks.map((block) => ({
+          blockId: block.id,
+          blockType: block.type,
+          blockOrder: ++engagementOrder,
+          blockRevision: block.revision,
+          contentHash: block.contentHash,
+          submoduleId: submodule.id,
+          payload: block,
+        }));
+      }),
+    );
+
+    await replaceCourseEngagementBlocks({
+      courseVersionId: versionId,
+      blocks: engagementBlocksToPersist,
+    });
+
+    const engagementBlockSummaries = engagementBlocksToPersist.map((block) => ({
+      blockId: block.blockId,
+      blockType: block.blockType,
+      blockRevision: block.blockRevision,
+      contentHash: block.contentHash,
+      submoduleId: block.submoduleId,
+    }));
+
     console.log("[course.generate] Course saved", {
       jobId: job.id,
       courseId,
@@ -819,6 +866,9 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
           startedAt: startTime,
           durationMs: Date.now() - startTime,
           moduleProgress: finalModuleProgress,
+          courseId,
+          courseVersionId: versionId,
+          engagementBlocks: engagementBlockSummaries,
         },
       });
     }

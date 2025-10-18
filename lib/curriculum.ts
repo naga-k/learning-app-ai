@@ -1,5 +1,10 @@
+import { createHash, randomUUID } from "crypto";
 import { z } from "zod";
-import { EngagementBlockArraySchema } from "./ai/tools/types";
+import {
+  EngagementBlockArraySchema,
+  type EngagementBlock,
+  type EngagementBlockWithMetadata,
+} from "./ai/tools/types";
 
 const stripModuleTitlePrefix = (title: string): string => {
   const trimmed = title.trim();
@@ -173,6 +178,7 @@ export const normalizeLearningPlan = (
 export type CourseSubmoduleWithIds = z.infer<typeof CourseSubmoduleSchema> & {
   id: string;
   order: number;
+  engagementBlocks?: CourseEngagementBlockWithIds[];
 };
 
 export type CourseModuleWithIds = Omit<
@@ -186,6 +192,70 @@ export type CourseModuleWithIds = Omit<
 
 export type CourseWithIds = Omit<Course, "modules"> & {
   modules: CourseModuleWithIds[];
+};
+
+export type CourseEngagementBlockWithIds = EngagementBlock & {
+  id: string;
+  order: number;
+  revision: number;
+  contentHash: string;
+  submoduleId: string;
+};
+
+const stripEngagementMetadata = (
+  block: EngagementBlockWithMetadata,
+): EngagementBlock => {
+  const cleaned = { ...block } as Record<string, unknown>;
+  delete cleaned.id;
+  delete cleaned.revision;
+  delete cleaned.contentHash;
+  return cleaned as EngagementBlock;
+};
+
+const computeEngagementBlockHash = (
+  block: EngagementBlockWithMetadata,
+): string =>
+  createHash("sha256")
+    .update(JSON.stringify(stripEngagementMetadata(block)))
+    .digest("hex");
+
+const ensureEngagementBlocks = ({
+  blocks,
+  submoduleId,
+}: {
+  blocks?: EngagementBlockWithMetadata[];
+  submoduleId: string;
+}): CourseEngagementBlockWithIds[] => {
+  if (!Array.isArray(blocks) || blocks.length === 0) return [];
+
+  return blocks.map((block, index) => {
+    const fallbackId = slugify(`${submoduleId}-block-${index + 1}-${block.type}`);
+    const normalizedId =
+      typeof block.id === "string" && block.id.trim().length > 0
+        ? block.id.trim()
+        : fallbackId.length > 0
+          ? fallbackId
+          : randomUUID();
+    const revision =
+      typeof block.revision === "number" && block.revision > 0
+        ? block.revision
+        : 1;
+    const contentHash =
+      typeof block.contentHash === "string" && block.contentHash.trim().length > 0
+        ? block.contentHash.trim()
+        : computeEngagementBlockHash(block);
+
+    const coreBlock = stripEngagementMetadata(block);
+
+    return {
+      ...coreBlock,
+      id: normalizedId,
+      order: index + 1,
+      revision,
+      contentHash,
+      submoduleId,
+    };
+  });
 };
 
 const ensureCourseIds = (
@@ -235,10 +305,19 @@ const ensureCourseIds = (
           const fallbackId = slugify(
             `${moduleId}-${subIndex + 1}-${submodule.title}`,
           );
+          const normalizedSubmoduleId = existingId ?? fallbackId;
+          const normalizedEngagementBlocks = ensureEngagementBlocks({
+            blocks: submodule.engagementBlocks,
+            submoduleId: normalizedSubmoduleId,
+          });
           return {
             ...submodule,
-            id: existingId ?? fallbackId,
+            id: normalizedSubmoduleId,
             order: subIndex + 1,
+            engagementBlocks:
+              normalizedEngagementBlocks.length > 0
+                ? normalizedEngagementBlocks
+                : undefined,
           };
         }),
       };
