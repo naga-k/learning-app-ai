@@ -343,7 +343,7 @@ export function ChatPanel({
                         return (
                           <div
                             key={`${message.id}-${index}`}
-                            className="mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100"
+                            className="mt-2 flex items-center gap-2 rounded-2xl border border-border bg-muted px-4 py-3 text-sm text-foreground transition-colors dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                           >
                             {showSpinner ? <Loader size={16} /> : null}
                             <span>{copy}</span>
