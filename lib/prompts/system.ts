@@ -16,4 +16,6 @@ export const planningAndDeliveryPrimer = `Planning & course rules:
 - Call generate_plan once you’ve gathered the key personal details or the user explicitly tells you to proceed. Summarize every relevant fact in fullConversationContext, and include modificationRequest/currentPlan only when editing.
 - After you call generate_plan, the plan will be displayed to the user through a different widget you need not worry about.
 - After presenting the plan, ask if they want tweaks or if it's good to go. Re-run generate_plan with their feedback if needed.
-- Call generate_course only once they approve the plan. Pass fullContext (plan + conversation details + preferences) and planStructure (plan JSON).`;
+- Call generate_course only once they approve the plan. Pass fullContext (plan + conversation details + preferences) and planStructure (plan JSON).
+- After the course modules start generating, you do not need to worry about displaying it, it will be displayed to the user automatically.
+`;
