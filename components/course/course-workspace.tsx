@@ -1768,26 +1768,6 @@ export function CourseWorkspace({
 
               {course.overview && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {overviewTitle && (
-                    <div className="rounded-[20px] border border-slate-200 bg-white px-5 py-5 text-sm text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-700 dark:text-slate-300">
-                        Course Title
-                      </h3>
-                      <p className="mt-3 whitespace-pre-line">
-                        <Linkify text={overviewTitle} />
-                      </p>
-                    </div>
-                  )}
-                  {overviewDescription && (
-                    <div className="rounded-[20px] border border-slate-200 bg-white px-5 py-5 text-sm text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-700 dark:text-slate-300">
-                        Course Summary
-                      </h3>
-                      <p className="mt-3 whitespace-pre-line">
-                        <Linkify text={overviewDescription} />
-                      </p>
-                    </div>
-                  )}
                   {course.overview.totalDuration && (
                     <div className="rounded-[20px] border border-slate-200 bg-white px-5 py-5 text-sm text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
                       <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-700 dark:text-slate-300">
