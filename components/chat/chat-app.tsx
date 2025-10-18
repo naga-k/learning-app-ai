@@ -44,6 +44,7 @@ export function ChatApp() {
   const pendingInitialMessageRef = useRef<string | null>(null);
   const { supabase } = useSupabase();
   const [mobileMenuExpanded, setMobileMenuExpanded] = useState(false);
+  const userSwitchedToChatRef = useRef(false);
 
   const transport = useMemo(() => {
     if (!sessionId) return undefined;
@@ -103,7 +104,9 @@ export function ChatApp() {
               if (coursePart?.courseStructured && courseRef.current !== messageId) {
                 courseRef.current = messageId;
                 setCourseState({ id: messageId, output: coursePart });
-                setViewMode("course");
+                if (!userSwitchedToChatRef.current) {
+                  setViewMode("course");
+                }
               }
             }
 
@@ -181,7 +184,9 @@ export function ChatApp() {
           if (coursePayload?.courseStructured && courseRef.current !== messageId) {
             courseRef.current = messageId;
             setCourseState({ id: messageId, output: coursePayload });
-            setViewMode("course");
+            if (!userSwitchedToChatRef.current) {
+              setViewMode("course");
+            }
           }
 
           return nextMessage as UIMessage;
@@ -267,7 +272,9 @@ export function ChatApp() {
 
     courseRef.current = latestCourse.id;
     setCourseState(latestCourse);
-    setViewMode('course');
+    if (!userSwitchedToChatRef.current) {
+      setViewMode('course');
+    }
   }, [latestCourse]);
 
   useEffect(() => {
@@ -406,6 +413,7 @@ export function ChatApp() {
   }, [router]);
 
   const openCourseWorkspace = useCallback(() => {
+    userSwitchedToChatRef.current = false;
     setViewMode('course');
   }, [setViewMode]);
 
@@ -618,7 +626,10 @@ export function ChatApp() {
           viewMode === 'chat' ? (
             <button
               type="button"
-              onClick={() => setViewMode('course')}
+              onClick={() => {
+                userSwitchedToChatRef.current = false;
+                setViewMode('course');
+              }}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:shadow-[0_0_30px_rgba(99,102,241,0.25)] dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
             >
               <BookOpen className="h-4 w-4" />
@@ -627,7 +638,10 @@ export function ChatApp() {
           ) : (
             <button
               type="button"
-              onClick={() => setViewMode('chat')}
+              onClick={() => {
+                userSwitchedToChatRef.current = true;
+                setViewMode('chat');
+              }}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:shadow-[0_0_30px_rgba(99,102,241,0.25)] dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -645,7 +659,10 @@ export function ChatApp() {
         <CourseWorkspace
           course={courseStructured}
           summary={courseSummary}
-          onBack={() => setViewMode('chat')}
+          onBack={() => {
+            userSwitchedToChatRef.current = true;
+            setViewMode('chat');
+          }}
           headerSlot={headerBar}
           mobileMenuExpanded={mobileMenuExpanded}
           setMobileMenuExpanded={setMobileMenuExpanded}
