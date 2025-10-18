@@ -788,7 +788,7 @@ export function CourseWorkspace({
                       >
                         <div className="flex flex-col">
                           <p className="text-sm font-semibold">
-                            Module {module.order}: {module.title}
+                            {module.title}
                           </p>
                           {moduleGenerating && (
                             <span className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-200">
@@ -1118,9 +1118,9 @@ export function CourseWorkspace({
                         >
                           <div>
                             <p className="text-sm font-semibold">
-                              Module {module.order}: {module.title}
-                              </p>
-                            </div>
+                              {module.title}
+                            </p>
+                          </div>
                             {isActiveModule ? (
                               <ChevronDown className="h-4 w-4 flex-shrink-0" />
                             ) : (
