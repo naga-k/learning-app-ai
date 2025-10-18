@@ -44,6 +44,7 @@ export function ChatApp() {
   const pendingInitialMessageRef = useRef<string | null>(null);
   const { supabase } = useSupabase();
   const [mobileMenuExpanded, setMobileMenuExpanded] = useState(false);
+  // Track if user manually switched to chat view to prevent auto-redirect during course generation polling
   const userSwitchedToChatRef = useRef(false);
 
   const transport = useMemo(() => {
