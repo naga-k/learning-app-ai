@@ -291,9 +291,48 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
 
           const planWithIds = plan as LearningPlanWithIds;
           const modulesWithIds = planWithIds.modules as LearningPlanModuleWithIds[];
-          const aggregatedResources: CourseResource[] = [
-            ...(overviewResult.resources ?? []),
-          ];
+          type NormalizedResource = CourseResource & { url: string };
+
+          const aggregatedResources: NormalizedResource[] = [];
+          const MAX_RESOURCE_COUNT = 3;
+          const normalizeResource = (resource: CourseResource): NormalizedResource | null => {
+            const title = resource.title?.trim();
+            const url = resource.url?.trim();
+            if (!title || !url) return null;
+            if (!/^https?:\/\//i.test(url)) return null;
+            const description = resource.description?.trim();
+            const type = resource.type?.trim();
+            return {
+              title,
+              url,
+              ...(description ? { description } : {}),
+              ...(type ? { type } : {}),
+            } as NormalizedResource;
+          };
+          const addResourceIfValid = (resource: CourseResource) => {
+            const normalized = normalizeResource(resource);
+            if (normalized) {
+              aggregatedResources.push(normalized);
+            }
+          };
+          const selectResources = (resources: CourseResource[]) => {
+            const seen = new Set<string>();
+            const filtered: NormalizedResource[] = [];
+            for (const resource of resources) {
+              const normalized = normalizeResource(resource);
+              if (!normalized) continue;
+              const key = `${normalized.title.toLowerCase()}|${normalized.url.toLowerCase()}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              filtered.push(normalized);
+              if (filtered.length >= MAX_RESOURCE_COUNT) break;
+            }
+            return filtered;
+          };
+
+          if (Array.isArray(overviewResult.resources)) {
+            overviewResult.resources.forEach(addResourceIfValid);
+          }
           const generatedSubmodules = new Map<string, CourseSubmoduleResult>();
           const engagementDiagnostics = new Map<
             string,
@@ -304,22 +343,6 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
             (sum, moduleWithIds) => sum + moduleWithIds.subtopics.length,
             0,
           );
-
-          const dedupeResources = (resources: CourseResource[]) => {
-            if (resources.length === 0) return [];
-
-            const seen = new Set<string>();
-            const result: CourseResource[] = [];
-
-            resources.forEach((resource) => {
-              const key = `${resource.title.trim().toLowerCase()}|${(resource.url ?? "").trim().toLowerCase()}`;
-              if (seen.has(key)) return;
-              seen.add(key);
-              result.push(resource);
-            });
-
-            return result;
-          };
 
           const publishPartialSnapshot = async ({
             conclusionResult,
@@ -362,7 +385,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                   }),
                 };
               }),
-              resources: dedupeResources(aggregatedResources),
+              resources: selectResources(aggregatedResources),
               conclusion: conclusionResult ?? undefined,
             });
 
@@ -577,7 +600,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
               });
               if (Array.isArray(submoduleResult.recommendedResources)) {
                 submoduleResult.recommendedResources.forEach((resource) => {
-                  aggregatedResources.push(resource);
+                  addResourceIfValid(resource);
                 });
               }
 
@@ -697,7 +720,7 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                 }),
               };
             }),
-            resources: dedupeResources(aggregatedResources),
+            resources: selectResources(aggregatedResources),
             conclusion: conclusionResult ?? undefined,
           });
 
