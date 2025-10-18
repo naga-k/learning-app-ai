@@ -3,7 +3,17 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { getToolOrDynamicToolName, isToolOrDynamicToolUIPart, type UIMessage } from 'ai';
-import { ArrowLeft, BookOpen, List, LogOut } from 'lucide-react';
+import {
+  ArrowLeft,
+  Ban,
+  BookOpen,
+  Copy,
+  Globe,
+  List,
+  Loader2,
+  LogOut,
+  Share2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/chat-panel';
@@ -19,6 +29,13 @@ import {
   type NavigationRailItem,
 } from '@/components/course/navigation-rail';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type CourseSnapshot = {
   id: string;
@@ -30,6 +47,274 @@ type PendingCourseJob = {
   messageId: string;
   status?: CourseToolOutput["status"];
 };
+
+type ShareCourseButtonProps = {
+  courseVersionId?: string | null;
+};
+
+function ShareCourseButton({ courseVersionId }: ShareCourseButtonProps) {
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [mutating, setMutating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<number | null>(null);
+
+  const shareUrl = useMemo(() => {
+    if (!shareToken) return null;
+    if (typeof window === "undefined") {
+      return `/courses/${shareToken}`;
+    }
+    return `${window.location.origin}/courses/${shareToken}`;
+  }, [shareToken]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setCopied(false);
+  }, [shareToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!courseVersionId) {
+      setShareToken(null);
+      setError(null);
+      setLoading(false);
+      setCopied(false);
+      return;
+    }
+
+    const loadShareStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/course-versions/${courseVersionId}/share`,
+          { cache: "no-store" },
+        );
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            if (!cancelled) {
+              setShareToken(null);
+              setError(null);
+            }
+            return;
+          }
+
+          const message =
+            data && typeof data.error === "string"
+              ? data.error
+              : `Unable to load share settings (${response.status})`;
+          throw new Error(message);
+        }
+
+        if (!cancelled) {
+          const token =
+            data && typeof data.shareToken === "string" && data.shareToken.length > 0
+              ? data.shareToken
+              : null;
+          setShareToken(token);
+          setError(null);
+        }
+      } catch (shareError) {
+        if (!cancelled) {
+          console.error("[share] failed to load status", shareError);
+          setError(
+            shareError instanceof Error
+              ? shareError.message
+              : "Unable to load share settings.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    setLoading(true);
+    setError(null);
+    setCopied(false);
+    void loadShareStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseVersionId]);
+
+  const handleCopy = useCallback(async () => {
+    if (!shareUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copyTimeoutRef.current = null;
+      }, 2000);
+    } catch (copyError) {
+      console.error("[share] failed to copy link", copyError);
+      setError("Unable to copy link. You can copy it manually below.");
+    }
+  }, [shareUrl]);
+
+  const enableShare = useCallback(async () => {
+    if (!courseVersionId) return;
+
+    setMutating(true);
+    setError(null);
+    setCopied(false);
+
+    try {
+      const response = await fetch(
+        `/api/course-versions/${courseVersionId}/share`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message =
+          data && typeof data.error === "string"
+            ? data.error
+            : `Unable to enable sharing (${response.status})`;
+        throw new Error(message);
+      }
+
+      const token =
+        data && typeof data.shareToken === "string" && data.shareToken.length > 0
+          ? data.shareToken
+          : null;
+      setShareToken(token);
+    } catch (enableError) {
+      console.error("[share] failed to enable sharing", enableError);
+      setError(
+        enableError instanceof Error
+          ? enableError.message
+          : "Unable to enable sharing.",
+      );
+    } finally {
+      setMutating(false);
+    }
+  }, [courseVersionId]);
+
+  const disableShare = useCallback(async () => {
+    if (!courseVersionId) return;
+
+    setMutating(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/course-versions/${courseVersionId}/share`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        const message =
+          data && typeof data.error === "string"
+            ? data.error
+            : `Unable to disable sharing (${response.status})`;
+        throw new Error(message);
+      }
+
+      setShareToken(null);
+      setCopied(false);
+    } catch (disableError) {
+      console.error("[share] failed to disable sharing", disableError);
+      setError(
+        disableError instanceof Error
+          ? disableError.message
+          : "Unable to disable sharing.",
+      );
+    } finally {
+      setMutating(false);
+    }
+  }, [courseVersionId]);
+
+  if (!courseVersionId) {
+    return null;
+  }
+
+  const buttonDisabled = loading || mutating;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={buttonDisabled}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:shadow-[0_0_30px_rgba(99,102,241,0.25)] dark:disabled:cursor-not-allowed dark:disabled:opacity-60 dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
+        >
+          {buttonDisabled ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Share2 className="h-4 w-4" />
+          )}
+          Share
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        {error ? (
+          <div className="px-3 py-2 text-xs text-rose-500">{error}</div>
+        ) : null}
+        {shareToken ? (
+          <>
+            <div className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Share link
+            </div>
+            <div className="px-3 pb-2 text-xs text-muted-foreground break-all">
+              {shareUrl}
+            </div>
+            <DropdownMenuItem
+              onClick={handleCopy}
+              disabled={mutating}
+              className="gap-2"
+            >
+              <Copy className="h-4 w-4" />
+              {copied ? "Copied!" : "Copy link"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={disableShare}
+              disabled={mutating}
+              variant="destructive"
+              className="gap-2 text-rose-500 focus:text-rose-600 dark:text-rose-300"
+            >
+              <Ban className="h-4 w-4" />
+              Disable sharing
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <DropdownMenuItem
+            onClick={enableShare}
+            disabled={mutating}
+            className="gap-2"
+          >
+            <Globe className="h-4 w-4" />
+            Enable sharing
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function ChatApp() {
   const router = useRouter();
@@ -651,6 +936,9 @@ export function ChatApp() {
         </button>
       ) : <div />}
       <div className="flex items-center gap-3">
+        {chatLocked ? (
+          <ShareCourseButton courseVersionId={courseMetadata?.courseVersionId ?? null} />
+        ) : null}
         <ThemeToggle />
         {showCourseToggle ? (
           viewMode === 'chat' ? (

@@ -43,6 +43,13 @@
       "when": 1760754431772,
       "tag": "0005_swift_alex_wilder",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1760762924060,
+      "tag": "0006_open_silhouette",
+      "breakpoints": true
     }
   ]
 }

@@ -13,10 +13,17 @@ export type NavigationRailItem = {
   disabled?: boolean;
 };
 
+export type NavigationRailTopAction = {
+  label: string;
+  icon: LucideIcon;
+  onClick?: () => void;
+};
+
 type NavigationRailProps = {
   primaryItems: NavigationRailItem[];
   secondaryItems: NavigationRailItem[];
-  onNavigateDashboard: () => void;
+  onNavigateDashboard?: () => void;
+  topAction?: NavigationRailTopAction | null;
   offsetTop?: number;
 };
 
@@ -24,12 +31,25 @@ export function NavigationRail({
   primaryItems,
   secondaryItems,
   onNavigateDashboard,
+  topAction,
   offsetTop = 0,
 }: NavigationRailProps) {
   const stickyStyle = {
     top: offsetTop,
     height: `calc(100vh - ${offsetTop}px)`,
   } as const;
+
+  const effectiveTopAction =
+    topAction === null
+      ? null
+      : topAction ??
+        (onNavigateDashboard
+          ? {
+              label: "Dashboard",
+              icon: LayoutDashboard,
+              onClick: onNavigateDashboard,
+            }
+          : null);
 
   return (
     <div
@@ -42,14 +62,22 @@ export function NavigationRail({
           <span className="sr-only">Course Architect</span>
         </div>
         <div className="flex flex-col items-center gap-4">
-          <button
-            type="button"
-            onClick={onNavigateDashboard}
-            className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium text-muted-foreground transition hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100"
-          >
-            <LayoutDashboard className="h-5 w-5" />
-            <span className="text-[11px] tracking-tight">Dashboard</span>
-          </button>
+          {effectiveTopAction ? (
+            <button
+              type="button"
+              onClick={effectiveTopAction.onClick}
+              disabled={!effectiveTopAction.onClick}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-md px-2 py-2 text-[11px] font-medium transition",
+                effectiveTopAction.onClick
+                  ? "text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100"
+                  : "cursor-not-allowed text-muted-foreground opacity-60 dark:text-slate-500",
+              )}
+            >
+              <effectiveTopAction.icon className="h-5 w-5" />
+              <span className="text-[11px] tracking-tight">{effectiveTopAction.label}</span>
+            </button>
+          ) : null}
           {primaryItems.map(({ key, label, icon: Icon, active, onClick, disabled }) => {
             const formattedLabel =
               label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();

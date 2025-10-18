@@ -37,6 +37,7 @@ import { useSupabase } from "@/components/supabase-provider";
 import {
   NavigationRail,
   type NavigationRailItem,
+  type NavigationRailTopAction,
 } from "@/components/course/navigation-rail";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import type { CourseModuleProgress } from "@/lib/ai/tool-output";
@@ -55,7 +56,7 @@ type ModuleProgressSubentry =
 type CourseWorkspaceProps = {
   course: CourseWithIds;
   summary?: string;
-  onBack: () => void;
+  onBack?: () => void;
   sidebarOffsetTop?: number;
   headerSlot?: ReactNode;
   mobileMenuExpanded?: boolean;
@@ -66,6 +67,10 @@ type CourseWorkspaceProps = {
     courseVersionId: string;
     engagementBlocks?: CourseEngagementBlockSummary[] | null;
   } | null;
+  readOnly?: boolean;
+  shareToken?: string | null;
+  allowAssistant?: boolean;
+  railTopAction?: NavigationRailTopAction | null;
 };
 
 type QuizSavePayload = {
@@ -250,11 +255,13 @@ function ReflectionEngagementBlockCard({
   index,
   response,
   onSave,
+  readOnly = false,
 }: {
   block: ReflectionEngagementBlock & CourseEngagementBlockWithIds;
   index: number;
   response?: EngagementResponseState;
   onSave: (text: string) => void;
+  readOnly?: boolean;
 }) {
   const responsePayload =
     response && response.response && typeof response.response === "object"
@@ -329,7 +336,11 @@ function ReflectionEngagementBlockCard({
         />
       </label>
       <div className="mt-3 text-xs text-slate-600 dark:text-slate-300">
-        {isStale ? (
+        {readOnly ? (
+          notes.trim().length > 0
+            ? "Responses are stored locally for this page. Sign in to keep your notes."
+            : "Sign in to save your reflections and track progress."
+        ) : isStale ? (
           <span className="text-rose-500 dark:text-rose-300">
             This prompt changed. Refresh the course to continue.
           </span>
@@ -354,6 +365,7 @@ function LessonEngagementBlocks({
   onSave,
   loading = false,
   persistenceReady,
+  readOnly = false,
 }: {
   blocks?: CourseEngagementBlockWithIds[];
   submoduleId: string;
@@ -364,6 +376,7 @@ function LessonEngagementBlocks({
   ) => void;
   loading?: boolean;
   persistenceReady: boolean;
+  readOnly?: boolean;
 }) {
   if (!blocks || blocks.length === 0) return null;
 
@@ -376,7 +389,9 @@ function LessonEngagementBlocks({
 
       {!persistenceReady ? (
         <p className="text-xs text-slate-500 dark:text-slate-300">
-          Engagement responses will sync once your course is finalized.
+          {readOnly
+            ? "Sign in to save your answers and track your progress."
+            : "Engagement responses will sync once your course is finalized."}
         </p>
       ) : loading ? (
         <p className="text-xs text-slate-500 dark:text-slate-300">
@@ -412,6 +427,7 @@ function LessonEngagementBlocks({
                   text,
                 })
               }
+              readOnly={readOnly}
             />
           ) : null,
         )}
@@ -430,6 +446,10 @@ export function CourseWorkspace({
   setMobileMenuExpanded: externalSetMobileMenuExpanded,
   moduleProgress,
   courseMetadata = null,
+  readOnly = false,
+  shareToken = null,
+  allowAssistant = true,
+  railTopAction,
 }: CourseWorkspaceProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -475,6 +495,10 @@ export function CourseWorkspace({
   const [engagementResponsesLoading, setEngagementResponsesLoading] = useState(false);
   const courseId = courseMetadata?.courseId ?? null;
   const courseVersionId = courseMetadata?.courseVersionId ?? null;
+  const engagementPersistenceReady =
+    !readOnly && Boolean(courseVersionId);
+  const engagementLoading =
+    engagementPersistenceReady && engagementResponsesLoading;
 
   // Helper function to toggle module expansion
   const toggleModuleExpanded = useCallback((moduleId: string) => {
@@ -503,6 +527,14 @@ export function CourseWorkspace({
 
   useEffect(() => {
     let cancelled = false;
+
+    if (readOnly) {
+      setEngagementResponses({});
+      setEngagementResponsesLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     if (!courseVersionId) {
       setEngagementResponses({});
@@ -578,12 +610,23 @@ export function CourseWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [courseVersionId]);
+  }, [courseVersionId, readOnly]);
 
-  const handleActivateAssistant = useCallback(
-    () => setSidePanelView("assistant"),
-    [],
-  );
+  const handleActivateAssistant = useCallback(() => {
+    if (!allowAssistant) return;
+    setSidePanelView("assistant");
+  }, [allowAssistant]);
+
+  useEffect(() => {
+    if (!allowAssistant) {
+      if (sidePanelView === "assistant") {
+        setSidePanelView("modules");
+      }
+      if (mobileAccordionView === "assistant") {
+        setMobileAccordionView("modules");
+      }
+    }
+  }, [allowAssistant, mobileAccordionView, sidePanelView]);
   const handleNavigateDashboard = useCallback(() => {
     router.push("/dashboard");
   }, [router]);
@@ -663,8 +706,6 @@ export function CourseWorkspace({
 
   const handleSaveEngagementResponse = useCallback(
     async (block: CourseEngagementBlockWithIds, payload: EngagementSavePayload) => {
-      if (!courseId || !courseVersionId) return;
-
       const baseState: EngagementResponseState = {
         blockId: block.id,
         blockType: block.type === "quiz" ? "quiz" : "reflection",
@@ -681,6 +722,30 @@ export function CourseWorkspace({
         saving: true,
         error: null,
       };
+
+      if (readOnly) {
+        if (payload.kind === "reflection" && payload.text.trim().length === 0) {
+          setEngagementResponses((prev) => {
+            const next = { ...prev };
+            delete next[block.id];
+            return next;
+          });
+          return;
+        }
+
+        setEngagementResponses((prev) => ({
+          ...prev,
+          [block.id]: {
+            ...(prev[block.id] ?? { ...baseState, saving: false }),
+            ...baseState,
+            saving: false,
+            updatedAt: new Date().toISOString(),
+          },
+        }));
+        return;
+      }
+
+      if (!courseId || !courseVersionId) return;
 
       setEngagementResponses((prev) => ({
         ...prev,
@@ -783,7 +848,7 @@ export function CourseWorkspace({
         }));
       }
     },
-    [courseId, courseVersionId],
+    [courseId, courseVersionId, readOnly],
   );
 
   useEffect(() => {
@@ -1009,8 +1074,8 @@ export function CourseWorkspace({
         ? conclusionContentRef
         : lessonContentRef;
 
-  const navigationPrimaryItems = useMemo<NavigationRailItem[]>(
-    () => [
+  const navigationPrimaryItems = useMemo<NavigationRailItem[]>(() => {
+    const items: NavigationRailItem[] = [
       {
         key: "modules",
         label: "Modules",
@@ -1018,19 +1083,27 @@ export function CourseWorkspace({
         onClick: () => setSidePanelView("modules"),
         active: sidePanelView === "modules",
       },
-      {
+    ];
+
+    if (allowAssistant) {
+      items.push({
         key: "assistant",
         label: "Assistant",
         icon: MessageCircle,
         onClick: () => setSidePanelView("assistant"),
         active: sidePanelView === "assistant",
-      },
-    ],
-    [sidePanelView],
-  );
+      });
+    }
 
-  const navigationSecondaryItems = useMemo<NavigationRailItem[]>(
-    () => [
+    return items;
+  }, [allowAssistant, sidePanelView]);
+
+  const navigationSecondaryItems = useMemo<NavigationRailItem[]>(() => {
+    if (readOnly) {
+      return [];
+    }
+
+    return [
       {
         key: "settings",
         label: "Settings",
@@ -1044,22 +1117,21 @@ export function CourseWorkspace({
         icon: LogOutIcon,
         onClick: handleSignOut,
       },
-    ],
-    [handleSignOut],
-  );
+    ];
+  }, [handleSignOut, readOnly]);
 
   const panelHeight = useMemo(
     () => `calc(100vh - ${sidebarOffsetTop}px)`,
     [sidebarOffsetTop],
   );
 
-  const navigationContent = useMemo(() => {
-    return (
-      <div className="flex h-full w-full">
+  const navigationContent = (
+    <div className="flex h-full w-full">
         <NavigationRail
           primaryItems={navigationPrimaryItems}
           secondaryItems={navigationSecondaryItems}
-          onNavigateDashboard={handleNavigateDashboard}
+          onNavigateDashboard={readOnly ? undefined : handleNavigateDashboard}
+          topAction={railTopAction}
           offsetTop={sidebarOffsetTop}
         />
         <div
@@ -1268,7 +1340,7 @@ export function CourseWorkspace({
               </nav>
             )}
 
-            {activeModule && activeSubmodule && (
+            {allowAssistant && activeModule && activeSubmodule && (
               <CourseAssistantPanel
                 moduleTitle={activeModule.title}
                 moduleSummary={activeModule.summary}
@@ -1280,6 +1352,7 @@ export function CourseWorkspace({
                 isActive={sidePanelView === "assistant"}
                 onActivate={handleActivateAssistant}
                 className="flex-1"
+                shareToken={shareToken ?? undefined}
               />
             )}
 
@@ -1297,32 +1370,6 @@ export function CourseWorkspace({
         </div>
       </div>
     );
-  }, [
-    activeModule,
-    activeModuleId,
-    activeSubmodule,
-    activeSubmoduleId,
-    course.modules,
-    expandedModuleIds,
-    moduleProgress,
-    moduleProgressMap,
-    readyLessonIds,
-    activeLessonReady,
-    allLessonsReady,
-    totalLessons,
-    handleActivateAssistant,
-    handleNavigateDashboard,
-    hasConclusion,
-    hasOverviewContent,
-    navigationPrimaryItems,
-    navigationSecondaryItems,
-    selectionSourceRef,
-    sidebarOffsetTop,
-    sidePanelView,
-    viewMode,
-    toggleModuleExpanded,
-    ensureModuleExpanded,
-  ]);
 
   if (!activeModule || !activeSubmodule) {
     return (
@@ -1333,14 +1380,16 @@ export function CourseWorkspace({
         <p className="max-w-md text-sm text-muted-foreground dark:text-slate-400">
           Please head back to the chat and request a fresh course.
         </p>
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:shadow-[0_0_30px_rgba(79,70,229,0.25)] dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
-          type="button"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to chat
-        </button>
+        {onBack ? (
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:shadow-[0_0_30px_rgba(79,70,229,0.25)] dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-950"
+            type="button"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to chat
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -1442,18 +1491,20 @@ export function CourseWorkspace({
                 >
                   Modules
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileAccordionView("assistant")}
-                  className={cn(
-                    "flex-1 rounded-full border px-3 py-2 text-sm font-semibold transition",
-                    mobileAccordionView === "assistant"
-                      ? "border-border bg-muted text-foreground dark:border-white/20 dark:bg-white/10 dark:text-slate-100"
-                      : "border-transparent text-muted-foreground hover:bg-muted/60 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5",
-                  )}
-                >
-                  Assistant
-                </button>
+                {allowAssistant ? (
+                  <button
+                    type="button"
+                    onClick={() => setMobileAccordionView("assistant")}
+                    className={cn(
+                      "flex-1 rounded-full border px-3 py-2 text-sm font-semibold transition",
+                      mobileAccordionView === "assistant"
+                        ? "border-border bg-muted text-foreground dark:border-white/20 dark:bg-white/10 dark:text-slate-100"
+                        : "border-transparent text-muted-foreground hover:bg-muted/60 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5",
+                    )}
+                  >
+                    Assistant
+                  </button>
+                ) : null}
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4">
@@ -1567,7 +1618,7 @@ export function CourseWorkspace({
                       </div>
                     )}
                   </nav>
-                ) : activeModule && activeSubmodule ? (
+                ) : allowAssistant && activeModule && activeSubmodule ? (
                   <CourseAssistantPanel
                     moduleTitle={activeModule.title}
                     moduleSummary={activeModule.summary}
@@ -1579,6 +1630,7 @@ export function CourseWorkspace({
                     isActive={mobileAccordionExpanded && mobileAccordionView === "assistant"}
                     onActivate={handleActivateAssistant}
                     className="h-full"
+                    shareToken={shareToken ?? undefined}
                   />
                 ) : null}
               </div>
@@ -1706,8 +1758,9 @@ export function CourseWorkspace({
                         submoduleId={activeSubmodule.id}
                         responses={engagementResponses}
                         onSave={handleSaveEngagementResponse}
-                        loading={!courseVersionId || engagementResponsesLoading}
-                        persistenceReady={Boolean(courseVersionId)}
+                        loading={engagementLoading}
+                        persistenceReady={engagementPersistenceReady}
+                        readOnly={readOnly}
                       />
                     </>
                   ) : (

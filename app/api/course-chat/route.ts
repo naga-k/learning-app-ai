@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { streamText } from 'ai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCourseVersionByShareToken } from '@/lib/db/operations';
 import {
   activeAIProvider,
   activeAIProviderName,
@@ -17,6 +18,7 @@ const requestSchema = z.object({
   lessonSummary: z.string().optional(),
   lessonContent: z.string().min(1),
   selection: z.string().optional(),
+  shareToken: z.string().min(1).optional(),
 });
 
 const OPENAI_PROVIDER_OPTIONS = {
@@ -26,7 +28,6 @@ const OPENAI_PROVIDER_OPTIONS = {
   },
 } as const;
 
-const isOpenAIProvider = activeAIProviderName === 'openai';
 const webSearchTool = supportsOpenAIWebSearch
   ? activeAIProvider.tools.webSearch({
       searchContextSize: 'high',
@@ -79,10 +80,6 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
   let parsedBody;
   try {
     const json = await req.json();
@@ -99,7 +96,19 @@ export async function POST(req: Request) {
     lessonSummary,
     lessonContent,
     selection,
+    shareToken,
   } = parsedBody;
+
+  if (!user) {
+    if (!shareToken) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const shareRecord = await getCourseVersionByShareToken(shareToken);
+    if (!shareRecord) {
+      return NextResponse.json({ error: 'Invalid or expired share link' }, { status: 403 });
+    }
+  }
 
   const lessonContext = buildLessonContext(lessonContent, selection);
   const systemPrompt = [
