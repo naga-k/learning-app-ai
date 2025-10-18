@@ -1745,18 +1745,6 @@ export function CourseWorkspace({
           {viewMode === "overview" && (
             <div ref={overviewContentRef} className="space-y-8">
               <div id="course-content-top" />
-              {firstLesson && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => goToLesson(firstLesson)}
-                    className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-indigo-500/20 dark:text-indigo-100 dark:hover:bg-indigo-500/30"
-                  >
-                    Start learning
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
               {hasCourseSummary && (
                 <div className="rounded-[26px] border border-slate-200 bg-white px-6 py-6 text-sm text-slate-900 shadow-md backdrop-blur dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-200 dark:shadow-[0_0_40px_-30px_rgba(15,23,42,0.6)]">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-600 dark:text-indigo-200">
@@ -1768,26 +1756,6 @@ export function CourseWorkspace({
 
               {course.overview && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {overviewTitle && (
-                    <div className="rounded-[20px] border border-slate-200 bg-white px-5 py-5 text-sm text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-700 dark:text-slate-300">
-                        Course Title
-                      </h3>
-                      <p className="mt-3 whitespace-pre-line">
-                        <Linkify text={overviewTitle} />
-                      </p>
-                    </div>
-                  )}
-                  {overviewDescription && (
-                    <div className="rounded-[20px] border border-slate-200 bg-white px-5 py-5 text-sm text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-700 dark:text-slate-300">
-                        Course Summary
-                      </h3>
-                      <p className="mt-3 whitespace-pre-line">
-                        <Linkify text={overviewDescription} />
-                      </p>
-                    </div>
-                  )}
                   {course.overview.totalDuration && (
                     <div className="rounded-[20px] border border-slate-200 bg-white px-5 py-5 text-sm text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100 dark:shadow-[0_0_25px_-20px_rgba(15,23,42,0.7)]">
                       <h3 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-700 dark:text-slate-300">
@@ -1846,6 +1814,19 @@ export function CourseWorkspace({
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {firstLesson && (
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => goToLesson(firstLesson)}
+                    className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-indigo-500/20 dark:text-indigo-100 dark:hover:bg-indigo-500/30"
+                  >
+                    Start learning
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
                 </div>
               )}
             </div>

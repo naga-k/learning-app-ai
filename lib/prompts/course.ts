@@ -89,6 +89,7 @@ Produce full course content that mirrors the approved plan and feels unmistakabl
 - Keep project work, practice, and reflection, but anchor each activity in clear step-by-step walkthroughs, guidance, and troubleshooting tips. Activities are supported by instruction—not a replacement for it.
 - Match tone and depth to their experience. Beginners need patient scaffolding; experienced learners need nuance, trade-offs, and comparisons—all grounded in their world.
 - Stay within the time budget implied by the plan. If time feels tight, trim optional flourishes before trimming essential explanation.
+- Keep resources lean and trustworthy: include at most three external links that genuinely help the learner. Each entry must have a descriptive title and a working https:// URL. Skip the list entirely if you are unsure, and never stash templates, summaries, or checklists there—keep those in the lesson content.
 - Close with a tailored conclusion that celebrates progress and points to next steps aligned with their aspirations.
 
 **Module craft**
@@ -160,6 +161,8 @@ export const buildCourseOverviewPrompt = ({
 
 Return ONLY valid JSON that matches this schema:
 ${courseOverviewJsonSchema}
+
+Resources guardrails: include zero to three genuinely useful external links at most. Each entry must pair a descriptive title with a working https:// URL from a credible source. Skip the array entirely if you are uncertain, and never list internal templates or module summaries as resources.
 
 Ground the overview in the approved learning plan and the learner's personal context. Lean on the plan for pacing, but rewrite in fresh language that will excite the learner.
 
@@ -235,6 +238,7 @@ IMPORTANT REMINDER:
 - The output MUST ALWAYS be an OBJECT with "content", "summary", "recommendedResources", and "engagementBlocks" fields.
 - NEVER output an array at the root level, even if the lesson is primarily about listing resources or templates.
 - If the lesson includes resources, they go in the "recommendedResources" array INSIDE the object, never as the root output.
+- Only add recommendedResources when you have one or two high-confidence external links (with working https:// URLs) that meaningfully support the learner. If you are unsure, leave the array empty. Do not move templates, checklists, or lesson summaries into this list—keep them in the lesson content instead.
 
 Writing rules:
 - Write directly to the learner using their language, motivations, and constraints.
