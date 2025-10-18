@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -42,7 +43,13 @@ export const courseVersions = pgTable("course_versions", {
   summary: text("summary"),
   structured: jsonb("structured").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+  shareToken: text("share_token"),
+  shareEnabledAt: timestamp("share_enabled_at", { withTimezone: true }),
+}, (table) => ({
+  shareTokenUnique: uniqueIndex("course_versions_share_token_idx")
+    .on(table.shareToken)
+    .where(sql`"share_token" IS NOT NULL`),
+}));
 
 export const courseGenerationJobs = pgTable("course_generation_jobs", {
   id: uuid("id").defaultRandom().primaryKey(),

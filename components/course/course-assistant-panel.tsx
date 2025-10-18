@@ -16,6 +16,7 @@ type CourseAssistantPanelProps = {
   isActive: boolean;
   onActivate: () => void;
   className?: string;
+  shareToken?: string | null;
 };
 
 type ChatRole = "user" | "assistant";
@@ -43,6 +44,7 @@ export function CourseAssistantPanel({
   isActive,
   onActivate,
   className,
+  shareToken,
 }: CourseAssistantPanelProps) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -284,16 +286,24 @@ export function CourseAssistantPanel({
           lessonSummary: lessonSummary ?? undefined,
           lessonContent,
           selection: shouldIncludeSelection ? capturedSelection ?? undefined : undefined,
+          shareToken: shareToken ?? undefined,
         }),
       });
       if (!response.ok || !response.body) {
         const errorJson = await response.json().catch(() => null);
-        const message =
+        let message =
           (errorJson && typeof errorJson.error === "string"
             ? errorJson.error
             : "Something went wrong while contacting the assistant.");
+
+        if (response.status === 401) {
+          message = "Sign in to ask questions with the assistant.";
+        } else if (response.status === 403) {
+          message = "This shared course is no longer available.";
+        }
+
         setError(message);
-        updateAssistantMessage("Sorry, I couldn't generate a response right now.");
+        updateAssistantMessage(message);
         return;
       }
 

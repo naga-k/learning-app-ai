@@ -1,6 +1,7 @@
 "use server";
 
-import { and, count, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { randomBytes } from "crypto";
+import { and, count, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "./client";
 import {
   chatMessages,
@@ -24,6 +25,16 @@ export type CourseEngagementBlockRecord =
   typeof courseEngagementBlocks.$inferSelect;
 export type CourseEngagementResponseRecord =
   typeof courseEngagementResponses.$inferSelect;
+
+const SHARE_TOKEN_BYTES = 18;
+
+const generateShareToken = () => randomBytes(SHARE_TOKEN_BYTES).toString("base64url");
+
+export type CourseVersionShareStatus = {
+  courseId: string;
+  shareToken: string | null;
+  shareEnabledAt: Date | null;
+};
 
 export async function createChatSession({
   userId,
@@ -308,6 +319,124 @@ export async function getCourseVersionForUser(params: {
     .limit(1);
 
   if (!row) return null;
+
+  return {
+    version: row.version,
+    course: row.course,
+  };
+}
+
+export async function getCourseVersionShareStatus(params: {
+  courseVersionId: string;
+  userId: string;
+}): Promise<CourseVersionShareStatus | null> {
+  const record = await getCourseVersionForUser(params);
+  if (!record) return null;
+
+  return {
+    courseId: record.course.id,
+    shareToken: record.version.shareToken ?? null,
+    shareEnabledAt: record.version.shareEnabledAt ?? null,
+  };
+}
+
+export async function enableCourseVersionShare(params: {
+  courseVersionId: string;
+  userId: string;
+  regenerateToken?: boolean;
+}): Promise<CourseVersionShareStatus> {
+  const record = await getCourseVersionForUser({
+    courseVersionId: params.courseVersionId,
+    userId: params.userId,
+  });
+
+  if (!record) {
+    throw new Error("Course version not found for user.");
+  }
+
+  let token =
+    !params.regenerateToken && record.version.shareToken
+      ? record.version.shareToken
+      : generateShareToken();
+
+  // Best-effort uniqueness check; collisions are extraordinarily unlikely.
+  if (params.regenerateToken || !record.version.shareToken) {
+    let attempts = 0;
+    while (attempts < 5) {
+      const [existing] = await db
+        .select({ id: courseVersions.id })
+        .from(courseVersions)
+        .where(eq(courseVersions.shareToken, token))
+        .limit(1);
+
+      if (!existing) {
+        break;
+      }
+
+      token = generateShareToken();
+      attempts += 1;
+    }
+
+    if (attempts >= 5) {
+      throw new Error("Unable to generate unique share token.");
+    }
+  }
+
+  const now = new Date();
+
+  await db
+    .update(courseVersions)
+    .set({
+      shareToken: token,
+      shareEnabledAt: now,
+    })
+    .where(eq(courseVersions.id, params.courseVersionId));
+
+  return {
+    courseId: record.course.id,
+    shareToken: token,
+    shareEnabledAt: now,
+  };
+}
+
+export async function disableCourseVersionShare(params: {
+  courseVersionId: string;
+  userId: string;
+}): Promise<void> {
+  const record = await getCourseVersionForUser({
+    courseVersionId: params.courseVersionId,
+    userId: params.userId,
+  });
+
+  if (!record) {
+    throw new Error("Course version not found for user.");
+  }
+
+  await db
+    .update(courseVersions)
+    .set({
+      shareToken: null,
+      shareEnabledAt: null,
+    })
+    .where(eq(courseVersions.id, params.courseVersionId));
+}
+
+export async function getCourseVersionByShareToken(token: string) {
+  if (!token.trim()) return null;
+
+  const [row] = await db
+    .select({
+      version: courseVersions,
+      course: courses,
+    })
+    .from(courseVersions)
+    .innerJoin(courses, eq(courseVersions.courseId, courses.id))
+    .where(and(eq(courseVersions.shareToken, token), isNotNull(courseVersions.shareEnabledAt)))
+    .limit(1);
+
+  if (!row || !row.version.shareEnabledAt) {
+    return null;
+  }
 
   return {
     version: row.version,
