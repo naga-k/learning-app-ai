@@ -1,4 +1,14 @@
-import { pgTable, text, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  jsonb,
+  integer,
+  boolean,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/pg-core";
 
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -64,3 +74,67 @@ export const courseGenerationSnapshots = pgTable("course_generation_snapshots", 
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const courseEngagementBlocks = pgTable(
+  "course_engagement_blocks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    courseVersionId: uuid("course_version_id")
+      .notNull()
+      .references(() => courseVersions.id, { onDelete: "cascade" }),
+    submoduleId: text("submodule_id").notNull(),
+    blockId: text("block_id").notNull(),
+    blockType: text("block_type").notNull(),
+    blockOrder: integer("block_order").notNull(),
+    blockRevision: integer("block_revision").notNull(),
+    contentHash: text("content_hash").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    courseVersionBlockIdIndex: uniqueIndex("course_engagement_blocks_version_block_idx").on(
+      table.courseVersionId,
+      table.blockId,
+    ),
+    courseVersionOrderIndex: index("course_engagement_blocks_order_idx").on(
+      table.courseVersionId,
+      table.blockOrder,
+    ),
+  }),
+);
+
+export const courseEngagementResponses = pgTable(
+  "course_engagement_responses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    courseVersionId: uuid("course_version_id")
+      .notNull()
+      .references(() => courseVersions.id, { onDelete: "cascade" }),
+    submoduleId: text("submodule_id").notNull(),
+    blockId: text("block_id").notNull(),
+    blockType: text("block_type").notNull(),
+    blockRevision: integer("block_revision").notNull(),
+    contentHash: text("content_hash").notNull(),
+    response: jsonb("response").notNull(),
+    score: integer("score"),
+    isCorrect: boolean("is_correct"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    uniquePerBlock: uniqueIndex("course_engagement_responses_unique").on(
+      table.userId,
+      table.courseVersionId,
+      table.blockId,
+    ),
+    versionBlockLookup: index("course_engagement_responses_version_block_idx").on(
+      table.courseVersionId,
+      table.blockId,
+    ),
+  }),
+);

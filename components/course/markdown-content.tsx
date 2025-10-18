@@ -2,7 +2,6 @@
 
 import {
   type ComponentPropsWithoutRef,
-  type ReactElement,
   type ReactNode,
   Fragment,
   isValidElement,

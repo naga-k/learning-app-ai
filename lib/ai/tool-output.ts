@@ -32,6 +32,14 @@ export type CourseModuleProgress = {
   }[];
 };
 
+export type CourseEngagementBlockSummary = {
+  blockId: string;
+  blockType: string;
+  blockRevision: number;
+  contentHash: string;
+  submoduleId: string;
+};
+
 export type CourseToolOutput = {
   course?: string;
   courseStructured?: CourseWithIds;
@@ -41,6 +49,9 @@ export type CourseToolOutput = {
   startedAt?: number;
   durationMs?: number;
   moduleProgress?: CourseModuleProgress;
+  courseId?: string;
+  courseVersionId?: string;
+  engagementBlocks?: CourseEngagementBlockSummary[];
 };
 
 export type ToolErrorOutput = {

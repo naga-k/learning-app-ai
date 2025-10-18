@@ -10,6 +10,7 @@ import { ChatPanel } from '@/components/chat/chat-panel';
 import { CourseWorkspace } from '@/components/course/course-workspace';
 import {
   isCourseToolOutput,
+  type CourseEngagementBlockSummary,
   type CourseToolOutput,
 } from '@/lib/ai/tool-output';
 import { useSupabase } from '@/components/supabase-provider';
@@ -102,12 +103,12 @@ export function ChatApp() {
                 })
                 .find(Boolean) as CourseToolOutput | null | undefined;
 
-              if (coursePart?.courseStructured && courseRef.current !== messageId) {
-                courseRef.current = messageId;
-                setCourseState({ id: messageId, output: coursePart });
-                if (!userSwitchedToChatRef.current) {
+              if (coursePart?.courseStructured) {
+                if (courseRef.current !== messageId && !userSwitchedToChatRef.current) {
                   setViewMode("course");
                 }
+                courseRef.current = messageId;
+                setCourseState({ id: messageId, output: coursePart });
               }
             }
 
@@ -182,12 +183,12 @@ export function ChatApp() {
             })
             .find(Boolean) as CourseToolOutput | null | undefined;
 
-          if (coursePayload?.courseStructured && courseRef.current !== messageId) {
-            courseRef.current = messageId;
-            setCourseState({ id: messageId, output: coursePayload });
-            if (!userSwitchedToChatRef.current) {
+          if (coursePayload?.courseStructured) {
+            if (courseRef.current !== messageId && !userSwitchedToChatRef.current) {
               setViewMode("course");
             }
+            courseRef.current = messageId;
+            setCourseState({ id: messageId, output: coursePayload });
           }
 
           return nextMessage as UIMessage;
@@ -318,17 +319,20 @@ export function ChatApp() {
           const jobData = data?.job as
             | {
                 id: string;
-                status?: string | null;
-                summary?: string | null;
-                error?: string | null;
-                resultSummary?: string | null;
-                resultCourseStructured?: CourseToolOutput["courseStructured"] | null;
-                partialCourseStructured?: CourseToolOutput["courseStructured"] | null;
-                moduleProgress?: CourseToolOutput["moduleProgress"] | null;
-                messageContent?: UIMessage | null;
-                assistantMessageId?: string | null;
-              }
-            | undefined;
+              status?: string | null;
+              summary?: string | null;
+              error?: string | null;
+              resultSummary?: string | null;
+              resultCourseStructured?: CourseToolOutput["courseStructured"] | null;
+              partialCourseStructured?: CourseToolOutput["courseStructured"] | null;
+              moduleProgress?: CourseToolOutput["moduleProgress"] | null;
+              messageContent?: UIMessage | null;
+              assistantMessageId?: string | null;
+              courseId?: string | null;
+              courseVersionId?: string | null;
+              engagementBlocks?: CourseEngagementBlockSummary[] | null;
+            }
+          | undefined;
 
           if (!jobData || cancelled) {
             return;
@@ -368,6 +372,18 @@ export function ChatApp() {
               updates.moduleProgress = jobData.moduleProgress;
             }
 
+            if (jobData.courseId) {
+              updates.courseId = jobData.courseId;
+            }
+
+            if (jobData.courseVersionId) {
+              updates.courseVersionId = jobData.courseVersionId;
+            }
+
+            if (jobData.engagementBlocks) {
+              updates.engagementBlocks = jobData.engagementBlocks;
+            }
+
             if (jobData.error) {
               updates.summary = jobData.error;
             }
@@ -404,6 +420,19 @@ export function ChatApp() {
 
   const courseStructured = courseState?.output.courseStructured;
   const courseSummary = courseState?.output.course;
+  const courseMetadata = useMemo(() => {
+    if (
+      !courseState?.output.courseId ||
+      !courseState?.output.courseVersionId
+    ) {
+      return null;
+    }
+    return {
+      courseId: courseState.output.courseId,
+      courseVersionId: courseState.output.courseVersionId,
+      engagementBlocks: courseState.output.engagementBlocks ?? null,
+    };
+  }, [courseState]);
   const chatLocked = Boolean(courseStructured);
   const showCourseToggle = chatLocked;
   const showCourseWorkspace =
@@ -668,6 +697,7 @@ export function ChatApp() {
           mobileMenuExpanded={mobileMenuExpanded}
           setMobileMenuExpanded={setMobileMenuExpanded}
           moduleProgress={courseState?.output.moduleProgress ?? null}
+          courseMetadata={courseMetadata}
         />
       </div>
     );

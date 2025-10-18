@@ -25,7 +25,10 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-import { CourseWithIds } from "@/lib/curriculum";
+import {
+  CourseWithIds,
+  type CourseEngagementBlockWithIds,
+} from "@/lib/curriculum";
 import { cn, sanitizeUrl } from "@/lib/utils";
 import { MarkdownContent, MarkdownInline } from "./markdown-content";
 import { Linkify } from "./linkify";
@@ -37,6 +40,7 @@ import {
 } from "@/components/course/navigation-rail";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import type { CourseModuleProgress } from "@/lib/ai/tool-output";
+import type { CourseEngagementBlockSummary } from "@/lib/ai/tool-output";
 import type {
   EngagementBlock,
   QuizEngagementBlock,
@@ -57,6 +61,39 @@ type CourseWorkspaceProps = {
   mobileMenuExpanded?: boolean;
   setMobileMenuExpanded?: (expanded: boolean | ((prev: boolean) => boolean)) => void;
   moduleProgress?: CourseModuleProgress | null;
+  courseMetadata?: {
+    courseId: string;
+    courseVersionId: string;
+    engagementBlocks?: CourseEngagementBlockSummary[] | null;
+  } | null;
+};
+
+type QuizSavePayload = {
+  kind: "quiz";
+  selectedOptionIndex: number;
+  isCorrect: boolean;
+};
+
+type ReflectionSavePayload = {
+  kind: "reflection";
+  text: string;
+};
+
+type EngagementSavePayload = QuizSavePayload | ReflectionSavePayload;
+
+type EngagementResponseState = {
+  blockId: string;
+  blockType: "quiz" | "reflection";
+  submoduleId: string;
+  blockRevision: number;
+  contentHash: string;
+  response: unknown;
+  isCorrect?: boolean | null;
+  score?: number | null;
+  stale?: boolean;
+  saving?: boolean;
+  error?: string | null;
+  updatedAt?: string;
 };
 
 const isQuizBlock = (
@@ -70,20 +107,48 @@ const isReflectionBlock = (
 function QuizEngagementBlockCard({
   block,
   index,
+  response,
+  onSave,
 }: {
-  block: QuizEngagementBlock;
+  block: QuizEngagementBlock & CourseEngagementBlockWithIds;
   index: number;
+  response?: EngagementResponseState;
+  onSave: (payload: { selectedOptionIndex: number; isCorrect: boolean }) => void;
 }) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [revealed, setRevealed] = useState(false);
+  const responsePayload =
+    response && response.response && typeof response.response === "object"
+      ? (response.response as { selectedOptionIndex?: number })
+      : null;
+  const savedSelection =
+    responsePayload && typeof responsePayload.selectedOptionIndex === "number"
+      ? responsePayload.selectedOptionIndex
+      : null;
+  const savedIsCorrect =
+    typeof response?.isCorrect === "boolean" ? response.isCorrect : null;
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(
+    savedSelection,
+  );
+  const [revealed, setRevealed] = useState(Boolean(savedIsCorrect !== null));
+
+  useEffect(() => {
+    setSelectedIndex(savedSelection);
+    setRevealed(Boolean(savedIsCorrect !== null));
+  }, [savedSelection, savedIsCorrect]);
 
   const handleCheckAnswer = () => {
     if (selectedIndex === null) return;
     setRevealed(true);
+    const isCorrect = selectedIndex === block.correctOptionIndex;
+    onSave({ selectedOptionIndex: selectedIndex, isCorrect });
   };
 
-  const isCorrectSelection =
-    revealed && selectedIndex === block.correctOptionIndex;
+  const effectiveIsCorrect =
+    revealed && selectedIndex !== null
+      ? selectedIndex === block.correctOptionIndex
+      : savedIsCorrect;
+  const saving = Boolean(response?.saving);
+  const errorMessage = response?.error;
+  const isStale = Boolean(response?.stale);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_0_45px_-35px_rgba(148,163,184,0.55)]">
@@ -142,24 +207,40 @@ function QuizEngagementBlockCard({
         <button
           type="button"
           onClick={handleCheckAnswer}
+          disabled={selectedIndex === null || saving || isStale}
           className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
         >
           Check answer
         </button>
 
-        {revealed && (
-          <div className="text-xs text-slate-600 dark:text-slate-300">
-            {isCorrectSelection
-              ? "Nice! You picked the strongest option."
-              : "Close! Take another look at the options above."}
-            {block.rationale && (
-              <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-300">
-                {block.rationale}
-              </p>
-            )}
-          </div>
-        )}
+        <div className="text-xs text-slate-600 dark:text-slate-300">
+          {isStale ? (
+            <span className="text-rose-500 dark:text-rose-300">
+              This activity changed. Refresh the course before answering.
+            </span>
+          ) : saving ? (
+            "Saving…"
+          ) : errorMessage ? (
+            <span className="text-rose-500 dark:text-rose-300">{errorMessage}</span>
+          ) : savedIsCorrect !== null ||
+              (revealed && selectedIndex !== null) ? (
+            "Saved"
+          ) : null}
+        </div>
       </div>
+
+      {revealed && !isStale && (
+        <div className="mt-4 text-xs text-slate-600 dark:text-slate-300">
+          {effectiveIsCorrect
+            ? "Nice! You picked the strongest option."
+            : "Close! Take another look at the options above."}
+          {block.rationale && (
+            <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-300">
+              {block.rationale}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -167,11 +248,47 @@ function QuizEngagementBlockCard({
 function ReflectionEngagementBlockCard({
   block,
   index,
+  response,
+  onSave,
 }: {
-  block: ReflectionEngagementBlock;
+  block: ReflectionEngagementBlock & CourseEngagementBlockWithIds;
   index: number;
+  response?: EngagementResponseState;
+  onSave: (text: string) => void;
 }) {
-  const [notes, setNotes] = useState("");
+  const responsePayload =
+    response && response.response && typeof response.response === "object"
+      ? (response.response as { text?: string })
+      : null;
+  const savedText =
+    responsePayload && typeof responsePayload.text === "string"
+      ? responsePayload.text
+      : "";
+  const [notes, setNotes] = useState(savedText);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (!dirty) {
+      setNotes(savedText);
+    }
+  }, [dirty, savedText]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    if (notes === savedText) {
+      setDirty(false);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      onSave(notes);
+      setDirty(false);
+    }, 600);
+    return () => clearTimeout(timeout);
+  }, [dirty, notes, onSave, savedText]);
+
+  const saving = Boolean(response?.saving);
+  const errorMessage = response?.error;
+  const isStale = Boolean(response?.stale);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-6 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-100">
@@ -201,22 +318,52 @@ function ReflectionEngagementBlockCard({
         Your notes
         <textarea
           value={notes}
-          onChange={(event) => setNotes(event.target.value)}
+          onChange={(event) => {
+            setNotes(event.target.value);
+            setDirty(true);
+          }}
+          disabled={isStale}
           placeholder="Capture a quick reflection while the ideas are fresh…"
           className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30"
           rows={4}
         />
       </label>
+      <div className="mt-3 text-xs text-slate-600 dark:text-slate-300">
+        {isStale ? (
+          <span className="text-rose-500 dark:text-rose-300">
+            This prompt changed. Refresh the course to continue.
+          </span>
+        ) : saving ? (
+          "Saving…"
+        ) : errorMessage ? (
+          <span className="text-rose-500 dark:text-rose-300">{errorMessage}</span>
+        ) : notes.trim().length > 0 ? (
+          "Saved"
+        ) : (
+          "Changes save automatically."
+        )}
+      </div>
     </div>
   );
 }
 
-function LessonEngagementBlocks({ 
-  blocks, 
-  submoduleId 
-}: { 
-  blocks?: EngagementBlock[];
+function LessonEngagementBlocks({
+  blocks,
+  submoduleId,
+  responses,
+  onSave,
+  loading = false,
+  persistenceReady,
+}: {
+  blocks?: CourseEngagementBlockWithIds[];
   submoduleId: string;
+  responses: Record<string, EngagementResponseState>;
+  onSave: (
+    block: CourseEngagementBlockWithIds,
+    payload: EngagementSavePayload,
+  ) => void;
+  loading?: boolean;
+  persistenceReady: boolean;
 }) {
   if (!blocks || blocks.length === 0) return null;
 
@@ -227,15 +374,44 @@ function LessonEngagementBlocks({
         Active practice
       </div>
 
+      {!persistenceReady ? (
+        <p className="text-xs text-slate-500 dark:text-slate-300">
+          Engagement responses will sync once your course is finalized.
+        </p>
+      ) : loading ? (
+        <p className="text-xs text-slate-500 dark:text-slate-300">
+          Restoring your saved answers…
+        </p>
+      ) : null}
+
       <div className="space-y-5">
         {blocks.map((block, index) =>
           isQuizBlock(block) ? (
-            <QuizEngagementBlockCard block={block} index={index} key={`${submoduleId}-quiz-${index}`} />
+            <QuizEngagementBlockCard
+              block={block}
+              index={index}
+              key={`${submoduleId}-quiz-${index}`}
+              response={responses[block.id]}
+              onSave={(payload) =>
+                onSave(block, {
+                  kind: "quiz",
+                  selectedOptionIndex: payload.selectedOptionIndex,
+                  isCorrect: payload.isCorrect,
+                })
+              }
+            />
           ) : isReflectionBlock(block) ? (
             <ReflectionEngagementBlockCard
               block={block}
               index={index}
               key={`${submoduleId}-reflection-${index}`}
+              response={responses[block.id]}
+              onSave={(text) =>
+                onSave(block, {
+                  kind: "reflection",
+                  text,
+                })
+              }
             />
           ) : null,
         )}
@@ -253,6 +429,7 @@ export function CourseWorkspace({
   mobileMenuExpanded: externalMobileMenuExpanded,
   setMobileMenuExpanded: externalSetMobileMenuExpanded,
   moduleProgress,
+  courseMetadata = null,
 }: CourseWorkspaceProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -292,6 +469,12 @@ export function CourseWorkspace({
   const [sidebarWidth, setSidebarWidth] = useState(480); // Default width in pixels
   const [isResizing, setIsResizing] = useState(false);
   const [expandedModuleIds, setExpandedModuleIds] = useState<Set<string>>(new Set());
+  const [engagementResponses, setEngagementResponses] = useState<
+    Record<string, EngagementResponseState>
+  >({});
+  const [engagementResponsesLoading, setEngagementResponsesLoading] = useState(false);
+  const courseId = courseMetadata?.courseId ?? null;
+  const courseVersionId = courseMetadata?.courseVersionId ?? null;
 
   // Helper function to toggle module expansion
   const toggleModuleExpanded = useCallback((moduleId: string) => {
@@ -317,6 +500,85 @@ export function CourseWorkspace({
   // Use external state if provided, otherwise use internal state
   const mobileAccordionExpanded = externalMobileMenuExpanded ?? internalMobileMenuExpanded;
   const setMobileAccordionExpanded = externalSetMobileMenuExpanded ?? setInternalMobileMenuExpanded;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!courseVersionId) {
+      setEngagementResponses({});
+      setEngagementResponsesLoading(false);
+      return;
+    }
+
+    setEngagementResponsesLoading(true);
+
+    const loadResponses = async () => {
+      try {
+        const response = await fetch(
+          `/api/course-versions/${courseVersionId}/engagement-responses`,
+        );
+        if (!response.ok) {
+          throw new Error(
+            `Failed to load engagement responses (${response.status})`,
+          );
+        }
+        const data = await response.json();
+        if (cancelled) return;
+
+        const mapped: Record<string, EngagementResponseState> = {};
+        const items = Array.isArray(data?.responses) ? data.responses : [];
+        for (const item of items) {
+          if (!item || typeof item !== "object") continue;
+          const blockId = typeof item.blockId === "string" ? item.blockId : null;
+          const blockType =
+            item.blockType === "quiz" || item.blockType === "reflection"
+              ? item.blockType
+              : null;
+          const submoduleId =
+            typeof item.submoduleId === "string" ? item.submoduleId : null;
+          const blockRevision =
+            typeof item.blockRevision === "number" ? item.blockRevision : 1;
+          const contentHash =
+            typeof item.contentHash === "string" ? item.contentHash : "";
+          if (!blockId || !blockType || !submoduleId || !contentHash) continue;
+
+          mapped[blockId] = {
+            blockId,
+            blockType,
+            submoduleId,
+            blockRevision,
+            contentHash,
+            response: item.response ?? null,
+            isCorrect:
+              typeof item.isCorrect === "boolean" ? item.isCorrect : null,
+            score: typeof item.score === "number" ? item.score : null,
+            stale: Boolean(item.stale),
+            saving: false,
+            error: null,
+            updatedAt:
+              typeof item.updatedAt === "string" ? item.updatedAt : undefined,
+          };
+        }
+
+        setEngagementResponses(mapped);
+      } catch (error) {
+        console.error("[course] failed to load engagement responses", error);
+        if (!cancelled) {
+          setEngagementResponses({});
+        }
+      } finally {
+        if (!cancelled) {
+          setEngagementResponsesLoading(false);
+        }
+      }
+    };
+
+    void loadResponses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseVersionId]);
 
   const handleActivateAssistant = useCallback(
     () => setSidePanelView("assistant"),
@@ -398,6 +660,131 @@ export function CourseWorkspace({
       };
     }
   }, [isResizing, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+
+  const handleSaveEngagementResponse = useCallback(
+    async (block: CourseEngagementBlockWithIds, payload: EngagementSavePayload) => {
+      if (!courseId || !courseVersionId) return;
+
+      const baseState: EngagementResponseState = {
+        blockId: block.id,
+        blockType: block.type === "quiz" ? "quiz" : "reflection",
+        submoduleId: block.submoduleId,
+        blockRevision: block.revision,
+        contentHash: block.contentHash,
+        response:
+          payload.kind === "quiz"
+            ? { selectedOptionIndex: payload.selectedOptionIndex }
+            : { text: payload.text },
+        isCorrect: payload.kind === "quiz" ? payload.isCorrect : null,
+        score: payload.kind === "quiz" ? (payload.isCorrect ? 1 : 0) : null,
+        stale: false,
+        saving: true,
+        error: null,
+      };
+
+      setEngagementResponses((prev) => ({
+        ...prev,
+        [block.id]: {
+          ...(prev[block.id] ?? baseState),
+          ...baseState,
+        },
+      }));
+
+      try {
+        if (payload.kind === "reflection" && payload.text.trim().length === 0) {
+          const response = await fetch(
+            `/api/course-versions/${courseVersionId}/engagement-responses/${encodeURIComponent(block.id)}`,
+            { method: "DELETE" },
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to delete engagement response (${response.status})`,
+            );
+          }
+
+          setEngagementResponses((prev) => {
+            const next = { ...prev };
+            delete next[block.id];
+            return next;
+          });
+          return;
+        }
+
+        const response = await fetch(
+          `/api/course-versions/${courseVersionId}/engagement-responses`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              blockId: block.id,
+              blockType: block.type,
+              submoduleId: block.submoduleId,
+              contentHash: block.contentHash,
+              response: baseState.response,
+              score:
+                typeof baseState.score === "number"
+                  ? baseState.score
+                  : undefined,
+              isCorrect:
+                typeof baseState.isCorrect === "boolean"
+                  ? baseState.isCorrect
+                  : undefined,
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => null);
+
+          if (response.status === 409) {
+            setEngagementResponses((prev) => ({
+              ...prev,
+              [block.id]: {
+                ...(prev[block.id] ?? baseState),
+                saving: false,
+                stale: true,
+                error:
+                  typeof errorBody?.error === "string"
+                    ? errorBody.error
+                    : "This activity has updated. Refresh the course to continue.",
+              },
+            }));
+            return;
+          }
+
+          throw new Error(
+            typeof errorBody?.error === "string"
+              ? errorBody.error
+              : `Failed to save engagement response (${response.status})`,
+          );
+        }
+
+        setEngagementResponses((prev) => ({
+          ...prev,
+          [block.id]: {
+            ...(prev[block.id] ?? baseState),
+            saving: false,
+            stale: false,
+            error: null,
+            updatedAt: new Date().toISOString(),
+          },
+        }));
+      } catch (error) {
+        console.error("[course] failed to persist engagement response", error);
+        setEngagementResponses((prev) => ({
+          ...prev,
+          [block.id]: {
+            ...(prev[block.id] ?? baseState),
+            saving: false,
+            error:
+              error instanceof Error ? error.message : String(error ?? "Unknown error"),
+          },
+        }));
+      }
+    },
+    [courseId, courseVersionId],
+  );
 
   useEffect(() => {
     const firstModule = course.modules[0];
@@ -1317,6 +1704,10 @@ export function CourseWorkspace({
                       <LessonEngagementBlocks
                         blocks={activeSubmodule.engagementBlocks}
                         submoduleId={activeSubmodule.id}
+                        responses={engagementResponses}
+                        onSave={handleSaveEngagementResponse}
+                        loading={!courseVersionId || engagementResponsesLoading}
+                        persistenceReady={Boolean(courseVersionId)}
                       />
                     </>
                   ) : (
