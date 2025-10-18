@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { streamText } from 'ai';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { activeAIProviderName, getModel } from '@/lib/ai/provider';
+import {
+  activeAIProvider,
+  activeAIProviderName,
+  getModel,
+  supportsOpenAIWebSearch,
+} from '@/lib/ai/provider';
 
 const requestSchema = z.object({
   question: z.string().min(1).max(2000),
@@ -20,6 +25,14 @@ const OPENAI_PROVIDER_OPTIONS = {
     textVerbosity: 'low',
   },
 } as const;
+
+const isOpenAIProvider = activeAIProviderName === 'openai';
+const webSearchTool = supportsOpenAIWebSearch
+  ? activeAIProvider.tools.webSearch({
+      searchContextSize: 'high',
+    })
+  : undefined;
+const webSearchTools = webSearchTool ? { web_search: webSearchTool } : undefined;
 
 function trimContent(content: string, maxLength = 4000): string {
   if (content.length <= maxLength) return content;
@@ -91,8 +104,9 @@ export async function POST(req: Request) {
   const lessonContext = buildLessonContext(lessonContent, selection);
   const systemPrompt = [
     'You are a friendly teaching assistant helping a learner understand a specific lesson in a personalized course.',
-    'Always ground your answer in the provided module and lesson content.',
-    'If the learner asks about something that is not covered in the provided context, state clearly that it is not in the lesson and suggest how they could explore it further.',
+    'Prioritize grounding your answer in the provided module and lesson content.',
+    'If the learner asks about something related to but not directly covered in the lesson, use web search to find relevant, up-to-date information to supplement and expand on the lesson. Clearly distinguish between what is in the lesson and what you found through web search.',
+    'If the learner asks about something completely out of context from the lesson, clearly state it is not covered in the current material, but you can offer supplementary information from web search if it would be helpful.',
     'Respond with a concise explanation (2-3 short paragraphs) and include an optional quick tip or next step when it adds value.',
   ].join(' ');
 
@@ -119,6 +133,7 @@ export async function POST(req: Request) {
       model: getModel('chat'),
       system: systemPrompt,
       prompt: userPrompt,
+      tools: webSearchTools,
       providerOptions,
     });
 
