@@ -1,6 +1,34 @@
 import { z } from "zod";
 import { EngagementBlockArraySchema } from "./ai/tools/types";
 
+const stripModuleTitlePrefix = (title: string): string => {
+  const trimmed = title.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const prefixPatterns = [
+    /^\s*(?:module|lesson|part|chapter|section)\s+(?:\d+|[ivxlcdm]+)\s*[:\-.)]?\s*/i,
+    /^\s*(?:\d+(?:\.\d+)?|[ivxlcdm]+)\s*[:\-.)]\s*/i,
+  ];
+
+  for (const pattern of prefixPatterns) {
+    if (pattern.test(trimmed)) {
+      const withoutPrefix = trimmed.replace(pattern, "").trim();
+      if (withoutPrefix.length > 0) {
+        return withoutPrefix;
+      }
+    }
+  }
+
+  return trimmed;
+};
+
+export const sanitizeModuleTitle = (title: string): string => {
+  const stripped = stripModuleTitlePrefix(title);
+  return stripped.length > 0 ? stripped : title.trim();
+};
+
 const SubtopicSchema = z.object({
   title: z.string().min(1),
   duration: z.string().min(1),
@@ -121,9 +149,11 @@ export const normalizeLearningPlan = (
 ): LearningPlanWithIds => ({
   ...plan,
   modules: plan.modules.map((module, moduleIndex) => {
-    const moduleId = slugify(`${moduleIndex + 1}-${module.title}`);
+    const sanitizedTitle = sanitizeModuleTitle(module.title);
+    const moduleId = slugify(`${moduleIndex + 1}-${sanitizedTitle}`);
     return {
       ...module,
+      title: sanitizedTitle,
       id: moduleId,
       order: moduleIndex + 1,
       subtopics: module.subtopics.map((subtopic, subIndex) => {
@@ -184,7 +214,8 @@ const ensureCourseIds = (
   return {
     ...course,
     modules: course.modules.map((module, moduleIndex) => {
-      const fallbackModuleId = slugify(`${moduleIndex + 1}-${module.title}`);
+      const sanitizedModuleTitle = sanitizeModuleTitle(module.title);
+      const fallbackModuleId = slugify(`${moduleIndex + 1}-${sanitizedModuleTitle}`);
       const moduleId =
         module.moduleId && module.moduleId.length > 0
           ? module.moduleId
@@ -193,6 +224,7 @@ const ensureCourseIds = (
 
       return {
         ...module,
+        title: sanitizedModuleTitle,
         moduleId,
         order: moduleIndex + 1,
         submodules: module.submodules.map((submodule, subIndex) => {

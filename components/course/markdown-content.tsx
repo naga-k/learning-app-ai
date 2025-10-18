@@ -30,7 +30,7 @@ type MarkdownInlineProps = {
 };
 
 const baseContentClasses =
-  "prose prose-base max-w-none text-foreground prose-headings:text-foreground prose-p:text-muted-foreground prose-p:leading-[1.55] prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-transparent prose-pre:border-0 prose-pre:my-3 prose-pre:p-0 prose-ul:list-disc prose-ol:list-decimal prose-li:text-muted-foreground prose-blockquote:border-l-primary/40 prose-blockquote:bg-primary/10 prose-blockquote:py-1 prose-blockquote:italic dark:prose-invert dark:text-slate-100 dark:prose-strong:text-white dark:prose-code:bg-slate-800/80 dark:prose-code:text-slate-100 dark:prose-pre:bg-transparent";
+  "prose prose-base max-w-none text-foreground prose-headings:text-foreground prose-p:text-foreground prose-p:leading-[1.55] prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-transparent prose-pre:border-0 prose-pre:my-3 prose-pre:p-0 prose-ul:list-disc prose-ol:list-decimal prose-li:text-foreground prose-blockquote:border-l-primary/40 prose-blockquote:bg-primary/10 prose-blockquote:py-1 prose-blockquote:italic dark:prose-invert dark:text-slate-100 dark:prose-strong:text-white dark:prose-code:bg-slate-800/80 dark:prose-code:text-slate-100 dark:prose-pre:bg-transparent";
 
 const sharedRemarkPlugins = [remarkGfm];
 const sharedRehypePlugins = [rehypeHighlight];
