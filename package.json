@@ -39,6 +39,7 @@
     "embla-carousel-react": "^8.6.0",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.545.0",
+    "mcp-handler": "^1.0.3",
     "nanoid": "^5.1.6",
     "next": "15.5.4",
     "pg": "^8.16.3",
