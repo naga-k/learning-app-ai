@@ -13,7 +13,7 @@ const handler = createMcpHandler(
             'add',
             {
                 description: 'Adds two numbers together',
-                inputSchema: { a: z.number(), b: z.number() },
+                inputSchema: z.object({ a: z.number(), b: z.number() }).shape as any,
             },
             async (args: any) => {
                 const { a, b } = args;
@@ -34,7 +34,7 @@ const handler = createMcpHandler(
             'generate_plan',
             {
                 description: planTool.description,
-                inputSchema: planTool.inputSchema.shape,
+                inputSchema: planTool.inputSchema.shape as any,
             },
             async (args: any) => {
                 const result = await planTool.execute(args);
