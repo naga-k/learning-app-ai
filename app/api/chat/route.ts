@@ -46,34 +46,36 @@ import {
 import { generateChatTitle } from '@/lib/chat/title';
 import { isPlanToolOutput, type CourseEngagementBlockSummary } from '@/lib/ai/tool-output';
 import { mergeCourseToolOutputIntoMessage } from '@/lib/chat/messages';
+import { createGeneratePlanTool } from '@/lib/ai/tools/generate-plan';
+import { createGenerateCourseTool } from '@/lib/ai/tools/generate-course';
 
 export const runtime = 'nodejs';
 
 const isOpenAIProvider = activeAIProviderName === 'openai';
 const webSearchTool = supportsOpenAIWebSearch
   ? activeAIProvider.tools.webSearch({
-      searchContextSize: 'high',
-    })
+    searchContextSize: 'high',
+  })
   : undefined;
 const webSearchTools = webSearchTool ? { web_search: webSearchTool } : undefined;
 
 const planProviderOptions = isOpenAIProvider
   ? {
-      openai: {
-        reasoningEffort: 'low',
-        textVerbosity: 'low',
-      },
-    }
+    openai: {
+      reasoningEffort: 'low',
+      textVerbosity: 'low',
+    },
+  }
   : undefined;
 
 const chatProviderOptions = isOpenAIProvider
   ? {
-      openai: {
-        reasoningEffort: 'low',
-        textVerbosity: 'low',
-        parallelToolCalls: false,
-      },
-    }
+    openai: {
+      reasoningEffort: 'low',
+      textVerbosity: 'low',
+      parallelToolCalls: false,
+    },
+  }
   : undefined;
 
 type GenerateTextParams = Parameters<typeof generateText>[0];
@@ -276,208 +278,20 @@ export async function POST(req: Request) {
   // ------------------------------
   // Tool: Generate Personalized Plan
   // ------------------------------
-  const generatePlanTool = {
-    description:
-      'Generate a hyper-personalized learning plan based on ALL the context gathered from the conversation. This creates truly customized courses unlike generic platforms.',
-    inputSchema: z.object({
-      fullConversationContext: z.string().describe(`A comprehensive, detailed summary of EVERYTHING discussed with the user. Include:
-- What they want to learn (topic, subject, skill)
-- WHY they want to learn it (goals, motivation, use case, personal reasons)
-- How much time they have available
-- Their current experience level and relevant background
-- Any specific focus areas, preferences, or constraints they mentioned
-- Learning style preferences if discussed
-- Real-world applications they're interested in
-- Any prior attempts or struggles they mentioned
-- Career goals or personal projects related to this learning
-- Literally anything else that makes this course PERSONAL to them
-
-Be verbose and detailed - this context is used to create a truly personalized learning experience.`),
-      modificationRequest: z.string().nullable().optional(),
-      currentPlan: z.string().nullable().optional(),
-    }),
-    execute: async ({
-      fullConversationContext,
-      modificationRequest,
-      currentPlan,
-    }: {
-      fullConversationContext: string;
-      modificationRequest?: string | null;
-      currentPlan?: string | null;
-    }) => {
-      console.log('[generate_plan] Creating personalized plan with context length:', fullConversationContext.length);
-
-      const planningPrompt = buildLearningPlanPrompt({
-        fullConversationContext,
-        modificationRequest,
-        currentPlan,
-      });
-
-        const startTime = Date.now();
-
-        try {
-          console.log('[generate_plan] Calling generateText (reasoningEffort=low)...');
-          const planObject = await generateJsonWithRetry({
-            prompt: planningPrompt,
-            model: getModel('plan'),
-            tools: webSearchTools,
-            providerOptions: planProviderOptions,
-            parse: (text) => {
-              const planJsonText = extractJsonFromText(text);
-              const parsedPlan = JSON.parse(planJsonText);
-              return LearningPlanSchema.parse(parsedPlan);
-            },
-          });
-
-        console.log('[generate_plan] Personalized plan generated successfully!');
-        const elapsedMs = Date.now() - startTime;
-
-        const structuredPlan = normalizeLearningPlan(planObject);
-        latestStructuredPlan = structuredPlan;
-        const planText = formatLearningPlanText(structuredPlan);
-
-        return {
-          plan: planText,
-          structuredPlan,
-          summary: `Plan ready—tell me if you want any tweaks or say "Generate the course."`,
-          startedAt: startTime,
-          durationMs: elapsedMs,
-          ctaSuggestions: [
-            {
-              label: 'Generate course',
-              message: 'Generate the course',
-            },
-            {
-              label: 'Edit the plan',
-              message: 'Can we edit the plan?',
-            },
-          ],
-        };
-      } catch (error) {
-        console.error('[generate_plan] failed after ms:', Date.now() - startTime, error);
-        latestStructuredPlan = null;
-        throw error instanceof Error ? error : new Error(String(error));
-      }
-    },
-  };
+  const generatePlanTool = createGeneratePlanTool({
+    model: getModel('plan'),
+    webSearchTools,
+    providerOptions: planProviderOptions,
+  });
 
   // ------------------------------
   // Tool: Generate Personalized Course
   // ------------------------------
-  const generateCourseTool = {
-    description:
-      'Generate complete, hyper-personalized course content with full lessons tailored exactly to this learner.',
-    inputSchema: z.object({
-      fullContext: z.string().describe(`Everything about this learner and their approved plan. Include:
-- The complete approved learning plan
-- All conversation context (their goals, motivations, experience level, interests, constraints)
-- Any specific examples or use cases they want to see
-- Their learning preferences or style if discussed
-- Career goals or projects that motivated this learning
-- Literally everything that makes this course PERSONAL
-
-Be comprehensive - this is used to create course content that feels custom-made for them.`),
-      planStructure: z.union([z.string(), z.any()])
-        .nullable()
-        .optional(),
-    }),
-    execute: async ({
-      fullContext,
-      planStructure,
-    }: {
-      fullContext: string;
-      planStructure?: string | unknown | null;
-    }) => {
-      console.log('[generate_course] Creating personalized course with context length:', fullContext.length);
-
-      let parsedPlan: LearningPlanWithIds | null = null;
-
-      if (planStructure) {
-        try {
-          const json =
-            typeof planStructure === 'string'
-              ? JSON.parse(planStructure)
-              : planStructure;
-          parsedPlan = normalizeLearningPlan(LearningPlanSchema.parse(json));
-        } catch {
-          parsedPlan = null;
-        }
-      }
-
-      if (!parsedPlan && latestStructuredPlan) parsedPlan = latestStructuredPlan;
-
-      const enqueueStartTime = Date.now();
-      let jobRecord:
-        | Awaited<ReturnType<typeof createCourseGenerationJob>>
-        | null = null;
-
-      try {
-        jobRecord = await createCourseGenerationJob({
-          userId: user.id,
-          sessionId,
-          payload: {
-            fullContext,
-            planNormalized: parsedPlan,
-            metadata: {
-              planProvided: Boolean(parsedPlan),
-              moduleCount: parsedPlan?.modules.length ?? 0,
-              createdFrom: 'api/chat/generate_course',
-            },
-          },
-        });
-
-        const elapsedMs = Date.now() - enqueueStartTime;
-
-        return {
-          jobId: jobRecord.id,
-          status: 'queued' as const,
-          summary:
-            'Course generation is running in the background. I will let you know when it is ready.',
-          startedAt: enqueueStartTime,
-          durationMs: elapsedMs,
-        };
-      } catch (error) {
-        const elapsedMs = Date.now() - enqueueStartTime;
-        console.error('[generate_course] failed to enqueue job', error);
-
-        if (jobRecord) {
-          const message =
-            error instanceof Error && error.message
-              ? error.message
-              : typeof error === 'string'
-                ? error
-                : 'Unknown error';
-          await markCourseGenerationJobFailed({
-            jobId: jobRecord.id,
-            error: message,
-          }).catch((markError) => {
-            console.error(
-              '[generate_course] failed to mark job as failed',
-              markError,
-            );
-          });
-        }
-
-        let friendlyMessage =
-          'Course generation could not be queued. Please try again.';
-
-        if (error instanceof Error) {
-          const message = error.message?.trim();
-          if (message) {
-            friendlyMessage = `Course generation could not be queued: ${message}`;
-          }
-        } else if (typeof error === 'string' && error.trim().length > 0) {
-          friendlyMessage = `Course generation could not be queued: ${error.trim()}`;
-        }
-
-        return {
-          errorMessage: friendlyMessage,
-          startedAt: enqueueStartTime,
-          durationMs: elapsedMs,
-        };
-      }
-    },
-  };
+  const generateCourseTool = createGenerateCourseTool({
+    userId: user.id,
+    sessionId,
+    latestStructuredPlan,
+  });
 
   // ------------------------------
   // Main Agent (Primary Model)
@@ -492,11 +306,11 @@ Be comprehensive - this is used to create course content that feels custom-made 
   const stripWebSearchParts = (parts?: UIMessage['parts']): UIMessage['parts'] =>
     Array.isArray(parts)
       ? parts.filter(
-          (part): part is UIMessage['parts'][number] => {
-            if (!isToolOrDynamicToolUIPart(part)) return true;
-            return getToolOrDynamicToolName(part) !== 'web_search';
-          },
-        )
+        (part): part is UIMessage['parts'][number] => {
+          if (!isToolOrDynamicToolUIPart(part)) return true;
+          return getToolOrDynamicToolName(part) !== 'web_search';
+        },
+      )
       : (parts ?? []);
 
   const result = streamText({
@@ -550,9 +364,9 @@ Be comprehensive - this is used to create course content that feels custom-made 
 
             const jobId =
               payload &&
-              typeof payload === 'object' &&
-              payload !== null &&
-              'jobId' in payload
+                typeof payload === 'object' &&
+                payload !== null &&
+                'jobId' in payload
                 ? (payload as { jobId?: unknown }).jobId
                 : undefined;
 

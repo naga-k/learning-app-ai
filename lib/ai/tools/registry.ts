@@ -55,7 +55,7 @@ export class InMemoryToolRegistry implements ToolRegistry {
     if (this.tools.has(tool.name)) {
       throw new Error(`Tool with name "${tool.name}" is already registered.`);
     }
-    this.tools.set(tool.name, tool as RegisteredTool<z.ZodTypeAny>);
+    this.tools.set(tool.name, tool as unknown as RegisteredTool<z.ZodTypeAny>);
   }
 
   list() {
