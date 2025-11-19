@@ -25,10 +25,7 @@ const handler = createMcpHandler(
             },
         );
 
-        const courseTool = createGenerateCourseTool({
-            userId: 'mcp-user', // Default user ID for MCP calls
-            sessionId: 'mcp-session', // Default session ID for MCP calls
-        });
+        const courseTool = createGenerateCourseTool({});
 
         server.tool(
             'generate_course',
