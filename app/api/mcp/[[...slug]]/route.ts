@@ -7,37 +7,35 @@ import { getModel } from '@/lib/ai/provider';
 const handler = createMcpHandler(
     async (server) => {
         // ------------------------------
-        // Simple Tool for Verification
-        // ------------------------------
-        server.registerTool(
-            'add',
-            {
-                description: 'Adds two numbers together',
-                inputSchema: z.object({ a: z.number(), b: z.number() }).shape as any,
-            },
-            async (args: any) => {
-                const { a, b } = args;
-                return {
-                    content: [{ type: 'text' as const, text: String(a + b) }],
-                };
-            },
-        );
-
-        // ------------------------------
-        // Real Project Tools
+        // Learning App AI Tools
         // ------------------------------
         const planTool = createGeneratePlanTool({
             model: getModel('plan'),
         });
 
-        server.registerTool(
+        server.tool(
             'generate_plan',
-            {
-                description: planTool.description,
-                inputSchema: planTool.inputSchema.shape as any,
-            },
+            planTool.description,
+            planTool.inputSchema.shape,
             async (args: any) => {
                 const result = await planTool.execute(args);
+                return {
+                    content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+                };
+            },
+        );
+
+        const courseTool = createGenerateCourseTool({
+            userId: 'mcp-user', // Default user ID for MCP calls
+            sessionId: 'mcp-session', // Default session ID for MCP calls
+        });
+
+        server.tool(
+            'generate_course',
+            courseTool.description,
+            courseTool.inputSchema.shape,
+            async (args: any) => {
+                const result = await courseTool.execute(args);
                 return {
                     content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
                 };
