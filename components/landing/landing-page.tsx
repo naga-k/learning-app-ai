@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { BookOpen, Brain, Sparkles, Target, Zap, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function LandingPage() {
@@ -21,7 +22,7 @@ export function LandingPage() {
           </div>
           
           <h1 className="text-5xl font-bold tracking-tight text-foreground dark:text-white sm:text-6xl md:text-7xl">
-            Master Anything with
+            <span className="text-3xl sm:text-4xl md:text-5xl">Master Anything with</span>
             <br />
             <span className="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-500">
               Course Architect
@@ -40,7 +41,7 @@ export function LandingPage() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/login">Sign In</Link>
+              <Link href="/login">Sign Up / Sign In</Link>
             </Button>
           </div>
         </div>
@@ -48,74 +49,92 @@ export function LandingPage() {
         {/* Features Section */}
         <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader>
-              <div className="mb-2 inline-flex size-12 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950/50">
+            <CardHeader className="flex flex-row items-start gap-4">
+              <div className="inline-flex size-12 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950/50 shrink-0">
                 <Brain className="size-6 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <CardTitle>AI-Powered Courses</CardTitle>
-              <CardDescription>
-                Intelligent course generation tailored to your learning style and goals
-              </CardDescription>
+              <div className="space-y-2">
+                <CardTitle>AI-Powered Courses</CardTitle>
+                <CardDescription>
+                  Intelligent course generation tailored to your learning style and goals
+                </CardDescription>
+              </div>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader>
-              <div className="mb-2 inline-flex size-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950/50">
+            <CardHeader className="flex flex-row items-start gap-4">
+              <div className="inline-flex size-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950/50 shrink-0">
                 <Target className="size-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <CardTitle>Personalized Paths</CardTitle>
-              <CardDescription>
-                Custom learning journeys designed around your objectives and experience level
-              </CardDescription>
+              <div className="space-y-2">
+                <CardTitle>Personalized Paths</CardTitle>
+                <CardDescription>
+                  Custom learning journeys designed around your objectives and experience level
+                </CardDescription>
+              </div>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader>
-              <div className="mb-2 inline-flex size-12 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50">
+            <CardHeader className="flex flex-row items-start gap-4">
+              <div className="inline-flex size-12 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50 shrink-0">
                 <Zap className="size-6 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <CardTitle>Interactive Learning</CardTitle>
-              <CardDescription>
-                Engage with AI-assisted chat to deepen understanding and clarify concepts
-              </CardDescription>
+              <div className="space-y-2">
+                <CardTitle>Interactive Learning</CardTitle>
+                <CardDescription>
+                  Engage with AI-assisted chat to deepen understanding and clarify concepts
+                </CardDescription>
+              </div>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader>
-              <div className="mb-2 inline-flex size-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/50">
+            <CardHeader className="flex flex-row items-start gap-4">
+              <div className="inline-flex size-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/50 shrink-0">
                 <BookOpen className="size-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <CardTitle>Structured Content</CardTitle>
-              <CardDescription>
-                Well-organized modules and lessons that build upon each other progressively
-              </CardDescription>
+              <div className="space-y-2">
+                <CardTitle>Structured Content</CardTitle>
+                <CardDescription>
+                  Well-organized modules and lessons that build upon each other progressively
+                </CardDescription>
+              </div>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader>
-              <div className="mb-2 inline-flex size-12 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/50">
+            <CardHeader className="flex flex-row items-start gap-4">
+              <div className="inline-flex size-12 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/50 shrink-0">
                 <Sparkles className="size-6 text-orange-600 dark:text-orange-400" />
               </div>
-              <CardTitle>Continuous Updates</CardTitle>
-              <CardDescription>
-                Your learning plans evolve with you as you progress through your journey
-              </CardDescription>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle>Continuous Updates</CardTitle>
+                  <Badge variant="secondary" className="text-[10px]">Coming Soon</Badge>
+                </div>
+                <CardDescription>
+                  Your learning plans evolve with you as you progress through your journey
+                </CardDescription>
+              </div>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader>
-              <div className="mb-2 inline-flex size-12 items-center justify-center rounded-lg bg-pink-100 dark:bg-pink-950/50">
+            <CardHeader className="flex flex-row items-start gap-4">
+              <div className="inline-flex size-12 items-center justify-center rounded-lg bg-pink-100 dark:bg-pink-950/50 shrink-0">
                 <Target className="size-6 text-pink-600 dark:text-pink-400" />
               </div>
-              <CardTitle>Track Progress</CardTitle>
-              <CardDescription>
-                Monitor your learning journey with detailed insights and milestones
-              </CardDescription>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle>Track Progress</CardTitle>
+                  <Badge variant="secondary" className="text-[10px]">Coming Soon</Badge>
+                </div>
+                <CardDescription>
+                  Monitor your learning journey with detailed insights and milestones
+                </CardDescription>
+              </div>
             </CardHeader>
           </Card>
         </div>
