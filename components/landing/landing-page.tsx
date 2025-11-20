@@ -49,8 +49,8 @@ export function LandingPage() {
         {/* Features Section */}
         <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950/50 shrink-0 mt-1">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950/50 shrink-0">
                 <Brain className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div className="flex-1 space-y-1">
@@ -63,8 +63,8 @@ export function LandingPage() {
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950/50 shrink-0 mt-1">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950/50 shrink-0">
                 <Target className="h-4 w-4 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="flex-1 space-y-1">
@@ -77,8 +77,8 @@ export function LandingPage() {
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50 shrink-0 mt-1">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50 shrink-0">
                 <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div className="flex-1 space-y-1">
@@ -91,8 +91,8 @@ export function LandingPage() {
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/50 shrink-0 mt-1">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/50 shrink-0">
                 <BookOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="flex-1 space-y-1">
@@ -105,8 +105,8 @@ export function LandingPage() {
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/50 shrink-0 mt-1">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/50 shrink-0">
                 <Sparkles className="h-4 w-4 text-orange-600 dark:text-orange-400" />
               </div>
               <div className="flex-1 space-y-1">
@@ -115,15 +115,15 @@ export function LandingPage() {
                   Your learning plans evolve with you as you progress through your journey
                 </CardDescription>
               </div>
-              <Badge variant="secondary" className="h-auto py-1 px-2 text-[10px] text-center leading-3 shrink-0">
-                Coming<br />Soon
+              <Badge variant="secondary" className="h-auto py-1 px-2 text-[10px] whitespace-nowrap shrink-0">
+                Soon
               </Badge>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-pink-100 dark:bg-pink-950/50 shrink-0 mt-1">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-pink-100 dark:bg-pink-950/50 shrink-0">
                 <Target className="h-4 w-4 text-pink-600 dark:text-pink-400" />
               </div>
               <div className="flex-1 space-y-1">
@@ -132,8 +132,8 @@ export function LandingPage() {
                   Monitor your learning journey with detailed insights and milestones
                 </CardDescription>
               </div>
-              <Badge variant="secondary" className="h-auto py-1 px-2 text-[10px] text-center leading-3 shrink-0">
-                Coming<br />Soon
+              <Badge variant="secondary" className="h-auto py-1 px-2 text-[10px] whitespace-nowrap shrink-0">
+                Soon
               </Badge>
             </CardHeader>
           </Card>
