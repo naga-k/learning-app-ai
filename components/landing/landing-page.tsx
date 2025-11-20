@@ -35,7 +35,7 @@ export function LandingPage() {
 
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
             <Button asChild size="lg" className="gap-2">
-              <Link href="/login">
+              <Link href="/login?view=sign-up">
                 Get Started
                 <ArrowRight className="size-4" />
               </Link>
@@ -49,88 +49,92 @@ export function LandingPage() {
         {/* Features Section */}
         <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="inline-flex size-12 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950/50 shrink-0">
-                  <Brain className="size-6 text-indigo-600 dark:text-indigo-400" />
-                </div>
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-950/50 shrink-0 mt-1">
+                <Brain className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="flex-1 space-y-1">
                 <CardTitle>AI-Powered Courses</CardTitle>
+                <CardDescription>
+                  Intelligent course generation tailored to your learning style and goals
+                </CardDescription>
               </div>
-              <CardDescription>
-                Intelligent course generation tailored to your learning style and goals
-              </CardDescription>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="inline-flex size-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950/50 shrink-0">
-                  <Target className="size-6 text-purple-600 dark:text-purple-400" />
-                </div>
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950/50 shrink-0 mt-1">
+                <Target className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="flex-1 space-y-1">
                 <CardTitle>Personalized Paths</CardTitle>
+                <CardDescription>
+                  Custom learning journeys designed around your objectives and experience level
+                </CardDescription>
               </div>
-              <CardDescription>
-                Custom learning journeys designed around your objectives and experience level
-              </CardDescription>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="inline-flex size-12 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50 shrink-0">
-                  <Zap className="size-6 text-emerald-600 dark:text-emerald-400" />
-                </div>
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50 shrink-0 mt-1">
+                <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="flex-1 space-y-1">
                 <CardTitle>Interactive Learning</CardTitle>
+                <CardDescription>
+                  Engage with AI-assisted chat to deepen understanding and clarify concepts
+                </CardDescription>
               </div>
-              <CardDescription>
-                Engage with AI-assisted chat to deepen understanding and clarify concepts
-              </CardDescription>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="inline-flex size-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/50 shrink-0">
-                  <BookOpen className="size-6 text-blue-600 dark:text-blue-400" />
-                </div>
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/50 shrink-0 mt-1">
+                <BookOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1 space-y-1">
                 <CardTitle>Structured Content</CardTitle>
+                <CardDescription>
+                  Well-organized modules and lessons that build upon each other progressively
+                </CardDescription>
               </div>
-              <CardDescription>
-                Well-organized modules and lessons that build upon each other progressively
-              </CardDescription>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="inline-flex size-12 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/50 shrink-0">
-                  <Sparkles className="size-6 text-orange-600 dark:text-orange-400" />
-                </div>
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-950/50 shrink-0 mt-1">
+                <Sparkles className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="flex-1 space-y-1">
                 <CardTitle>Continuous Updates</CardTitle>
-                <Badge variant="secondary" className="text-[10px]">Coming Soon</Badge>
+                <CardDescription>
+                  Your learning plans evolve with you as you progress through your journey
+                </CardDescription>
               </div>
-              <CardDescription>
-                Your learning plans evolve with you as you progress through your journey
-              </CardDescription>
+              <Badge variant="secondary" className="h-auto py-1 px-2 text-[10px] text-center leading-3 shrink-0">
+                Coming<br />Soon
+              </Badge>
             </CardHeader>
           </Card>
 
           <Card className="border-border bg-card/50 backdrop-blur-sm transition-all hover:shadow-lg dark:border-white/10 dark:bg-white/[0.03]">
-            <CardHeader className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="inline-flex size-12 items-center justify-center rounded-lg bg-pink-100 dark:bg-pink-950/50 shrink-0">
-                  <Target className="size-6 text-pink-600 dark:text-pink-400" />
-                </div>
-                <CardTitle>Track Progress</CardTitle>
-                <Badge variant="secondary" className="text-[10px]">Coming Soon</Badge>
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-pink-100 dark:bg-pink-950/50 shrink-0 mt-1">
+                <Target className="h-4 w-4 text-pink-600 dark:text-pink-400" />
               </div>
-              <CardDescription>
-                Monitor your learning journey with detailed insights and milestones
-              </CardDescription>
+              <div className="flex-1 space-y-1">
+                <CardTitle>Track Progress</CardTitle>
+                <CardDescription>
+                  Monitor your learning journey with detailed insights and milestones
+                </CardDescription>
+              </div>
+              <Badge variant="secondary" className="h-auto py-1 px-2 text-[10px] text-center leading-3 shrink-0">
+                Coming<br />Soon
+              </Badge>
             </CardHeader>
           </Card>
         </div>
@@ -144,7 +148,7 @@ export function LandingPage() {
             Join thousands of learners who are achieving their goals with AI-powered personalized courses.
           </p>
           <Button asChild size="lg" className="gap-2">
-            <Link href="/login">
+            <Link href="/login?view=sign-up">
               Create Your Free Account
               <ArrowRight className="size-4" />
             </Link>

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { AuthPageContent } from '@/components/auth/auth-page-content';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -12,5 +13,9 @@ export default async function LoginPage() {
     redirect('/');
   }
 
-  return <AuthPageContent />;
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AuthPageContent />
+    </Suspense>
+  );
 }

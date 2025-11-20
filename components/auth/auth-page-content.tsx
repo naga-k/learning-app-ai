@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMemo, useState, useEffect } from "react";
 import { AuthForm, type AuthMode } from "./auth-form";
 
 export function AuthPageContent() {
-  const [mode, setMode] = useState<AuthMode>("sign-in");
+  const searchParams = useSearchParams();
+  const viewParam = searchParams.get("view");
+  const initialAuthMode: AuthMode = viewParam === "sign-up" ? "sign-up" : "sign-in";
+
+  const [mode, setMode] = useState<AuthMode>(initialAuthMode);
+
+  useEffect(() => {
+    setMode(initialAuthMode);
+  }, [initialAuthMode]);
 
   const heroHeading = useMemo(
     () => {
@@ -40,7 +49,11 @@ export function AuthPageContent() {
           <p className="text-sm text-muted-foreground">{heroDescription}</p>
         </div>
 
-        <AuthForm onModeChange={setMode} initialMode="sign-in" />
+        <AuthForm 
+          onModeChange={setMode} 
+          initialMode={initialAuthMode}
+          key={initialAuthMode}
+        />
 
         <footer className="text-xs text-muted-foreground">
           <span className="mr-2">Need help?</span>
