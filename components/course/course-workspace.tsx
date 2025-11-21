@@ -1318,11 +1318,6 @@ export function CourseWorkspace({
                         </ul>
                       )}
 
-                      {!hasAnyReadySubmodule && (
-                        <div className="mt-3 rounded-xl border border-dashed border-slate-300/70 bg-slate-100/60 p-3 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
-                          Lessons are still generating. We’ll unlock this module soon.
-                        </div>
-                      )}
                     </div>
                   );
                 })}
