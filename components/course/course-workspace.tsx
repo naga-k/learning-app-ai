@@ -1225,11 +1225,15 @@ export function CourseWorkspace({
                             // Collapse the module
                             toggleModuleExpanded(module.moduleId);
                           } else {
-                            // Expand the module and navigate to first lesson
+                            // Expand the module and navigate to first ready lesson
                             toggleModuleExpanded(module.moduleId);
                             setActiveModuleId(module.moduleId);
+                            // Find the first ready submodule, or fall back to first submodule if none are ready
+                            const firstReadySubmodule = module.submodules.find(sub => 
+                              readyLessonIds.size === 0 || readyLessonIds.has(sub.id)
+                            );
                             setActiveSubmoduleId(
-                              module.submodules[0]?.id ?? activeSubmoduleId,
+                              firstReadySubmodule?.id ?? module.submodules[0]?.id ?? activeSubmoduleId,
                             );
                             setViewMode("lesson");
                           }
