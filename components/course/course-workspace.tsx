@@ -1212,7 +1212,8 @@ export function CourseWorkspace({
                     progressDetails?.totalCount ?? module.submodules.length;
                   const moduleReady = readyCount >= totalCount;
                   const moduleGenerating = !moduleReady;
-                  const moduleInteractive = moduleReady || isActiveModule;
+                  const hasAnyReadySubmodule = readyCount > 0;
+                  const moduleInteractive = hasAnyReadySubmodule || isActiveModule;
 
                   return (
                     <div key={module.moduleId} className="mb-3">
@@ -1262,7 +1263,7 @@ export function CourseWorkspace({
                         )}
                       </button>
 
-                      {moduleReady && expandedModuleIds.has(module.moduleId) && (
+                      {hasAnyReadySubmodule && expandedModuleIds.has(module.moduleId) && (
                         <ul className="mt-3 space-y-1 border-l border-slate-200 pl-3 dark:border-white/10">
                           {module.submodules.map((submodule) => {
                             const submoduleActive =
@@ -1311,7 +1312,7 @@ export function CourseWorkspace({
                         </ul>
                       )}
 
-                      {!moduleReady && (
+                      {!hasAnyReadySubmodule && (
                         <div className="mt-3 rounded-xl border border-dashed border-slate-300/70 bg-slate-100/60 p-3 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
                           Lessons are still generating. We’ll unlock this module soon.
                         </div>
