@@ -1228,7 +1228,9 @@ export function CourseWorkspace({
                             // Expand the module and navigate to first ready lesson
                             toggleModuleExpanded(module.moduleId);
                             setActiveModuleId(module.moduleId);
-                            // Find the first ready submodule, or fall back to first submodule if none are ready
+                            // Find the first ready submodule:
+                            // - If no progress data exists (readyLessonIds.size === 0), all submodules are considered ready
+                            // - Otherwise, find the first submodule that's marked as ready
                             const firstReadySubmodule = module.submodules.find(sub => 
                               readyLessonIds.size === 0 || readyLessonIds.has(sub.id)
                             );
