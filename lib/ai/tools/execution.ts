@@ -4,6 +4,7 @@ import type {
   ToolRegistry,
 } from "./registry";
 import type { EngagementBlock } from "./types";
+import { isProgrammingDomain } from "./utils";
 
 export type ToolInvocation = {
   name: string;
@@ -41,6 +42,21 @@ const DEFAULT_FALLBACK_BLOCKS: EngagementBlock[] = [
   },
 ];
 
+const PROGRAMMING_FALLBACKS: EngagementBlock[] = [
+  {
+    type: "code-exercise",
+    prompt:
+      "Write a small function that demonstrates the core concept from this lesson. Keep it under 30 lines and include a short comment on why it works.",
+    language: "javascript",
+    starterCode: "// Start here\n",
+    hints: [
+      "Focus on the key API or concept introduced in the lesson.",
+      "Add a quick inline test call to show the output.",
+    ],
+  },
+  ...DEFAULT_FALLBACK_BLOCKS,
+];
+
 const DOMAIN_FALLBACKS: Record<string, EngagementBlock[]> = {
   "frontend-development": [
     {
@@ -71,6 +87,9 @@ const DOMAIN_FALLBACKS: Record<string, EngagementBlock[]> = {
 
 const buildFallbackBlocks: FallbackBuilder = (context) => {
   const domainKey = normalizeDomain(context.domain);
+  if (isProgrammingDomain(domainKey)) {
+    return PROGRAMMING_FALLBACKS;
+  }
   if (domainKey && DOMAIN_FALLBACKS[domainKey]) {
     return DOMAIN_FALLBACKS[domainKey];
   }

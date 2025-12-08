@@ -13,14 +13,18 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Code2,
   ChevronDown,
   ChevronRight,
   ExternalLink,
   Flag,
+  Link2,
   LayoutDashboard,
   List,
+  ListChecks,
   LogOut as LogOutIcon,
   MessageCircle,
+  PenLine,
   Settings,
   X,
   Loader2,
@@ -44,6 +48,10 @@ import type { CourseModuleProgress } from "@/lib/ai/tool-output";
 import type { CourseEngagementBlockSummary } from "@/lib/ai/tool-output";
 import type {
   EngagementBlock,
+  CodeExerciseEngagementBlock,
+  EssayEngagementBlock,
+  FillInBlankEngagementBlock,
+  MatchingEngagementBlock,
   QuizEngagementBlock,
   ReflectionEngagementBlock,
 } from "@/lib/ai/tools/types";
@@ -79,16 +87,51 @@ type QuizSavePayload = {
   isCorrect: boolean;
 };
 
+type CodeExerciseSavePayload = {
+  kind: "code-exercise";
+  code: string;
+};
+
+type FillInBlankSavePayload = {
+  kind: "fill-in-blank";
+  answers: Record<string, string>;
+  isCorrect: boolean;
+};
+
+type MatchingSavePayload = {
+  kind: "matching";
+  pairs: Array<{ leftId: string; rightId: string }>;
+  isCorrect: boolean;
+};
+
 type ReflectionSavePayload = {
   kind: "reflection";
   text: string;
 };
 
-type EngagementSavePayload = QuizSavePayload | ReflectionSavePayload;
+type EssaySavePayload = {
+  kind: "essay";
+  text: string;
+  wordCount: number;
+};
+
+type EngagementSavePayload =
+  | QuizSavePayload
+  | ReflectionSavePayload
+  | CodeExerciseSavePayload
+  | FillInBlankSavePayload
+  | MatchingSavePayload
+  | EssaySavePayload;
 
 type EngagementResponseState = {
   blockId: string;
-  blockType: "quiz" | "reflection";
+  blockType:
+    | "quiz"
+    | "reflection"
+    | "code-exercise"
+    | "fill-in-blank"
+    | "matching"
+    | "essay";
   submoduleId: string;
   blockRevision: number;
   contentHash: string;
@@ -108,6 +151,22 @@ const isQuizBlock = (
 const isReflectionBlock = (
   block: EngagementBlock,
 ): block is ReflectionEngagementBlock => block.type === "reflection";
+
+const isCodeExerciseBlock = (
+  block: EngagementBlock,
+): block is CodeExerciseEngagementBlock => block.type === "code-exercise";
+
+const isFillInBlankBlock = (
+  block: EngagementBlock,
+): block is FillInBlankEngagementBlock => block.type === "fill-in-blank";
+
+const isMatchingBlock = (
+  block: EngagementBlock,
+): block is MatchingEngagementBlock => block.type === "matching";
+
+const isEssayBlock = (
+  block: EngagementBlock,
+): block is EssayEngagementBlock => block.type === "essay";
 
 function QuizEngagementBlockCard({
   block,
@@ -358,6 +417,517 @@ function ReflectionEngagementBlockCard({
   );
 }
 
+function CodeExerciseEngagementBlockCard({
+  block,
+  index,
+  response,
+  onSave,
+  readOnly = false,
+}: {
+  block: CodeExerciseEngagementBlock & CourseEngagementBlockWithIds;
+  index: number;
+  response?: EngagementResponseState;
+  onSave: (code: string) => void;
+  readOnly?: boolean;
+}) {
+  const responsePayload =
+    response && response.response && typeof response.response === "object"
+      ? (response.response as { code?: string })
+      : null;
+  const savedCode =
+    responsePayload && typeof responsePayload.code === "string"
+      ? responsePayload.code
+      : block.starterCode ?? "";
+  const [code, setCode] = useState(savedCode);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (!dirty) {
+      setCode(savedCode);
+    }
+  }, [dirty, savedCode]);
+
+  const handleSave = () => {
+    onSave(code);
+    setDirty(false);
+  };
+
+  const saving = Boolean(response?.saving);
+  const errorMessage = response?.error;
+  const isStale = Boolean(response?.stale);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_0_45px_-35px_rgba(148,163,184,0.55)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-200">
+        <span className="inline-flex items-center gap-2">
+          <Code2 className="h-3.5 w-3.5" />
+          Code exercise {index + 1}
+        </span>
+        {block.language && (
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold tracking-[0.2em] text-slate-500 dark:bg-white/10 dark:text-slate-300">
+            {block.language}
+          </span>
+        )}
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-slate-900 dark:text-slate-100">
+        {block.prompt}
+      </p>
+
+      {block.hints && block.hints.length > 0 && (
+        <div className="mt-4 space-y-2 rounded-xl bg-indigo-50/80 p-4 text-xs text-indigo-900 shadow-inner dark:bg-indigo-500/10 dark:text-indigo-100">
+          <div className="font-semibold tracking-[0.1em] text-indigo-700 dark:text-indigo-200">
+            Hints
+          </div>
+          <ul className="space-y-1">
+            {block.hints.map((hint, hintIndex) => (
+              <li key={hintIndex} className="leading-relaxed">
+                {hint}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {block.testCases && block.testCases.length > 0 && (
+        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-700 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+          <div className="font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
+            Test cases (for reference)
+          </div>
+          <div className="mt-2 space-y-2">
+            {block.testCases.map((test, testIndex) => (
+              <div
+                key={testIndex}
+                className="rounded-lg bg-white px-3 py-2 text-[11px] shadow-sm dark:bg-white/5"
+              >
+                <div className="font-semibold text-slate-600 dark:text-slate-200">
+                  Input
+                </div>
+                <pre className="whitespace-pre-wrap text-slate-800 dark:text-slate-100">
+                  {test.input}
+                </pre>
+                <div className="mt-1 font-semibold text-slate-600 dark:text-slate-200">
+                  Expected output
+                </div>
+                <pre className="whitespace-pre-wrap text-slate-800 dark:text-slate-100">
+                  {test.expectedOutput}
+                </pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <label className="mt-5 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+        Your solution
+        <textarea
+          value={code}
+          onChange={(event) => {
+            setCode(event.target.value);
+            setDirty(true);
+          }}
+          disabled={isStale}
+          className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-900/90 px-3 py-2 font-mono text-sm text-slate-50 shadow-inner outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200 dark:border-white/10 dark:bg-slate-900 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30"
+          rows={8}
+          spellCheck={false}
+        />
+      </label>
+
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || isStale || readOnly || !dirty}
+          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-300 dark:focus-visible:ring-offset-slate-900"
+        >
+          Save response
+        </button>
+
+        <div className="text-xs text-slate-600 dark:text-slate-300">
+          {isStale ? (
+            <span className="text-rose-500 dark:text-rose-300">
+              This activity changed. Refresh the course before answering.
+            </span>
+          ) : saving ? (
+            "Saving…"
+          ) : errorMessage ? (
+            <span className="text-rose-500 dark:text-rose-300">{errorMessage}</span>
+          ) : dirty ? (
+            "Unsaved changes"
+          ) : code.trim().length > 0 ? (
+            "Saved"
+          ) : (
+            "Add your code to save."
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FillInBlankEngagementBlockCard({
+  block,
+  index,
+  response,
+  onSave,
+  readOnly = false,
+}: {
+  block: FillInBlankEngagementBlock & CourseEngagementBlockWithIds;
+  index: number;
+  response?: EngagementResponseState;
+  onSave: (answers: Record<string, string>, isCorrect: boolean) => void;
+  readOnly?: boolean;
+}) {
+  const responsePayload =
+    response && response.response && typeof response.response === "object"
+      ? (response.response as { answers?: Record<string, string> })
+      : null;
+  const savedAnswers = responsePayload?.answers ?? {};
+  const [answers, setAnswers] = useState<Record<string, string>>(savedAnswers);
+
+  useEffect(() => {
+    setAnswers(savedAnswers);
+  }, [savedAnswers]);
+
+  const computeIsCorrect = () =>
+    block.blanks.every((blank) => {
+      const value = answers[blank.id] ?? "";
+      const expected = blank.correctAnswer;
+      if (block.caseSensitive) {
+        return value.trim() === expected.trim();
+      }
+      return value.trim().toLowerCase() === expected.trim().toLowerCase();
+    });
+
+  const handleCheck = () => {
+    const isCorrect = computeIsCorrect();
+    onSave(answers, isCorrect);
+  };
+
+  const saving = Boolean(response?.saving);
+  const errorMessage = response?.error;
+  const isStale = Boolean(response?.stale);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_0_45px_-35px_rgba(148,163,184,0.55)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-200">
+        <span className="inline-flex items-center gap-2">
+          <ListChecks className="h-3.5 w-3.5" />
+          Fill in the blank {index + 1}
+        </span>
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-slate-900 dark:text-slate-100">
+        {block.prompt}
+      </p>
+
+      <div className="mt-4 space-y-3">
+        {block.blanks.map((blank) => (
+          <label
+            key={blank.id}
+            className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300"
+          >
+            Blank {blank.id}
+            <input
+              type="text"
+              value={answers[blank.id] ?? ""}
+              onChange={(event) =>
+                setAnswers((prev) => ({ ...prev, [blank.id]: event.target.value }))
+              }
+              disabled={isStale}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30"
+              placeholder="Type your answer"
+            />
+            {blank.alternatives && blank.alternatives.length > 0 && (
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-300">
+                Accepted alternatives: {blank.alternatives.join(", ")}
+              </p>
+            )}
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={handleCheck}
+          disabled={saving || isStale || readOnly}
+          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-300 dark:focus-visible:ring-offset-slate-900"
+        >
+          Check answers
+        </button>
+
+        <div className="text-xs text-slate-600 dark:text-slate-300">
+          {isStale ? (
+            <span className="text-rose-500 dark:text-rose-300">
+              This activity changed. Refresh to continue.
+            </span>
+          ) : saving ? (
+            "Saving…"
+          ) : errorMessage ? (
+            <span className="text-rose-500 dark:text-rose-300">{errorMessage}</span>
+          ) : response?.isCorrect === true ? (
+            "Saved • All correct"
+          ) : response?.isCorrect === false ? (
+            "Saved • Keep iterating"
+          ) : (
+            "Not checked yet"
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatchingEngagementBlockCard({
+  block,
+  index,
+  response,
+  onSave,
+  readOnly = false,
+}: {
+  block: MatchingEngagementBlock & CourseEngagementBlockWithIds;
+  index: number;
+  response?: EngagementResponseState;
+  onSave: (pairs: Array<{ leftId: string; rightId: string }>, isCorrect: boolean) => void;
+  readOnly?: boolean;
+}) {
+  const responsePayload =
+    response && response.response && typeof response.response === "object"
+      ? (response.response as { pairs?: Array<{ leftId: string; rightId: string }> })
+      : null;
+  const savedPairs = responsePayload?.pairs ?? [];
+  const [pairs, setPairs] = useState<Record<string, string>>(
+    Object.fromEntries(savedPairs.map((pair) => [pair.leftId, pair.rightId])),
+  );
+
+  useEffect(() => {
+    setPairs(Object.fromEntries(savedPairs.map((pair) => [pair.leftId, pair.rightId])));
+  }, [savedPairs]);
+
+  const computeIsCorrect = () =>
+    block.correctPairs.every((pair) => pairs[pair.leftId] === pair.rightId);
+
+  const handleSavePairs = () => {
+    const formattedPairs = Object.entries(pairs).map(([leftId, rightId]) => ({
+      leftId,
+      rightId,
+    }));
+    const isCorrect = computeIsCorrect();
+    onSave(formattedPairs, isCorrect);
+  };
+
+  const saving = Boolean(response?.saving);
+  const errorMessage = response?.error;
+  const isStale = Boolean(response?.stale);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_0_45px_-35px_rgba(148,163,184,0.55)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-200">
+        <span className="inline-flex items-center gap-2">
+          <Link2 className="h-3.5 w-3.5" />
+          Matching {index + 1}
+        </span>
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-slate-900 dark:text-slate-100">
+        {block.prompt}
+      </p>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {block.leftItems.map((leftItem) => (
+          <div
+            key={leftItem.id}
+            className="rounded-xl border border-slate-100 bg-slate-50 p-4 shadow-inner dark:border-white/10 dark:bg-white/5"
+          >
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+              {leftItem.label}
+            </div>
+            <select
+              value={pairs[leftItem.id] ?? ""}
+              onChange={(event) =>
+                setPairs((prev) => ({
+                  ...prev,
+                  [leftItem.id]: event.target.value,
+                }))
+              }
+              disabled={isStale}
+              className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30"
+            >
+              <option value="" disabled>
+                Select match
+              </option>
+              {block.rightItems.map((right) => (
+                <option key={right.id} value={right.id}>
+                  {right.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={handleSavePairs}
+          disabled={saving || isStale || readOnly}
+          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-300 dark:focus-visible:ring-offset-slate-900"
+        >
+          Save matches
+        </button>
+
+        <div className="text-xs text-slate-600 dark:text-slate-300">
+          {isStale ? (
+            <span className="text-rose-500 dark:text-rose-300">
+              This activity changed. Refresh to continue.
+            </span>
+          ) : saving ? (
+            "Saving…"
+          ) : errorMessage ? (
+            <span className="text-rose-500 dark:text-rose-300">{errorMessage}</span>
+          ) : response?.isCorrect === true ? (
+            "Saved • All correct"
+          ) : response?.isCorrect === false ? (
+            "Saved • Keep iterating"
+          ) : (
+            "Not checked yet"
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EssayEngagementBlockCard({
+  block,
+  index,
+  response,
+  onSave,
+  readOnly = false,
+}: {
+  block: EssayEngagementBlock & CourseEngagementBlockWithIds;
+  index: number;
+  response?: EngagementResponseState;
+  onSave: (text: string, wordCount: number) => void;
+  readOnly?: boolean;
+}) {
+  const responsePayload =
+    response && response.response && typeof response.response === "object"
+      ? (response.response as { text?: string; wordCount?: number })
+      : null;
+  const savedText =
+    responsePayload && typeof responsePayload.text === "string"
+      ? responsePayload.text
+      : "";
+  const [essay, setEssay] = useState(savedText);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (!dirty) {
+      setEssay(savedText);
+    }
+  }, [dirty, savedText]);
+
+  const wordCount = essay.trim().length === 0 ? 0 : essay.trim().split(/\s+/).length;
+
+  const handleSave = () => {
+    onSave(essay, wordCount);
+    setDirty(false);
+  };
+
+  const saving = Boolean(response?.saving);
+  const errorMessage = response?.error;
+  const isStale = Boolean(response?.stale);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-6 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-300">
+        <span className="inline-flex items-center gap-2">
+          <PenLine className="h-3.5 w-3.5" />
+          Essay {index + 1}
+        </span>
+        <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 shadow-sm dark:bg-white/10 dark:text-slate-200">
+          {wordCount} words
+        </span>
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-slate-900 dark:text-slate-100">
+        {block.prompt}
+      </p>
+
+      {block.guidance && (
+        <p className="mt-3 rounded-xl bg-white px-4 py-3 text-xs italic text-slate-500 shadow-sm dark:bg-white/5 dark:text-slate-300">
+          {block.guidance}
+        </p>
+      )}
+
+      <label className="mt-5 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+        Your response
+        <textarea
+          value={essay}
+          onChange={(event) => {
+            setEssay(event.target.value);
+            setDirty(true);
+          }}
+          disabled={isStale}
+          placeholder="Write your response here..."
+          className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30"
+          rows={6}
+        />
+      </label>
+
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600 dark:text-slate-300">
+        {typeof block.minWords === "number" && (
+          <span>Minimum: {block.minWords} words</span>
+        )}
+        {typeof block.maxWords === "number" && (
+          <span>Maximum: {block.maxWords} words</span>
+        )}
+        {block.enableAIFeedback && <span>AI feedback enabled</span>}
+      </div>
+
+      {block.rubric && (
+        <div className="mt-3 rounded-xl border border-slate-100 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
+          <div className="font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
+            Rubric
+          </div>
+          <p className="mt-1 leading-relaxed">{block.rubric}</p>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || isStale || readOnly || !dirty}
+          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-slate-300 dark:focus-visible:ring-offset-slate-900"
+        >
+          Save response
+        </button>
+
+        <div className="text-xs text-slate-600 dark:text-slate-300">
+          {isStale ? (
+            <span className="text-rose-500 dark:text-rose-300">
+              This prompt changed. Refresh to continue.
+            </span>
+          ) : saving ? (
+            "Saving…"
+          ) : errorMessage ? (
+            <span className="text-rose-500 dark:text-rose-300">{errorMessage}</span>
+          ) : dirty ? (
+            "Unsaved changes"
+          ) : essay.trim().length > 0 ? (
+            "Saved"
+          ) : (
+            "Add your response to save."
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LessonEngagementBlocks({
   blocks,
   submoduleId,
@@ -425,6 +995,65 @@ function LessonEngagementBlocks({
                 onSave(block, {
                   kind: "reflection",
                   text,
+                })
+              }
+              readOnly={readOnly}
+            />
+          ) : isCodeExerciseBlock(block) ? (
+            <CodeExerciseEngagementBlockCard
+              block={block}
+              index={index}
+              key={`${submoduleId}-code-exercise-${index}`}
+              response={responses[block.id]}
+              onSave={(code) =>
+                onSave(block, {
+                  kind: "code-exercise",
+                  code,
+                })
+              }
+              readOnly={readOnly}
+            />
+          ) : isFillInBlankBlock(block) ? (
+            <FillInBlankEngagementBlockCard
+              block={block}
+              index={index}
+              key={`${submoduleId}-fill-in-blank-${index}`}
+              response={responses[block.id]}
+              onSave={(answers, isCorrect) =>
+                onSave(block, {
+                  kind: "fill-in-blank",
+                  answers,
+                  isCorrect,
+                })
+              }
+              readOnly={readOnly}
+            />
+          ) : isMatchingBlock(block) ? (
+            <MatchingEngagementBlockCard
+              block={block}
+              index={index}
+              key={`${submoduleId}-matching-${index}`}
+              response={responses[block.id]}
+              onSave={(pairs, isCorrect) =>
+                onSave(block, {
+                  kind: "matching",
+                  pairs,
+                  isCorrect,
+                })
+              }
+              readOnly={readOnly}
+            />
+          ) : isEssayBlock(block) ? (
+            <EssayEngagementBlockCard
+              block={block}
+              index={index}
+              key={`${submoduleId}-essay-${index}`}
+              response={responses[block.id]}
+              onSave={(text, wordCount) =>
+                onSave(block, {
+                  kind: "essay",
+                  text,
+                  wordCount,
                 })
               }
               readOnly={readOnly}
@@ -706,22 +1335,70 @@ export function CourseWorkspace({
 
   const handleSaveEngagementResponse = useCallback(
     async (block: CourseEngagementBlockWithIds, payload: EngagementSavePayload) => {
-      const baseState: EngagementResponseState = {
-        blockId: block.id,
-        blockType: block.type === "quiz" ? "quiz" : "reflection",
-        submoduleId: block.submoduleId,
-        blockRevision: block.revision,
-        contentHash: block.contentHash,
-        response:
-          payload.kind === "quiz"
-            ? { selectedOptionIndex: payload.selectedOptionIndex }
-            : { text: payload.text },
-        isCorrect: payload.kind === "quiz" ? payload.isCorrect : null,
-        score: payload.kind === "quiz" ? (payload.isCorrect ? 1 : 0) : null,
-        stale: false,
-        saving: true,
-        error: null,
-      };
+      const baseState: EngagementResponseState = (() => {
+        const shared = {
+          blockId: block.id,
+          blockType: block.type,
+          submoduleId: block.submoduleId,
+          blockRevision: block.revision,
+          contentHash: block.contentHash,
+          stale: false,
+          saving: true,
+          error: null as string | null | undefined,
+        };
+
+        switch (payload.kind) {
+          case "quiz":
+            return {
+              ...shared,
+              response: { selectedOptionIndex: payload.selectedOptionIndex },
+              isCorrect: payload.isCorrect,
+              score: payload.isCorrect ? 1 : 0,
+            };
+          case "reflection":
+            return {
+              ...shared,
+              response: { text: payload.text },
+              isCorrect: null,
+              score: null,
+            };
+          case "code-exercise":
+            return {
+              ...shared,
+              response: { code: payload.code },
+              isCorrect: null,
+              score: null,
+            };
+          case "fill-in-blank":
+            return {
+              ...shared,
+              response: { answers: payload.answers },
+              isCorrect: payload.isCorrect,
+              score: payload.isCorrect ? 1 : 0,
+            };
+          case "matching":
+            return {
+              ...shared,
+              response: { pairs: payload.pairs },
+              isCorrect: payload.isCorrect,
+              score: payload.isCorrect ? 1 : 0,
+            };
+          case "essay":
+            return {
+              ...shared,
+              response: { text: payload.text, wordCount: payload.wordCount },
+              isCorrect: null,
+              score: null,
+            };
+          default:
+            return {
+              ...shared,
+              response: null,
+              isCorrect: null,
+              score: null,
+            };
+        }
+      })();
 
       if (readOnly) {
         if (payload.kind === "reflection" && payload.text.trim().length === 0) {

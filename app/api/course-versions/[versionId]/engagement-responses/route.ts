@@ -11,7 +11,14 @@ import {
 
 const UpsertEngagementResponseSchema = z.object({
   blockId: z.string().min(1),
-  blockType: z.enum(['quiz', 'reflection']),
+  blockType: z.enum([
+    'quiz',
+    'reflection',
+    'code-exercise',
+    'fill-in-blank',
+    'matching',
+    'essay',
+  ]),
   submoduleId: z.string().min(1),
   contentHash: z.string().min(1).optional(),
   response: z.unknown(),

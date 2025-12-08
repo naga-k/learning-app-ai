@@ -5,6 +5,12 @@ import {
   type ToolExecutionResult,
   type ToolRegistry,
 } from "./registry";
+import {
+  generateCodeExerciseTool,
+  generateEssayTool,
+  generateFillInBlankTool,
+  generateMatchingTool,
+} from "./engagement-tools";
 import type { EngagementBlock } from "./types";
 import { executeEngagementTools, type ToolInvocation } from "./execution";
 
@@ -90,6 +96,10 @@ export const createMockToolRegistry = (): ToolRegistry => {
   const registry = new InMemoryToolRegistry();
   registry.register(quizTool);
   registry.register(reflectionTool);
+  registry.register(generateCodeExerciseTool);
+  registry.register(generateFillInBlankTool);
+  registry.register(generateMatchingTool);
+  registry.register(generateEssayTool);
   return registry;
 };
 
