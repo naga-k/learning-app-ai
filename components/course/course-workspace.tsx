@@ -12,16 +12,20 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  Award,
   BookOpen,
   ChevronDown,
   ChevronRight,
   ExternalLink,
   Flag,
+  Flame,
   LayoutDashboard,
   List,
   LogOut as LogOutIcon,
   MessageCircle,
+  Sparkles,
   Settings,
+  Trophy,
   X,
   Loader2,
 } from "lucide-react";
@@ -34,6 +38,7 @@ import { MarkdownContent, MarkdownInline } from "./markdown-content";
 import { Linkify } from "./linkify";
 import { CourseAssistantPanel } from "@/components/course/course-assistant-panel";
 import { useSupabase } from "@/components/supabase-provider";
+import { Badge } from "@/components/ui/badge";
 import {
   NavigationRail,
   type NavigationRailItem,
@@ -100,6 +105,114 @@ type EngagementResponseState = {
   error?: string | null;
   updatedAt?: string;
 };
+
+type ProgressSnapshot = {
+  totalBlocks: number;
+  completedBlocks: number;
+  correctQuizzes: number;
+  points: number;
+  streakDays: number;
+  moduleCompleted: boolean;
+};
+
+const computeProgressSnapshot = ({
+  course,
+  responses,
+}: {
+  course: CourseWithIds;
+  responses: Record<string, EngagementResponseState>;
+}): ProgressSnapshot => {
+  const blocks = course.modules.flatMap((module) =>
+    module.submodules.flatMap((submodule) => submodule.engagementBlocks ?? []),
+  );
+  const totalBlocks = blocks.length;
+  const responseList = Object.values(responses);
+  const completedBlockIds = new Set(
+    responseList
+      .filter((response) => !response.stale && Boolean(response.response))
+      .map((response) => response.blockId),
+  );
+  const completedBlocks = completedBlockIds.size;
+  const correctQuizzes = responseList.filter(
+    (response) => response.blockType === "quiz" && response.isCorrect === true,
+  ).length;
+  const points = completedBlocks * 10 + correctQuizzes * 20;
+
+  const moduleCompleted = course.modules.some((module) => {
+    const moduleBlocks = module.submodules.flatMap(
+      (submodule) => submodule.engagementBlocks ?? [],
+    );
+    if (moduleBlocks.length === 0) return false;
+    return moduleBlocks.every((block) => completedBlockIds.has(block.id));
+  });
+
+  const dayKey = (timestamp: string | undefined) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    return Number.isNaN(date.getTime())
+      ? null
+      : date.toISOString().slice(0, 10);
+  };
+  const activeDays = Array.from(
+    new Set(
+      responseList
+        .map((response) => response.updatedAt || null)
+        .map((ts) => (ts ? dayKey(ts) : null))
+        .filter((day): day is string => Boolean(day)),
+    ),
+  ).sort((a, b) => (a < b ? 1 : -1));
+
+  let streakDays = 0;
+  if (activeDays.length > 0) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayMs = 24 * 60 * 60 * 1000;
+    const todayKey = today.toISOString().slice(0, 10);
+    let expected = todayKey;
+    for (const day of activeDays) {
+      if (day === expected) {
+        streakDays += 1;
+        const next = new Date(expected);
+        next.setTime(next.getTime() - dayMs);
+        expected = next.toISOString().slice(0, 10);
+      } else if (streakDays === 0 && day < expected) {
+        // allow streak to start from previous day if no activity today
+        const todayMinusOne = new Date(today.getTime() - dayMs)
+          .toISOString()
+          .slice(0, 10);
+        if (day === todayMinusOne) {
+          streakDays = 1;
+          const next = new Date(day);
+          next.setTime(next.getTime() - dayMs);
+          expected = next.toISOString().slice(0, 10);
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
+  return {
+    totalBlocks,
+    completedBlocks,
+    correctQuizzes,
+    points,
+    streakDays,
+    moduleCompleted,
+  };
+};
+
+const ENABLE_GAMIFY =
+  typeof process !== "undefined" &&
+  process.env.NEXT_PUBLIC_ENABLE_GAMIFY !== "false";
+const ENABLE_COPILOT =
+  typeof process !== "undefined" &&
+  process.env.NEXT_PUBLIC_ENABLE_COPILOT !== "false";
+const ENABLE_QUICK_CHECKS =
+  typeof process !== "undefined" &&
+  process.env.NEXT_PUBLIC_ENABLE_QUICK_CHECKS !== "false";
 
 const isQuizBlock = (
   block: EngagementBlock,
@@ -436,6 +549,130 @@ function LessonEngagementBlocks({
   );
 }
 
+function QuickCheckCard({
+  submoduleId,
+  lessonTitle,
+  lessonSummary,
+  onEvent,
+}: {
+  submoduleId: string;
+  lessonTitle: string;
+  lessonSummary?: string | null;
+  onEvent?: (eventType: string, payload?: Record<string, unknown>) => void;
+}) {
+  const [answer, setAnswer] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [score, setScore] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const storageKey = `quick-check-${submoduleId}`;
+  const question =
+    lessonSummary && lessonSummary.trim().length > 0
+      ? `What is the key takeaway from "${lessonTitle}"?`
+      : `Summarize the most important idea from "${lessonTitle}".`;
+  const answerKey = lessonSummary?.trim() || lessonTitle;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        answer?: string;
+        feedback?: string | null;
+        score?: number | null;
+      };
+      if (parsed.answer) setAnswer(parsed.answer);
+      if (parsed.feedback) setFeedback(parsed.feedback);
+      if (typeof parsed.score === "number") setScore(parsed.score);
+    } catch {
+      // ignore parse errors
+    } finally {
+      setLoaded(true);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const payload = { answer, feedback, score };
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+  }, [answer, feedback, score, storageKey]);
+
+  const gradeAnswer = useCallback(
+    (value: string) => {
+      const cleaned = value.trim().toLowerCase();
+      if (!cleaned) {
+        setFeedback("Share a quick takeaway to check your understanding.");
+        setScore(null);
+        return;
+      }
+      const keyTokens = (answerKey || "").toLowerCase().split(/\W+/).filter(Boolean);
+      const answerTokens = cleaned.split(/\W+/).filter(Boolean);
+      const overlap = keyTokens.filter((token) => answerTokens.includes(token)).length;
+      const tokenScore =
+        keyTokens.length === 0 ? 0 : Math.round((overlap / keyTokens.length) * 100);
+      const lengthBonus = Math.min(20, Math.max(0, cleaned.length - 40));
+      const finalScore = Math.min(100, tokenScore + lengthBonus);
+      setScore(finalScore);
+      if (finalScore >= 70) {
+        setFeedback("Nice—your summary hits the core idea.");
+      } else if (finalScore >= 40) {
+        setFeedback("Close. Add one more detail from the lesson summary.");
+      } else {
+        setFeedback("Re-read the lesson and call out the main point explicitly.");
+      }
+      onEvent?.("quick_check_graded", {
+        submoduleId,
+        score: finalScore,
+      });
+    },
+    [answerKey, onEvent, submoduleId],
+  );
+
+  if (!ENABLE_QUICK_CHECKS) return null;
+  if (!loaded && typeof window !== "undefined") return null;
+
+  return (
+    <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/80 p-5 text-indigo-900 shadow-sm dark:border-indigo-400/40 dark:bg-indigo-500/10 dark:text-indigo-50">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em]">
+          <Sparkles className="h-4 w-4" />
+          Quick check
+        </div>
+        {score !== null && (
+          <Badge variant="outline" className="border-indigo-300/60 text-indigo-900 dark:text-indigo-50">
+            Score: {score}%
+          </Badge>
+        )}
+      </div>
+      <p className="mt-3 text-sm font-medium">{question}</p>
+      <textarea
+        value={answer}
+        onChange={(event) => setAnswer(event.target.value)}
+        placeholder="Write a 2-3 sentence answer..."
+        className="mt-3 w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm text-indigo-900 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 dark:border-indigo-400/30 dark:bg-white/5 dark:text-indigo-50 dark:focus:border-indigo-300 dark:focus:ring-indigo-300/30"
+        rows={3}
+      />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => gradeAnswer(answer)}
+          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+        >
+          Check answer
+        </button>
+        <div className="text-xs text-indigo-800/80 dark:text-indigo-100/80">
+          {feedback ?? "A 30-second reflection to reinforce the lesson."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CourseWorkspace({
   course,
   summary,
@@ -499,6 +736,30 @@ export function CourseWorkspace({
     !readOnly && Boolean(courseVersionId);
   const engagementLoading =
     engagementPersistenceReady && engagementResponsesLoading;
+  const assistantEnabled = allowAssistant && ENABLE_COPILOT;
+
+  const logClientEvent = useCallback(
+    (eventType: string, payload?: Record<string, unknown>) => {
+      if (typeof window === "undefined") return;
+      const key = `course-events-${courseVersionId ?? "local"}`;
+      try {
+        const existingRaw = window.localStorage.getItem(key);
+        const existing = existingRaw ? (JSON.parse(existingRaw) as unknown[]) : [];
+        const next = [
+          ...existing,
+          {
+            eventType,
+            payload: payload ?? {},
+            timestamp: new Date().toISOString(),
+          },
+        ].slice(-100);
+        window.localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        // ignore client logging failures
+      }
+    },
+    [courseVersionId],
+  );
 
   // Helper function to toggle module expansion
   const toggleModuleExpanded = useCallback((moduleId: string) => {
@@ -613,12 +874,12 @@ export function CourseWorkspace({
   }, [courseVersionId, readOnly]);
 
   const handleActivateAssistant = useCallback(() => {
-    if (!allowAssistant) return;
+    if (!assistantEnabled) return;
     setSidePanelView("assistant");
-  }, [allowAssistant]);
+  }, [assistantEnabled]);
 
   useEffect(() => {
-    if (!allowAssistant) {
+    if (!assistantEnabled) {
       if (sidePanelView === "assistant") {
         setSidePanelView("modules");
       }
@@ -626,7 +887,7 @@ export function CourseWorkspace({
         setMobileAccordionView("modules");
       }
     }
-  }, [allowAssistant, mobileAccordionView, sidePanelView]);
+  }, [assistantEnabled, mobileAccordionView, sidePanelView]);
   const handleNavigateDashboard = useCallback(() => {
     router.push("/dashboard");
   }, [router]);
@@ -721,6 +982,7 @@ export function CourseWorkspace({
         stale: false,
         saving: true,
         error: null,
+        updatedAt: new Date().toISOString(),
       };
 
       if (readOnly) {
@@ -835,6 +1097,13 @@ export function CourseWorkspace({
             updatedAt: new Date().toISOString(),
           },
         }));
+        logClientEvent("engagement_saved", {
+          blockId: block.id,
+          blockType: block.type,
+          submoduleId: block.submoduleId,
+          isCorrect: baseState.isCorrect,
+          score: baseState.score,
+        });
       } catch (error) {
         console.error("[course] failed to persist engagement response", error);
         setEngagementResponses((prev) => ({
@@ -1015,6 +1284,46 @@ export function CourseWorkspace({
   );
   const firstLesson = flattenedLessons[0] ?? null;
 
+  const progressSnapshot = useMemo(
+    () => computeProgressSnapshot({ course, responses: engagementResponses }),
+    [course, engagementResponses],
+  );
+
+  const earnedBadges = useMemo(
+    () => [
+      {
+        key: "first-session",
+        label: "First session",
+        earned: progressSnapshot.completedBlocks > 0,
+        icon: Flame,
+      },
+      {
+        key: "three-day-streak",
+        label: "3-day streak",
+        earned: progressSnapshot.streakDays >= 3,
+        icon: Trophy,
+      },
+      {
+        key: "completed-module",
+        label: "Completed module",
+        earned: progressSnapshot.moduleCompleted,
+        icon: Award,
+      },
+    ],
+    [progressSnapshot],
+  );
+
+  const loggedBadgesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    earnedBadges.forEach((badge) => {
+      if (!badge.earned) return;
+      if (loggedBadgesRef.current.has(badge.key)) return;
+      loggedBadgesRef.current.add(badge.key);
+      logClientEvent("badge_earned", { badge: badge.key });
+    });
+  }, [earnedBadges, logClientEvent]);
+
   const currentLessonIndex = useMemo(() => {
     if (!activeModule || !activeSubmodule) return -1;
     return flattenedLessons.findIndex(
@@ -1085,7 +1394,7 @@ export function CourseWorkspace({
       },
     ];
 
-    if (allowAssistant) {
+    if (assistantEnabled) {
       items.push({
         key: "assistant",
         label: "Assistant",
@@ -1096,7 +1405,7 @@ export function CourseWorkspace({
     }
 
     return items;
-  }, [allowAssistant, sidePanelView]);
+  }, [assistantEnabled, sidePanelView]);
 
   const navigationSecondaryItems = useMemo<NavigationRailItem[]>(() => {
     if (readOnly) {
@@ -1342,7 +1651,7 @@ export function CourseWorkspace({
               </nav>
             )}
 
-            {allowAssistant && activeModule && activeSubmodule && (
+            {assistantEnabled && activeModule && activeSubmodule && (
               <CourseAssistantPanel
                 moduleTitle={activeModule.title}
                 moduleSummary={activeModule.summary}
@@ -1355,6 +1664,13 @@ export function CourseWorkspace({
                 onActivate={handleActivateAssistant}
                 className="flex-1"
                 shareToken={shareToken ?? undefined}
+                onQuickAction={(action) =>
+                  logClientEvent("assistant_quick_action", {
+                    action,
+                    moduleId: activeModule.moduleId,
+                    submoduleId: activeSubmodule.id,
+                  })
+                }
               />
             )}
 
@@ -1493,7 +1809,7 @@ export function CourseWorkspace({
                 >
                   Modules
                 </button>
-                {allowAssistant ? (
+                {assistantEnabled ? (
                   <button
                     type="button"
                     onClick={() => setMobileAccordionView("assistant")}
@@ -1620,7 +1936,7 @@ export function CourseWorkspace({
                       </div>
                     )}
                   </nav>
-                ) : allowAssistant && activeModule && activeSubmodule ? (
+                ) : assistantEnabled && activeModule && activeSubmodule ? (
                   <CourseAssistantPanel
                     moduleTitle={activeModule.title}
                     moduleSummary={activeModule.summary}
@@ -1633,6 +1949,13 @@ export function CourseWorkspace({
                     onActivate={handleActivateAssistant}
                     className="h-full"
                     shareToken={shareToken ?? undefined}
+                    onQuickAction={(action) =>
+                      logClientEvent("assistant_quick_action", {
+                        action,
+                        moduleId: activeModule.moduleId,
+                        submoduleId: activeSubmodule.id,
+                      })
+                    }
                   />
                 ) : null}
               </div>
@@ -1693,6 +2016,64 @@ export function CourseWorkspace({
                   Reflect on what you’ve achieved and line up your next steps.
                 </p>
               </>
+            )}
+            {ENABLE_GAMIFY && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-indigo-200/80 bg-white px-4 py-3 shadow-sm dark:border-indigo-400/30 dark:bg-white/5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-200">
+                    Points
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
+                    {progressSnapshot.points}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    {progressSnapshot.completedBlocks} of {progressSnapshot.totalBlocks || "—"} activities
+                    completed
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-indigo-200/80 bg-white px-4 py-3 shadow-sm dark:border-indigo-400/30 dark:bg-white/5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-200">
+                    Progress
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
+                    {progressSnapshot.totalBlocks > 0
+                      ? Math.round(
+                          (progressSnapshot.completedBlocks / progressSnapshot.totalBlocks) * 100,
+                        )
+                      : 0}
+                    %
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Streak: {progressSnapshot.streakDays} day
+                    {progressSnapshot.streakDays === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-indigo-200/80 bg-white px-4 py-3 shadow-sm dark:border-indigo-400/30 dark:bg-white/5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-600 dark:text-indigo-200">
+                    Badges
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {earnedBadges.map((badge) => {
+                      const Icon = badge.icon;
+                      return (
+                        <Badge
+                          key={badge.key}
+                          variant={badge.earned ? "default" : "outline"}
+                          className={cn(
+                            "gap-1",
+                            badge.earned
+                              ? "bg-gradient-to-r from-indigo-500 to-sky-500 text-white"
+                              : "text-slate-700 dark:text-slate-200",
+                          )}
+                        >
+                          <Icon className="h-3 w-3" />
+                          {badge.label}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
           {headerSlot ? null : (
@@ -1755,6 +2136,16 @@ export function CourseWorkspace({
                   {activeLessonReady ? (
                     <>
                       <MarkdownContent content={activeSubmodule.content} />
+                      {ENABLE_QUICK_CHECKS && (
+                        <div className="mt-6">
+                          <QuickCheckCard
+                            submoduleId={activeSubmodule.id}
+                            lessonTitle={activeSubmodule.title}
+                            lessonSummary={activeSubmodule.summary}
+                            onEvent={logClientEvent}
+                          />
+                        </div>
+                      )}
                       <LessonEngagementBlocks
                         blocks={activeSubmodule.engagementBlocks}
                         submoduleId={activeSubmodule.id}

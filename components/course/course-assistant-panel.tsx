@@ -17,6 +17,7 @@ type CourseAssistantPanelProps = {
   onActivate: () => void;
   className?: string;
   shareToken?: string | null;
+  onQuickAction?: (action: string) => void;
 };
 
 type ChatRole = "user" | "assistant";
@@ -45,6 +46,7 @@ export function CourseAssistantPanel({
   onActivate,
   className,
   shareToken,
+  onQuickAction,
 }: CourseAssistantPanelProps) {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -58,6 +60,23 @@ export function CourseAssistantPanel({
   const [isMounted, setIsMounted] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const quickActions = useMemo(
+    () => [
+      {
+        label: "Summarize lesson",
+        prompt: `Summarize the key takeaways from "${lessonTitle}" in 3 tight bullets and one practical tip.`,
+      },
+      {
+        label: "Give me a hint",
+        prompt: `I'm stuck in "${lessonTitle}". Give me a hint and a tiny nudge to unblock me without giving away the full answer.`,
+      },
+      {
+        label: "Practice question",
+        prompt: `Generate one practice question and a short ideal answer for "${lessonTitle}".`,
+      },
+    ],
+    [lessonTitle],
+  );
 
   const hasQuestion = question.trim().length > 0;
   const hasSelection = Boolean(capturedSelection && capturedSelection.trim().length > 0);
@@ -360,6 +379,17 @@ export function CourseAssistantPanel({
 
   const canClearConversation = messages.length > 0 || hasQuestion || hasSelection || isSending;
 
+  const handleQuickAction = (actionLabel: string, prompt: string) => {
+    if (isSending) return;
+    setCapturedSelection(null);
+    setIncludeSelection(false);
+    setQuestion(prompt);
+    onQuickAction?.(actionLabel);
+    requestAnimationFrame(() => {
+      formRef.current?.requestSubmit();
+    });
+  };
+
   if (!isMounted) {
     return null;
   }
@@ -464,6 +494,20 @@ export function CourseAssistantPanel({
             className="border-t border-border bg-transparent px-4 pb-5 pt-4 transition-colors sm:px-6 dark:border-white/10"
           >
             <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {quickActions.map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => handleQuickAction(action.label, action.prompt)}
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.08] dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-white/15 dark:focus-visible:ring-indigo-300 dark:focus-visible:ring-offset-slate-950"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+
               {capturedSelection && (
                 <div className="mx-auto max-w-3xl rounded-2xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary transition-colors dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-50">
                   <div className="flex items-start gap-2">
