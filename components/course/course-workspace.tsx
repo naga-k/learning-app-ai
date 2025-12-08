@@ -499,6 +499,31 @@ export function CourseWorkspace({
     !readOnly && Boolean(courseVersionId);
   const engagementLoading =
     engagementPersistenceReady && engagementResponsesLoading;
+  const progressEnabled = !readOnly && Boolean(courseId && courseVersionId);
+  const [progressSummary, setProgressSummary] = useState<{
+    completionPercent: number;
+    completedSubmodules: number;
+    totalSubmodules: number;
+    totalTimeSeconds: number;
+    lastAccessedAt: string | null;
+  } | null>(null);
+  const progressEndpoint = useMemo(
+    () => (courseId ? `/api/courses/${courseId}/progress` : null),
+    [courseId],
+  );
+  const progressTimerStartRef = useRef<number | null>(null);
+  const progressSubmoduleRef = useRef<string | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const formatTimeSpent = useCallback((seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "0m";
+    const totalMinutes = Math.max(0, Math.floor(seconds / 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
+    }
+    return `${minutes}m`;
+  }, []);
 
   // Helper function to toggle module expansion
   const toggleModuleExpanded = useCallback((moduleId: string) => {
@@ -611,6 +636,45 @@ export function CourseWorkspace({
       cancelled = true;
     };
   }, [courseVersionId, readOnly]);
+
+  useEffect(() => {
+    if (!progressEnabled || !progressEndpoint) {
+      setProgressSummary(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadProgress = async () => {
+      try {
+        const response = await fetch(progressEndpoint, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Failed to load progress (${response.status})`);
+        }
+        const data = await response.json();
+        if (cancelled) return;
+        if (data?.summary) {
+          setProgressSummary({
+            completionPercent: Number(data.summary.completionPercent ?? 0),
+            completedSubmodules: Number(data.summary.completedSubmodules ?? 0),
+            totalSubmodules: Number(data.summary.totalSubmodules ?? 0),
+            totalTimeSeconds: Number(data.summary.totalTimeSeconds ?? 0),
+            lastAccessedAt: data.summary.lastAccessedAt ?? null,
+          });
+        }
+      } catch (error) {
+        console.error("[course] failed to load course progress", error);
+        if (!cancelled) {
+          setProgressSummary(null);
+        }
+      }
+    };
+
+    void loadProgress();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [progressEnabled, progressEndpoint]);
 
   const handleActivateAssistant = useCallback(() => {
     if (!allowAssistant) return;
@@ -851,6 +915,115 @@ export function CourseWorkspace({
     [courseId, courseVersionId, readOnly],
   );
 
+  const postProgressUpdate = useCallback(
+    async (payload: {
+      submoduleId: string;
+      status?: "not_started" | "in_progress" | "completed";
+      timeSpentSecondsDelta?: number;
+      lastAccessedAt?: string;
+      completedAt?: string | null;
+    }) => {
+      if (!progressEnabled || !progressEndpoint) return;
+      try {
+        const response = await fetch(progressEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update progress (${response.status})`);
+        }
+        const data = await response.json().catch(() => null);
+        if (data?.summary) {
+          setProgressSummary({
+            completionPercent: Number(data.summary.completionPercent ?? 0),
+            completedSubmodules: Number(data.summary.completedSubmodules ?? 0),
+            totalSubmodules: Number(data.summary.totalSubmodules ?? 0),
+            totalTimeSeconds: Number(data.summary.totalTimeSeconds ?? 0),
+            lastAccessedAt: data.summary.lastAccessedAt ?? null,
+          });
+        }
+      } catch (error) {
+        console.error("[course] failed to post progress update", error);
+      }
+    },
+    [progressEnabled, progressEndpoint],
+  );
+
+  const flushProgress = useCallback(
+    async ({ markCompleted = false, keepRunning = false } = {}) => {
+      if (!progressEnabled) return;
+      const submoduleId = progressSubmoduleRef.current;
+      if (!submoduleId) return;
+
+      const nowMs = Date.now();
+      const start = progressTimerStartRef.current;
+      const deltaSeconds =
+        start !== null ? Math.max(0, Math.floor((nowMs - start) / 1000)) : 0;
+
+      if (!keepRunning) {
+        progressTimerStartRef.current = null;
+      } else {
+        progressTimerStartRef.current = nowMs;
+      }
+
+      if (deltaSeconds === 0 && !markCompleted) return;
+
+      await postProgressUpdate({
+        submoduleId,
+        status: markCompleted ? "completed" : "in_progress",
+        timeSpentSecondsDelta: deltaSeconds > 0 ? deltaSeconds : undefined,
+        lastAccessedAt: new Date().toISOString(),
+        completedAt: markCompleted ? new Date().toISOString() : undefined,
+      });
+
+      if (!keepRunning && !markCompleted) {
+        progressSubmoduleRef.current = null;
+      }
+    },
+    [postProgressUpdate, progressEnabled],
+  );
+
+  const stopLessonTracking = useCallback(
+    async (markCompleted = false) => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      await flushProgress({ markCompleted, keepRunning: false });
+      if (markCompleted) {
+        progressSubmoduleRef.current = null;
+      }
+    },
+    [flushProgress],
+  );
+
+  const startLessonTracking = useCallback(
+    (submoduleId: string) => {
+      if (!progressEnabled) return;
+      const current = progressSubmoduleRef.current;
+      if (current && current !== submoduleId) {
+        void flushProgress({ markCompleted: false, keepRunning: false });
+      }
+
+      progressSubmoduleRef.current = submoduleId;
+      progressTimerStartRef.current = Date.now();
+
+      if (!progressIntervalRef.current) {
+        progressIntervalRef.current = setInterval(() => {
+          void flushProgress({ keepRunning: true });
+        }, 15000);
+      }
+
+      void postProgressUpdate({
+        submoduleId,
+        status: "in_progress",
+        lastAccessedAt: new Date().toISOString(),
+      });
+    },
+    [flushProgress, postProgressUpdate, progressEnabled],
+  );
+
   useEffect(() => {
     const firstModule = course.modules[0];
     if (!firstModule) return;
@@ -931,6 +1104,36 @@ export function CourseWorkspace({
       ) ?? activeModule.submodules[0]
     );
   }, [activeModule, activeSubmoduleId]);
+
+  useEffect(() => {
+    if (!progressEnabled) return;
+    if (viewMode === "lesson" && activeSubmodule?.id) {
+      startLessonTracking(activeSubmodule.id);
+    } else {
+      void stopLessonTracking(false);
+    }
+  }, [activeSubmodule?.id, progressEnabled, startLessonTracking, stopLessonTracking, viewMode]);
+
+  useEffect(() => {
+    if (!progressEnabled) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void stopLessonTracking(false);
+      } else if (document.visibilityState === "visible" && viewMode === "lesson" && activeSubmodule?.id) {
+        startLessonTracking(activeSubmodule.id);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [activeSubmodule?.id, progressEnabled, startLessonTracking, stopLessonTracking, viewMode]);
+
+  useEffect(() => {
+    return () => {
+      void stopLessonTracking(false);
+    };
+  }, [stopLessonTracking]);
 
   const moduleCount = course.modules.length;
   const totalLessons = course.modules.reduce(
@@ -1066,6 +1269,10 @@ export function CourseWorkspace({
       });
     });
   }, [setViewMode]);
+
+  const markCurrentLessonComplete = useCallback(() => {
+    void stopLessonTracking(true);
+  }, [stopLessonTracking]);
 
   const selectionSourceRef =
     viewMode === "overview"
@@ -1752,6 +1959,19 @@ export function CourseWorkspace({
                   )}
                   </div>
 
+                  {progressEnabled && progressSummary ? (
+                    <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground dark:text-slate-300">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700 dark:bg-white/5 dark:text-slate-100">
+                        Progress: {progressSummary.completedSubmodules}/
+                        {progressSummary.totalSubmodules || totalLessons} lessons ·{" "}
+                        {progressSummary.completionPercent}%
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700 dark:bg-white/5 dark:text-slate-100">
+                        Time spent: {formatTimeSpent(progressSummary.totalTimeSeconds)}
+                      </span>
+                    </div>
+                  ) : null}
+
                   {activeLessonReady ? (
                     <>
                       <MarkdownContent content={activeSubmodule.content} />
@@ -1777,7 +1997,10 @@ export function CourseWorkspace({
                   {nextLesson ? (
                     <button
                       type="button"
-                      onClick={() => goToLesson(nextLesson)}
+                      onClick={() => {
+                        markCurrentLessonComplete();
+                        goToLesson(nextLesson);
+                      }}
                       className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/10 dark:bg-indigo-500/20 dark:text-indigo-100 dark:hover:bg-indigo-500/30"
                     >
                       Next module
@@ -1786,7 +2009,10 @@ export function CourseWorkspace({
                   ) : (
                     <button
                       type="button"
-                      onClick={goToWrapUp}
+                      onClick={() => {
+                        markCurrentLessonComplete();
+                        goToWrapUp();
+                      }}
                       className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-4 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-emerald-300/40 dark:bg-emerald-500/20 dark:text-emerald-100 dark:hover:bg-emerald-500/30"
                     >
                       Wrap up course

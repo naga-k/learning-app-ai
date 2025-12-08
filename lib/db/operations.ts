@@ -1,7 +1,18 @@
 "use server";
 
 import { randomBytes } from "crypto";
-import { and, count, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  sql,
+  sum,
+} from "drizzle-orm";
 import { db } from "./client";
 import {
   chatMessages,
@@ -12,6 +23,7 @@ import {
   courseGenerationSnapshots,
   courseEngagementBlocks,
   courseEngagementResponses,
+  courseProgress,
 } from "./schema";
 
 export type StoredMessage = {
@@ -25,6 +37,7 @@ export type CourseEngagementBlockRecord =
   typeof courseEngagementBlocks.$inferSelect;
 export type CourseEngagementResponseRecord =
   typeof courseEngagementResponses.$inferSelect;
+export type CourseProgressRecord = typeof courseProgress.$inferSelect;
 
 const SHARE_TOKEN_BYTES = 18;
 
@@ -785,4 +798,350 @@ export async function listRecentChatSessions(
     .limit(limit);
 
   return sessions;
+}
+
+type CourseStructureStats = {
+  totalSubmodules: number;
+  modules: {
+    moduleId: string;
+    title: string;
+    submodules: { id: string; title: string | null }[];
+  }[];
+};
+
+const extractCourseStructureStats = (structured: unknown): CourseStructureStats => {
+  const fallback: CourseStructureStats = { totalSubmodules: 0, modules: [] };
+  if (!structured || typeof structured !== "object") {
+    return fallback;
+  }
+
+  const modules = (structured as { modules?: unknown }).modules;
+  if (!Array.isArray(modules)) {
+    return fallback;
+  }
+
+  const parsedModules = modules
+    .map((module) => {
+      if (!module || typeof module !== "object") return null;
+      const moduleId = (module as { moduleId?: unknown }).moduleId;
+      const title = (module as { title?: unknown }).title;
+      const submodules = (module as { submodules?: unknown }).submodules;
+      if (typeof moduleId !== "string") return null;
+      if (!Array.isArray(submodules)) return null;
+
+      const parsedSubmodules = submodules
+        .map((submodule) => {
+          if (!submodule || typeof submodule !== "object") return null;
+          const id = (submodule as { id?: unknown }).id;
+          const subTitle = (submodule as { title?: unknown }).title;
+          if (typeof id !== "string") return null;
+          return {
+            id,
+            title: typeof subTitle === "string" ? subTitle : null,
+          };
+        })
+        .filter(Boolean) as { id: string; title: string | null }[];
+
+      return {
+        moduleId,
+        title: typeof title === "string" ? title : moduleId,
+        submodules: parsedSubmodules,
+      };
+    })
+    .filter(Boolean) as CourseStructureStats["modules"];
+
+  const totalSubmodules = parsedModules.reduce(
+    (sum, module) => sum + module.submodules.length,
+    0,
+  );
+
+  return {
+    totalSubmodules,
+    modules: parsedModules,
+  };
+};
+
+export async function getCourseWithActiveVersion(params: {
+  courseId: string;
+  userId: string;
+}) {
+  const [row] = await db
+    .select({
+      course: courses,
+      version: courseVersions,
+    })
+    .from(courses)
+    .leftJoin(courseVersions, eq(courseVersions.id, courses.activeVersionId))
+    .where(and(eq(courses.id, params.courseId), eq(courses.userId, params.userId)))
+    .limit(1);
+
+  if (!row) return null;
+  return row;
+}
+
+export async function updateCourseProgress(params: {
+  userId: string;
+  courseId: string;
+  courseVersionId: string;
+  submoduleId: string;
+  status?: "not_started" | "in_progress" | "completed";
+  timeSpentSecondsDelta?: number;
+  timeSpentSeconds?: number;
+  lastAccessedAt?: Date | string | null;
+  completedAt?: Date | string | null;
+}) {
+  const now = new Date();
+  const deltaSeconds = Math.max(0, Math.floor(params.timeSpentSecondsDelta ?? 0));
+  const lastAccessedAt =
+    params.lastAccessedAt === undefined
+      ? now
+      : params.lastAccessedAt === null
+        ? null
+        : new Date(params.lastAccessedAt);
+  const completedAt =
+    params.completedAt === undefined
+      ? params.status === "completed"
+        ? now
+        : undefined
+      : params.completedAt === null
+        ? null
+        : new Date(params.completedAt);
+
+  const updatePayload: Record<string, unknown> = {
+    updatedAt: now,
+    courseId: params.courseId,
+    courseVersionId: params.courseVersionId,
+  };
+
+  if (params.status) {
+    updatePayload.status = params.status;
+  }
+
+  if (lastAccessedAt) {
+    updatePayload.lastAccessedAt = lastAccessedAt;
+  }
+
+  if (completedAt !== undefined) {
+    updatePayload.completedAt = completedAt;
+  }
+
+  if (params.timeSpentSeconds !== undefined) {
+    updatePayload.timeSpentSeconds = Math.max(0, Math.floor(params.timeSpentSeconds));
+  } else if (deltaSeconds > 0) {
+    updatePayload.timeSpentSeconds = sql`${courseProgress.timeSpentSeconds} + ${deltaSeconds}`;
+  }
+
+  await db
+    .insert(courseProgress)
+    .values({
+      userId: params.userId,
+      courseId: params.courseId,
+      courseVersionId: params.courseVersionId,
+      submoduleId: params.submoduleId,
+      status: params.status ?? "in_progress",
+      timeSpentSeconds:
+        params.timeSpentSeconds !== undefined
+          ? Math.max(0, Math.floor(params.timeSpentSeconds))
+          : deltaSeconds,
+      lastAccessedAt,
+      completedAt: completedAt ?? null,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        courseProgress.userId,
+        courseProgress.courseVersionId,
+        courseProgress.submoduleId,
+      ],
+      set: updatePayload,
+    });
+}
+
+export async function getCourseProgress(params: {
+  userId: string;
+  courseId?: string;
+  courseVersionId: string;
+  structured?: unknown;
+}) {
+  const rows = await db
+    .select()
+    .from(courseProgress)
+    .where(
+      and(
+        eq(courseProgress.userId, params.userId),
+        eq(courseProgress.courseVersionId, params.courseVersionId),
+      ),
+    );
+
+  const structureStats = extractCourseStructureStats(params.structured);
+  const totalTimeSeconds = rows.reduce(
+    (sum, row) => sum + Math.max(0, row.timeSpentSeconds ?? 0),
+    0,
+  );
+  const completedSubmodules = rows.filter((row) => row.status === "completed").length;
+  const inProgressSubmodules = rows.filter((row) => row.status === "in_progress").length;
+  const lastAccessedAt = rows.reduce<Date | null>((latest, row) => {
+    const current = row.lastAccessedAt ? new Date(row.lastAccessedAt) : null;
+    if (!current) return latest;
+    if (!latest) return current;
+    return current > latest ? current : latest;
+  }, null);
+
+  const moduleBreakdown = structureStats.modules.map((module) => {
+    const completedInModule = module.submodules.filter((submodule) =>
+      rows.some(
+        (row) => row.submoduleId === submodule.id && row.status === "completed",
+      ),
+    ).length;
+
+    const inProgressInModule = module.submodules.filter((submodule) =>
+      rows.some(
+        (row) => row.submoduleId === submodule.id && row.status === "in_progress",
+      ),
+    ).length;
+
+    return {
+      moduleId: module.moduleId,
+      title: module.title,
+      totalSubmodules: module.submodules.length,
+      completedSubmodules: completedInModule,
+      inProgressSubmodules: inProgressInModule,
+    };
+  });
+
+  return {
+    progress: rows,
+    summary: {
+      courseId: params.courseId ?? null,
+      courseVersionId: params.courseVersionId,
+      totalSubmodules: structureStats.totalSubmodules,
+      completedSubmodules,
+      inProgressSubmodules,
+      completionPercent:
+        structureStats.totalSubmodules > 0
+          ? Math.round((completedSubmodules / structureStats.totalSubmodules) * 100)
+          : 0,
+      totalTimeSeconds,
+      lastAccessedAt,
+    },
+    modules: moduleBreakdown,
+  };
+}
+
+export async function getCourseAnalytics(params: { userId: string; courseId: string }) {
+  const record = await getCourseWithActiveVersion({
+    courseId: params.courseId,
+    userId: params.userId,
+  });
+  if (!record || !record.course || !record.version) return null;
+
+  const progress = await getCourseProgress({
+    userId: params.userId,
+    courseId: params.courseId,
+    courseVersionId: record.version.id,
+    structured: record.version.structured,
+  });
+
+  const [engagementStats] = await db
+    .select({
+      totalResponses: count(),
+      correctResponses: sum(
+        sql<number>`case when ${courseEngagementResponses.isCorrect} = true then 1 else 0 end`,
+      ),
+    })
+    .from(courseEngagementResponses)
+    .where(
+      and(
+        eq(courseEngagementResponses.userId, params.userId),
+        eq(courseEngagementResponses.courseId, params.courseId),
+      ),
+    );
+
+  const totalResponses = Number(engagementStats?.totalResponses ?? 0);
+  const correctResponses = Number(engagementStats?.correctResponses ?? 0);
+  const accuracyRate =
+    totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : null;
+
+  return {
+    courseId: params.courseId,
+    courseVersionId: record.version.id,
+    progress,
+    engagement: {
+      totalResponses,
+      correctResponses,
+      accuracyRate,
+    },
+  };
+}
+
+export async function getUserAnalytics(userId: string) {
+  const courseRows = await db
+    .select({
+      course: courses,
+      version: courseVersions,
+    })
+    .from(courses)
+    .leftJoin(courseVersions, eq(courseVersions.id, courses.activeVersionId))
+    .where(eq(courses.userId, userId));
+
+  const courseAnalytics = await Promise.all(
+    courseRows.map(async (row) => {
+      if (!row.course) return null;
+      return await getCourseAnalytics({
+        userId,
+        courseId: row.course.id,
+      });
+    }),
+  );
+
+  const validAnalytics = courseAnalytics.filter(Boolean) as Awaited<
+    ReturnType<typeof getCourseAnalytics>
+  >[];
+
+  const totalCourses = courseRows.length;
+  const completedCourses = validAnalytics.filter(
+    (entry) => entry?.progress.summary.completionPercent === 100,
+  ).length;
+  const totalTimeSeconds = validAnalytics.reduce(
+    (sum, entry) => sum + (entry?.progress.summary.totalTimeSeconds ?? 0),
+    0,
+  );
+  const averageCompletion =
+    validAnalytics.length > 0
+      ? Math.round(
+          validAnalytics.reduce(
+            (sum, entry) => sum + (entry?.progress.summary.completionPercent ?? 0),
+            0,
+          ) / validAnalytics.length,
+        )
+      : 0;
+  const latestActivity = validAnalytics.reduce<Date | null>((latest, entry) => {
+    const entryDate = entry?.progress.summary.lastAccessedAt
+      ? new Date(entry.progress.summary.lastAccessedAt)
+      : null;
+    if (!entryDate) return latest;
+    if (!latest) return entryDate;
+    return entryDate > latest ? entryDate : latest;
+  }, null);
+
+  return {
+    totals: {
+      totalCourses,
+      completedCourses,
+      inProgressCourses: Math.max(0, totalCourses - completedCourses),
+      totalTimeSeconds,
+      averageCompletionPercent: averageCompletion,
+      latestActivity,
+    },
+    courses: validAnalytics.map((entry) => ({
+      courseId: entry?.courseId ?? "",
+      courseVersionId: entry?.courseVersionId ?? "",
+      completionPercent: entry?.progress.summary.completionPercent ?? 0,
+      totalTimeSeconds: entry?.progress.summary.totalTimeSeconds ?? 0,
+      totalSubmodules: entry?.progress.summary.totalSubmodules ?? 0,
+      completedSubmodules: entry?.progress.summary.completedSubmodules ?? 0,
+      accuracyRate: entry?.engagement.accuracyRate ?? null,
+      lastAccessedAt: entry?.progress.summary.lastAccessedAt ?? null,
+    })),
+  };
 }

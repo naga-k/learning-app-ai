@@ -51,6 +51,41 @@ export const courseVersions = pgTable("course_versions", {
     .where(sql`"share_token" IS NOT NULL`),
 }));
 
+export const courseProgress = pgTable(
+  "course_progress",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    courseVersionId: uuid("course_version_id")
+      .notNull()
+      .references(() => courseVersions.id, { onDelete: "cascade" }),
+    submoduleId: text("submodule_id").notNull(),
+    status: text("status").notNull().default("not_started"),
+    timeSpentSeconds: integer("time_spent_seconds").default(0),
+    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueUserSubmodule: uniqueIndex("course_progress_user_submodule_idx").on(
+      table.userId,
+      table.courseVersionId,
+      table.submoduleId,
+    ),
+    userCourseIdx: index("course_progress_user_course_idx").on(
+      table.userId,
+      table.courseId,
+    ),
+    courseVersionIdx: index("course_progress_course_version_idx").on(
+      table.courseVersionId,
+    ),
+  }),
+);
+
 export const courseGenerationJobs = pgTable("course_generation_jobs", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull(),
