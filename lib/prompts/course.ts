@@ -99,9 +99,13 @@ Produce full course content that mirrors the approved plan and feels unmistakabl
 
 **Interactive engagement**
 - For every submodule, populate the \`engagementBlocks\` array with 1–2 activities tailored to the learner’s context.
-- Available tools:
-  - \`generate_multiple_choice_quiz\`: fast knowledge checks. Include \`prompt\`, 2–4 \`options\`, a \`correctOptionIndex\`, plus optional \`rationale\` and \`difficulty\`.
-  - \`generate_reflection_prompt\`: targeted reflections. Include \`prompt\`, optional \`guidance\`, and optional \`expectedDurationMinutes\`.
+- Available block types (choose the best fit; you are not required to use all of them):
+  - \`quiz\`: fast knowledge checks. Include \`prompt\`, 2–4 \`options\`, a \`correctOptionIndex\`, plus optional \`rationale\` and \`difficulty\`.
+  - \`reflection\`: targeted reflections. Include \`prompt\`, optional \`guidance\`, and optional \`expectedDurationMinutes\`.
+  - \`code-exercise\`: hands-on coding practice for programming domains. Include \`prompt\`, optional \`starterCode\`, optional \`solution\`, optional \`language\`, optional \`testCases\` (\`input\`, \`expectedOutput\`), and optional \`hints\`.
+  - \`fill-in-blank\`: cloze practice. Include \`prompt\`, and \`blanks\` with \`id\`, \`correctAnswer\`, optional \`alternatives\`, plus optional \`caseSensitive\`.
+  - \`matching\`: pair concepts. Include \`prompt\`, \`leftItems\` (\`id\`, \`label\`), \`rightItems\` (\`id\`, \`label\`), and \`correctPairs\` (\`leftId\`, \`rightId\`).
+  - \`essay\`: longer-form reflection. Include \`prompt\`, optional \`guidance\`, optional \`minWords\`, optional \`maxWords\`, optional \`rubric\`, and optional \`enableAIFeedback\`.
 - Choose the mix that reinforces the key takeaway of that lesson. Avoid generic prompts—hook them into the learner’s actual goals, constraints, or projects.
 
 **Pacing cues**
@@ -201,6 +205,45 @@ CRITICAL: The root JSON MUST ALWAYS be an OBJECT. Never output an array at the t
       "prompt": "string",
       "guidance": "string (optional)",
       "expectedDurationMinutes": "number (optional)"
+    } |
+    {
+      "type": "code-exercise",
+      "prompt": "string",
+      "starterCode": "string (optional)",
+      "solution": "string (optional)",
+      "language": "string (optional)",
+      "testCases": [
+        { "input": "string", "expectedOutput": "string" }
+      ] (optional),
+      "hints": ["string", "..."] (optional)
+    } |
+    {
+      "type": "fill-in-blank",
+      "prompt": "string",
+      "blanks": [
+        {
+          "id": "string",
+          "correctAnswer": "string",
+          "alternatives": ["string", "..."] (optional)
+        }
+      ],
+      "caseSensitive": "boolean (optional)"
+    } |
+    {
+      "type": "matching",
+      "prompt": "string",
+      "leftItems": [{ "id": "string", "label": "string" }],
+      "rightItems": [{ "id": "string", "label": "string" }],
+      "correctPairs": [{ "leftId": "string", "rightId": "string" }]
+    } |
+    {
+      "type": "essay",
+      "prompt": "string",
+      "guidance": "string (optional)",
+      "minWords": "number (optional)",
+      "maxWords": "number (optional)",
+      "rubric": "string (optional)",
+      "enableAIFeedback": "boolean (optional)"
     }
   ] (optional, include 1-3 interactive blocks tailored to the learner)
 }`.trim();

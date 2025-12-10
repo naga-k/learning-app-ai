@@ -35,8 +35,19 @@ import {
 } from "@/lib/ai/provider";
 import { z } from "zod";
 import { EngagementBlockArraySchema } from "@/lib/ai/tools/types";
-import { resolveEngagementBlocksFromResults } from "@/lib/ai/tools/execution";
-import type { ToolExecutionContext } from "@/lib/ai/tools/registry";
+import {
+  executeEngagementTools,
+  resolveEngagementBlocksFromResults,
+  type ToolInvocation,
+} from "@/lib/ai/tools/execution";
+import { InMemoryToolRegistry, type ToolExecutionContext } from "@/lib/ai/tools/registry";
+import {
+  generateCodeExerciseTool,
+  generateEssayTool,
+  generateFillInBlankTool,
+  generateMatchingTool,
+} from "@/lib/ai/tools/engagement-tools";
+import { isProgrammingDomain } from "@/lib/ai/tools/utils";
 
 const requiredEnvVars = ["SUPABASE_DB_URL", "OPENAI_API_KEY", "AI_PROVIDER"];
 
@@ -55,6 +66,107 @@ const webSearchTool = supportsOpenAIWebSearch
   : undefined;
 
 const webSearchTools = webSearchTool ? { web_search: webSearchTool } : undefined;
+
+const MAX_ENGAGEMENT_BLOCKS = 3;
+
+const createEngagementToolRegistry = () => {
+  const registry = new InMemoryToolRegistry();
+  registry.register(generateCodeExerciseTool);
+  registry.register(generateFillInBlankTool);
+  registry.register(generateMatchingTool);
+  registry.register(generateEssayTool);
+  return registry;
+};
+
+type EngagementToolInputs = {
+  moduleTitle: string;
+  lessonTitle: string;
+  domain?: string;
+  summary?: string | null;
+  content?: string | null;
+};
+
+const buildEngagementToolInvocations = ({
+  moduleTitle,
+  lessonTitle,
+  domain,
+  summary,
+  content,
+}: EngagementToolInputs): ToolInvocation[] => {
+  const lessonFocus = (summary ?? content ?? "").trim();
+  const fallbackFocus =
+    lessonFocus.length > 0
+      ? lessonFocus
+      : `the core idea of "${lessonTitle}" in module "${moduleTitle}"`;
+
+  const basePrompt = `Ground this activity in ${fallbackFocus}`;
+
+  const invocations: ToolInvocation[] = [
+    {
+      name: "generate_fill_in_blank",
+      input: {
+        prompt: `Fill in the missing key phrases from "${lessonTitle}".`,
+        blanks: [
+          {
+            id: "blank-1",
+            correctAnswer: lessonTitle,
+            alternatives: [moduleTitle],
+          },
+          {
+            id: "blank-2",
+            correctAnswer: fallbackFocus.slice(0, 60) || moduleTitle,
+          },
+        ],
+        caseSensitive: false,
+      },
+    },
+    {
+      name: "generate_matching",
+      input: {
+        prompt: `Match lesson concepts for "${lessonTitle}".`,
+        leftItems: [
+          { id: "left-1", label: "Key idea" },
+          { id: "left-2", label: "Practical step" },
+        ],
+        rightItems: [
+          { id: "right-1", label: lessonTitle },
+          { id: "right-2", label: moduleTitle },
+        ],
+        correctPairs: [
+          { leftId: "left-1", rightId: "right-1" },
+          { leftId: "left-2", rightId: "right-2" },
+        ],
+      },
+    },
+    {
+      name: "generate_essay_prompt",
+      input: {
+        prompt: `Write a short reflection connecting "${lessonTitle}" to your work.`,
+        guidance: "Focus on how you will apply this lesson this week.",
+        minWords: 80,
+        maxWords: 200,
+        enableAIFeedback: true,
+      },
+    },
+  ];
+
+  if (isProgrammingDomain(domain)) {
+    invocations.unshift({
+      name: "generate_code_exercise",
+      input: {
+        prompt: `Implement a small code exercise that demonstrates "${lessonTitle}".`,
+        language: "javascript",
+        starterCode: "// Start from this scaffold\n",
+        hints: [
+          "Keep the solution under 30 lines.",
+          "Include a quick inline example or test call.",
+        ],
+      },
+    });
+  }
+
+  return invocations;
+};
 
 const courseProviderOptions = isOpenAIProvider
   ? {
@@ -437,6 +549,8 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
 
           await publishPartialSnapshot({ conclusionResult: null });
 
+          const engagementToolRegistry = createEngagementToolRegistry();
+
           for (const planModule of modulesWithIds) {
             const subtopicsWithIds =
               planModule.subtopics as LearningPlanSubtopicWithIds[];
@@ -563,6 +677,20 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                     : undefined,
               };
 
+              const toolInvocations = buildEngagementToolInvocations({
+                moduleTitle: planModule.title,
+                lessonTitle: subtopic.title,
+                domain: toolContext.domain,
+                summary: submoduleResult.summary ?? subtopic.description,
+                content: submoduleResult.content,
+              });
+
+              const toolResolution = await executeEngagementTools({
+                invocations: toolInvocations,
+                registry: engagementToolRegistry,
+                context: toolContext,
+              });
+
               let engagementBlocks = Array.isArray(
                 submoduleResult.engagementBlocks,
               )
@@ -570,6 +698,23 @@ async function processJob(job: CourseGenerationJobRecord, workerId: string) {
                 : [];
 
               let engagementSource: "model" | "tool" | "fallback" = "model";
+
+              if (engagementBlocks.length === 0) {
+                engagementBlocks = toolResolution.blocks;
+                engagementSource = toolResolution.usedFallback ? "fallback" : "tool";
+              } else {
+                const existingTypes = new Set(engagementBlocks.map((block) => block.type));
+                const supplemental = toolResolution.blocks.filter(
+                  (block) => !existingTypes.has(block.type),
+                );
+                if (supplemental.length > 0) {
+                  engagementBlocks = [...engagementBlocks, ...supplemental].slice(
+                    0,
+                    MAX_ENGAGEMENT_BLOCKS,
+                  );
+                  engagementSource = "tool";
+                }
+              }
 
               if (engagementBlocks.length === 0) {
                 const resolution = resolveEngagementBlocksFromResults(

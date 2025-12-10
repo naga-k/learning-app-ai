@@ -582,12 +582,20 @@ function FillInBlankEngagementBlockCard({
     response && response.response && typeof response.response === "object"
       ? (response.response as { answers?: Record<string, string> })
       : null;
-  const savedAnswers = responsePayload?.answers ?? {};
-  const [answers, setAnswers] = useState<Record<string, string>>(savedAnswers);
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    () => responsePayload?.answers ?? {},
+  );
 
   useEffect(() => {
-    setAnswers(savedAnswers);
-  }, [savedAnswers]);
+    const nextAnswers = responsePayload?.answers ?? {};
+    const isSame =
+      Object.keys(answers).length === Object.keys(nextAnswers).length &&
+      Object.entries(nextAnswers).every(([key, value]) => answers[key] === value);
+
+    if (!isSame) {
+      setAnswers(nextAnswers);
+    }
+  }, [responsePayload?.answers, answers]);
 
   const computeIsCorrect = () =>
     block.blanks.every((blank) => {
