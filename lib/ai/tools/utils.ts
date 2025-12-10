@@ -1,3 +1,24 @@
+const PROGRAMMING_DOMAINS = [
+  "frontend-development",
+  "backend-development",
+  "programming",
+  "javascript",
+  "typescript",
+  "python",
+  "java",
+  "react",
+  "node",
+  "web-development",
+  "software-engineering",
+  "coding",
+];
+
+export const isProgrammingDomain = (domain?: string) => {
+  const normalized = domain?.trim().toLowerCase() ?? "";
+  return PROGRAMMING_DOMAINS.some((entry) => normalized.includes(entry));
+};
+
+export const PROGRAMMING_DOMAINS_LIST = PROGRAMMING_DOMAINS;
 import { generateText } from 'ai';
 import { z } from 'zod';
 
