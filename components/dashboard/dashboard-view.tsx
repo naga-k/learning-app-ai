@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, type UIEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type UIEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Brain, Calendar as CalendarIcon, Clock as ClockIcon, LogOut as LogOutIcon, Send } from 'lucide-react';
 import type {
@@ -16,6 +16,28 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useSupabase } from '@/components/supabase-provider';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
+import { Progress } from '@/components/ui/progress';
+
+type DashboardAnalytics = {
+  totals: {
+    totalCourses: number;
+    completedCourses: number;
+    inProgressCourses: number;
+    totalTimeSeconds: number;
+    averageCompletionPercent: number;
+    latestActivity: string | Date | null;
+  };
+  courses: {
+    courseId: string;
+    courseVersionId: string;
+    completionPercent: number;
+    totalTimeSeconds: number;
+    totalSubmodules: number;
+    completedSubmodules: number;
+    accuracyRate: number | null;
+    lastAccessedAt: string | null;
+  }[];
+};
 
 type DashboardViewProps = {
   initialCourses: DashboardCourse[];
@@ -25,6 +47,7 @@ type DashboardViewProps = {
   initialSessions: DashboardSession[];
   initialNextCursor: DashboardSessionCursor | null;
   sessionPageSize: number;
+  initialAnalytics: DashboardAnalytics | null;
 };
 
 export function DashboardView({
@@ -35,6 +58,7 @@ export function DashboardView({
   initialSessions,
   initialNextCursor,
   sessionPageSize,
+  initialAnalytics,
 }: DashboardViewProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
@@ -53,6 +77,9 @@ export function DashboardView({
   );
   const [loadingMoreSessions, setLoadingMoreSessions] = useState(false);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(initialAnalytics ?? null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -70,11 +97,54 @@ export function DashboardView({
     [router],
   );
 
+  const formatDuration = useCallback((totalSeconds: number) => {
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '0m';
+    const minutes = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${remainingMinutes.toString().padStart(2, '0')}m`;
+    }
+    return `${remainingMinutes}m`;
+  }, []);
+
+  const refreshAnalytics = useCallback(async () => {
+    try {
+      setAnalyticsLoading(true);
+      setAnalyticsError(null);
+      const response = await fetch('/api/dashboard/analytics', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Failed to load analytics (${response.status})`);
+      }
+      const data: DashboardAnalytics = await response.json();
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Failed to load dashboard analytics', error);
+      setAnalyticsError('Unable to load analytics right now.');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshAnalytics();
+  }, [refreshAnalytics]);
+
   const stats = useMemo(
     () => ({
-      total: courseTotalCount,
+      totalCourses: analytics?.totals.totalCourses ?? courseTotalCount,
+      completedCourses: analytics?.totals.completedCourses ?? 0,
+      inProgressCourses:
+        analytics?.totals.inProgressCourses ??
+        Math.max(
+          0,
+          (analytics?.totals.totalCourses ?? courseTotalCount) -
+            (analytics?.totals.completedCourses ?? 0),
+        ),
+      totalTimeSeconds: analytics?.totals.totalTimeSeconds ?? 0,
+      averageCompletionPercent: analytics?.totals.averageCompletionPercent ?? null,
     }),
-    [courseTotalCount],
+    [analytics?.totals.averageCompletionPercent, analytics?.totals.completedCourses, analytics?.totals.inProgressCourses, analytics?.totals.totalCourses, analytics?.totals.totalTimeSeconds, courseTotalCount],
   );
 
   const generatedSessions = useMemo(
@@ -151,6 +221,7 @@ export function DashboardView({
       if (typeof data.totalCount === 'number') {
         setCourseTotalCount(data.totalCount);
       }
+      void refreshAnalytics();
     } catch (error) {
       console.error('Failed to load more dashboard courses', error);
       setCourseLoadError('Unable to load more courses. Please try again.');
@@ -270,7 +341,7 @@ export function DashboardView({
             </div>
           </header>
 
-          <section className="grid gap-4 md:grid-cols-2">
+          <section className="grid gap-4 md:grid-cols-3">
             <Card className="border-slate-200 bg-white p-6 text-slate-900 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100">
               <div className="flex items-center gap-4">
                 <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
@@ -278,11 +349,49 @@ export function DashboardView({
                 </div>
                 <div>
                   <p className="text-sm text-slate-600 dark:text-slate-400">Total courses</p>
-                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-50">{stats.total}</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                    {stats.totalCourses}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="border-slate-200 bg-white p-6 text-slate-900 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                  <Brain className="h-5 w-5" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Completed</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                    {stats.completedCourses}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Avg completion {stats.averageCompletionPercent ?? 0}%
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="border-slate-200 bg-white p-6 text-slate-900 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="flex size-12 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-300">
+                  <ClockIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Time spent</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                    {formatDuration(stats.totalTimeSeconds)}
+                  </p>
                 </div>
               </div>
             </Card>
           </section>
+          {analyticsLoading ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">Refreshing analytics…</p>
+          ) : analyticsError ? (
+            <p className="text-xs text-rose-500">{analyticsError}</p>
+          ) : null}
 
           <section className="flex items-center justify-between gap-3">
             <div>
@@ -321,6 +430,13 @@ export function DashboardView({
             <div className="space-y-6">
               <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {allCourses.map((course) => {
+                  const courseAnalytics = analytics?.courses.find(
+                    (entry) => entry.courseId === course.id,
+                  );
+                  const completionPercent = courseAnalytics?.completionPercent ?? 0;
+                  const timeSpentLabel = courseAnalytics
+                    ? formatDuration(courseAnalytics.totalTimeSeconds)
+                    : null;
                   const createdDateLabel = new Date(course.createdAt).toLocaleDateString(
                     undefined,
                     {
@@ -356,6 +472,21 @@ export function DashboardView({
                               </p>
                             ) : null}
                           </div>
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            <span>Progress</span>
+                            <span>{completionPercent}%</span>
+                          </div>
+                          <Progress value={completionPercent} className="h-2 bg-slate-100 dark:bg-white/10" />
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                            <span>
+                              {courseAnalytics
+                                ? `${courseAnalytics.completedSubmodules}/${courseAnalytics.totalSubmodules || courseAnalytics.completedSubmodules} lessons`
+                                : 'Not started'}
+                            </span>
+                            {timeSpentLabel ? <span className="inline-flex items-center gap-1"><ClockIcon className="h-3 w-3" />{timeSpentLabel}</span> : null}
+                          </div>
+                        </div>
                           <div className="mt-3 border-t border-slate-200 pt-2 dark:border-white/10">
                             <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[0.65rem] sm:text-xs text-slate-700 dark:text-slate-300">
                               {modulesLabel ? (
